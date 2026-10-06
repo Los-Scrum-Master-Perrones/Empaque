@@ -7,10 +7,12 @@ use App\Http\Controllers\PermissionController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\CostosEmpaqueController;
+use App\Http\Controllers\EstadisticoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\VinetaController;
 use App\Http\Controllers\VinetaPorOrdenController;
+use App\Http\Controllers\VinetaPendienteController;
 use App\Http\Controllers\VinetaRegistroController;
 
 /*
@@ -125,6 +127,7 @@ Route::post('/catalogos/productos/sincronizar', [CatalogoController::class, 'sin
     ->name('catalogos.productos.show');
 
 Route::post('/catalogos/productos/{producto}/actividades/{actividad}/toggle', [CatalogoController::class, 'toggleActividadProducto'])
+    ->middleware('permission:productos.sincronizar')
     ->name('catalogos.productos.actividades.toggle');
 
     Route::get('/catalogos/marcas', [CatalogoController::class, 'marcas'])
@@ -144,6 +147,7 @@ Route::get('/catalogos/actividades', [CatalogoController::class, 'actividades'])
     ->name('catalogos.actividades.index');
 
 Route::post('/catalogos/actividades/sincronizar', [CatalogoController::class, 'sincronizarActividades'])
+    ->middleware('permission:productos.sincronizar')
     ->name('catalogos.actividades.sincronizar');
 
 
@@ -161,10 +165,13 @@ Route::get('/catalogos/tipos-empaque', [CatalogoController::class, 'tipoEmpaques
 });
 
 Route::middleware(['auth'])->group(function () {
+    $blockSupervisor = \App\Http\Middleware\BlockReadOnlySupervisor::class;
+
     Route::get('/empleados', [EmpleadoController::class, 'index'])
         ->name('empleados.index');
 
     Route::post('/empleados/sincronizar', [EmpleadoController::class, 'sincronizar'])
+        ->middleware($blockSupervisor)
         ->name('empleados.sincronizar');
 
     Route::get('/vinetas', [VinetaController::class, 'index'])
@@ -172,6 +179,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/vinetas-por-orden', [VinetaPorOrdenController::class, 'index'])
         ->name('vinetas-por-orden.index');
+
+    Route::post('/vinetas-por-orden', [VinetaPorOrdenController::class, 'store'])
+        ->middleware($blockSupervisor)
+        ->name('vinetas-por-orden.store');
+
+    Route::get('/vinetas-por-orden/siguiente-info', [VinetaPorOrdenController::class, 'siguienteInfo'])
+        ->name('vinetas-por-orden.siguiente-info');
+
+    Route::get('/vinetas-pendientes', [VinetaPendienteController::class, 'index'])
+        ->name('vinetas-pendientes.index');
 
     Route::get('/vinetas-registradas', [VinetaRegistroController::class, 'index'])
         ->name('vineta-registros.index');
@@ -182,6 +199,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/vinetas-registradas/reporte-semanal', [VinetaRegistroController::class, 'exportReporteSemanal'])
         ->name('vineta-registros.reporte-semanal');
 
+    Route::get('/vinetas-registradas/documentos', [VinetaRegistroController::class, 'documentosPorFecha'])
+        ->name('vineta-registros.documentos');
+
     Route::get('/vinetas-registradas/empleado', [VinetaRegistroController::class, 'empleado'])
         ->name('vineta-registros.empleado');
 
@@ -189,27 +209,41 @@ Route::middleware(['auth'])->group(function () {
         ->name('vineta-registros.seguimiento');
 
     Route::post('/vinetas-registradas/horas-ordinarias', [VinetaRegistroController::class, 'storeHoraOrdinaria'])
+        ->middleware($blockSupervisor)
         ->name('vineta-registros.horas-ordinarias.store');
 
     Route::patch('/vinetas-registradas/horas-ordinarias/{horaOrdinaria}', [VinetaRegistroController::class, 'updateHoraOrdinaria'])
+        ->middleware($blockSupervisor)
         ->name('vineta-registros.horas-ordinarias.update');
 
     Route::delete('/vinetas-registradas/horas-ordinarias/{horaOrdinaria}', [VinetaRegistroController::class, 'destroyHoraOrdinaria'])
+        ->middleware($blockSupervisor)
         ->name('vineta-registros.horas-ordinarias.destroy');
 
     Route::patch('/vinetas-registradas/{vinetaRegistro}', [VinetaRegistroController::class, 'update'])
+        ->middleware($blockSupervisor)
         ->name('vineta-registros.update');
 
     Route::delete('/vinetas-registradas/{vinetaRegistro}', [VinetaRegistroController::class, 'destroy'])
+        ->middleware($blockSupervisor)
         ->name('vineta-registros.destroy');
 
+    Route::get('/estadistico', [EstadisticoController::class, 'index'])
+        ->name('estadistico.index');
+
+    Route::get('/estadistico/detalle-actividad', [EstadisticoController::class, 'detalleActividad'])
+        ->name('estadistico.detalle-actividad');
+
     Route::get('/costos-empaque', [CostosEmpaqueController::class, 'index'])
+        ->middleware($blockSupervisor)
         ->name('costos-empaque.index');
 
     Route::get('/vinetas/notificaciones', [VinetaController::class, 'notificaciones'])
+        ->middleware($blockSupervisor)
         ->name('vinetas.notificaciones');
 
     Route::post('/vinetas/sincronizar', [VinetaController::class, 'sincronizar'])
+        ->middleware($blockSupervisor)
         ->name('vinetas.sincronizar');
 });
 

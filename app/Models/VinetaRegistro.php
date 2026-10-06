@@ -49,6 +49,12 @@ class VinetaRegistro extends Model
         'registrado_por_nombre',
         'estado',
         'observacion',
+        'documento_empaque_id',
+        'documento_numero',
+        'sucursal',
+        'erp_enviado',
+        'erp_enviado_en',
+        'erp_respuesta',
         'anulado_por_user_id',
         'anulado_en',
         'motivo_anulacion',
@@ -68,7 +74,16 @@ class VinetaRegistro extends Model
         'registrado_en' => 'datetime',
         'anulado_en' => 'datetime',
         'raw_payload' => 'array',
+        'sucursal' => 'integer',
+        'erp_enviado' => 'boolean',
+        'erp_enviado_en' => 'datetime',
+        'erp_respuesta' => 'array',
     ];
+
+    public function documentoEmpaque(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(DocumentoEmpaque::class, 'documento_empaque_id');
+    }
 
     public function getTotalMoAttribute(): float
     {
@@ -89,6 +104,69 @@ class VinetaRegistro extends Model
         return $this->textoReportePreferido(
             $this->vineta?->tipo_empaque,
             $this->tipo_empaque,
+            'N/A'
+        );
+    }
+
+    public function productoCodigoReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->codigo_producto,
+            $this->producto_codigo,
+            'N/A'
+        );
+    }
+
+    public function productoItemReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->item,
+            $this->producto_item,
+            'N/A'
+        );
+    }
+
+    public function marcaReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->marca,
+            $this->marca,
+            'N/A'
+        );
+    }
+
+    public function capaReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->capa,
+            $this->capa,
+            'N/A'
+        );
+    }
+
+    public function vitolaReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->vitola,
+            $this->vitola,
+            'N/A'
+        );
+    }
+
+    public function ordenReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->orden,
+            $this->orden,
+            'N/A'
+        );
+    }
+
+    public function ordenDelSistemaReporte(): string
+    {
+        return $this->textoReportePreferido(
+            $this->vineta?->orden_del_sistema,
+            $this->orden_del_sistema,
             'N/A'
         );
     }
@@ -120,19 +198,26 @@ class VinetaRegistro extends Model
             ?? ($this->precio_mo === null ? null : (float) $this->precio_mo);
     }
 
+    protected static ?array $precioActividadCache = null;
+
     public static function precioMoActividadCatalogo(?int $actividadId): ?float
     {
         if (! $actividadId) {
             return null;
         }
 
-        $precio = DB::table('actividad_producto')
-            ->where('actividad_id', $actividadId)
-            ->whereNotNull('precio_mo')
-            ->where('precio_mo', '>', 0)
-            ->min('precio_mo');
+        if (self::$precioActividadCache === null) {
+            self::$precioActividadCache = DB::table('actividad_producto')
+                ->whereNotNull('precio_mo')
+                ->where('precio_mo', '>', 0)
+                ->groupBy('actividad_id')
+                ->selectRaw('actividad_id, MIN(precio_mo) as min_precio')
+                ->pluck('min_precio', 'actividad_id')
+                ->map(fn ($p) => (float) $p)
+                ->toArray();
+        }
 
-        return $precio === null ? null : (float) $precio;
+        return self::$precioActividadCache[$actividadId] ?? null;
     }
 
     public function getTotalActividadesAttribute(): int

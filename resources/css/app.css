@@ -3766,8 +3766,20 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 
 .vinetas-id-badge {
     background: #eff6ff;
-    color: #0f172a;
+    color: #0b1220;
     border-color: #bfdbfe;
+}
+
+.vinetas-doc-badge {
+    background: #eff6ff;
+    color: #1e40af;
+    border-color: #bfdbfe;
+}
+
+.vinetas-no-doc-badge {
+    background: #f8fafc;
+    color: #64748b;
+    border-color: #e2e8f0;
 }
 
 .vinetas-status-badge {
@@ -3898,37 +3910,350 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 }
 
 .vineta-delivery-scroll {
-    overflow-x: visible;
-    padding: 0.25rem 0.25rem 0.75rem;
+    overflow-x: auto;
+    padding: 0.5rem 0.25rem 0.75rem;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
 }
 
 .vineta-delivery-scroll::-webkit-scrollbar {
-    height: 0;
+    height: 8px;
+}
+
+.vineta-delivery-scroll::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.7);
+    border-radius: 999px;
 }
 
 .vineta-delivery-scroll::-webkit-scrollbar-thumb {
-    background: #bfdbfe;
+    background: #93c5fd;
     border-radius: 999px;
 }
 
 .vineta-delivery-track {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(var(--vineta-steps, 3), minmax(0, 1fr));
-    min-width: 0;
+    display: flex;
+    gap: 1.25rem;
+    min-width: 100%;
+    width: max-content;
 }
 
 .vineta-delivery-step {
-    display: grid;
+    flex: 0 0 280px;
+    width: 280px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
     gap: 0.65rem;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 2.6rem minmax(0, 1fr);
     padding-bottom: 0;
     position: relative;
 }
 
 .vineta-delivery-step.is-last {
     padding-bottom: 0;
+}
+
+/* View mode toolbar */
+.vineta-view-mode-container {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.vineta-view-mode-btn {
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    color: #1e40af;
+    background: transparent;
+    transition: all 160ms ease;
+}
+
+.vineta-view-mode-btn:hover {
+    background: rgba(219, 234, 254, 0.6);
+    color: #1d4ed8;
+}
+
+.vineta-view-mode-btn.active {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
+}
+
+/* Vertical Timeline Layout */
+.vineta-timeline-vlist {
+    position: relative;
+    padding-left: 2.25rem;
+    padding-right: 0.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.vineta-timeline-vlist::before {
+    content: '';
+    position: absolute;
+    left: 1.05rem;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    width: 3px;
+    background: linear-gradient(180deg, #10b981 0%, #3b82f6 80%, #bfdbfe 100%);
+    border-radius: 999px;
+}
+
+.vineta-vitem {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.vineta-vitem-dot {
+    position: absolute;
+    left: -2.25rem;
+    top: 1rem;
+    transform: translateX(-50%);
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 900;
+    color: #ffffff;
+    background: #2563eb;
+    border: 3.5px solid #ffffff;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+    z-index: 2;
+}
+
+.vineta-vitem.is-complete .vineta-vitem-dot {
+    background: #10b981;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.28);
+}
+
+.vineta-vitem.is-current .vineta-vitem-dot {
+    background: #2563eb;
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.20), 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.vineta-vitem.is-anulado .vineta-vitem-dot {
+    background: #f43f5e;
+    box-shadow: 0 4px 14px rgba(244, 63, 94, 0.28);
+}
+
+.vineta-vcard {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 1.25rem;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+    padding: 1rem 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.vineta-vcard:hover {
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.09);
+    transform: translateY(-1px);
+}
+
+.vineta-vcard::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #2563eb;
+    border-radius: 999px 0 0 999px;
+}
+
+.vineta-vitem.is-complete .vineta-vcard::before {
+    background: #10b981;
+}
+
+.vineta-vitem.is-current .vineta-vcard {
+    border-color: #3b82f6;
+    box-shadow: 0 6px 22px rgba(37, 99, 235, 0.12);
+}
+
+.vineta-vitem.is-current .vineta-vcard::before {
+    background: #2563eb;
+}
+
+.vineta-vitem.is-anulado .vineta-vcard {
+    border-color: #fecdd3;
+}
+
+.vineta-vitem.is-anulado .vineta-vcard::before {
+    background: #f43f5e;
+}
+
+html:not(.dark-navy) #seguimientoScrollArea {
+    background-color: #ffffff !important;
+}
+
+html.dark-navy #seguimientoScrollArea {
+    background-color: #0b1220 !important;
+}
+
+html:not(.dark-navy) .vineta-vcard,
+html:not(.dark-navy) .vineta-delivery-card,
+html:not(.dark-navy) .vineta-grid-card {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05) !important;
+    color: #0f172a !important;
+}
+
+html:not(.dark-navy) .vineta-delivery-worker {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+}
+
+html:not(.dark-navy) .vineta-delivery-worker-avatar {
+    background: #eff6ff !important;
+    color: #1d4ed8 !important;
+    border: 1.5px solid #bfdbfe !important;
+}
+
+html:not(.dark-navy) .vineta-delivery-worker p,
+html:not(.dark-navy) .vineta-delivery-title {
+    color: #0f172a !important;
+}
+
+html:not(.dark-navy) .vineta-delivery-worker span:not(.vineta-delivery-worker-avatar),
+html:not(.dark-navy) .vineta-delivery-date {
+    color: #64748b !important;
+}
+
+html:not(.dark-navy) .vineta-vitem-dot,
+html:not(.dark-navy) .vineta-delivery-dot {
+    background: #2563eb !important;
+    border-color: #ffffff !important;
+    color: #ffffff !important;
+}
+
+html:not(.dark-navy) .vineta-vitem.is-complete .vineta-vitem-dot,
+html:not(.dark-navy) .vineta-delivery-step.is-complete .vineta-delivery-dot,
+html:not(.dark-navy) .vineta-grid-step-badge.is-complete {
+    background: #10b981 !important;
+    color: #ffffff !important;
+}
+
+html:not(.dark-navy) .vineta-vitem.is-current .vineta-vitem-dot,
+html:not(.dark-navy) .vineta-delivery-step.is-current .vineta-delivery-dot,
+html:not(.dark-navy) .vineta-grid-step-badge.is-current {
+    background: #2563eb !important;
+    color: #ffffff !important;
+}
+
+html:not(.dark-navy) .vineta-vitem.is-anulado .vineta-vitem-dot,
+html:not(.dark-navy) .vineta-delivery-step.is-anulado .vineta-delivery-dot,
+html:not(.dark-navy) .vineta-grid-step-badge.is-anulado {
+    background: #f43f5e !important;
+    color: #ffffff !important;
+}
+
+/* Grid Layout */
+.vineta-grid-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 1rem;
+    padding: 0.25rem;
+}
+
+.vineta-grid-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.vineta-grid-step-badge {
+    align-items: center;
+    background: #2563eb;
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 0.72rem;
+    font-weight: 900;
+    height: 1.6rem;
+    justify-content: center;
+    width: 1.6rem;
+}
+
+.vineta-grid-step-badge.is-complete {
+    background: #10b981;
+}
+
+.vineta-grid-step-badge.is-current {
+    background: #2563eb;
+}
+
+.vineta-grid-step-badge.is-anulado {
+    background: #f43f5e;
+}
+
+/* Horizontal Carousel Layout */
+.vineta-horizontal-scroll {
+    overflow-x: auto;
+    padding: 0.75rem 0.5rem 1.25rem;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+.vineta-horizontal-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.vineta-horizontal-scroll::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.7);
+    border-radius: 999px;
+}
+
+.vineta-horizontal-scroll::-webkit-scrollbar-thumb {
+    background: #93c5fd;
+    border-radius: 999px;
+}
+
+.vineta-horizontal-track {
+    display: flex;
+    gap: 1.25rem;
+    min-width: 100%;
+    width: max-content;
+}
+
+.vineta-horizontal-step {
+    flex: 0 0 280px;
+    width: 280px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    position: relative;
+}
+
+.vineta-horizontal-rail {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 2.6rem;
+    position: relative;
+}
+
+.vineta-horizontal-line {
+    background: linear-gradient(90deg, #bfdbfe 0%, #dbeafe 100%);
+    border-radius: 999px;
+    height: 3px;
+    left: calc(50% + 1.2rem);
+    position: absolute;
+    right: calc(-50% - 1.2rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
 }
 
 .vineta-delivery-rail {
@@ -3941,19 +4266,19 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 
 .vineta-delivery-dot {
     align-items: center;
-    background: #0f172a;
-    border: 4px solid #ffffff;
+    background: #2563eb;
+    border: 3.5px solid #ffffff;
     border-radius: 999px;
-    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
     color: #ffffff;
     display: inline-flex;
     font-size: 0.78rem;
     font-weight: 900;
-    height: 2rem;
+    height: 2.1rem;
     justify-content: center;
     line-height: 1;
     position: relative;
-    width: 2rem;
+    width: 2.1rem;
     z-index: 2;
 }
 
@@ -3969,19 +4294,17 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 }
 
 .vineta-delivery-card {
-    background:
-        linear-gradient(135deg, rgba(239, 246, 255, 0.72), rgba(255, 255, 255, 0.94)),
-        #ffffff;
-    border: 1px solid #dbeafe;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
     border-radius: 1.25rem;
-    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
     overflow: hidden;
     padding: 1rem;
     position: relative;
 }
 
 .vineta-delivery-card::before {
-    background: #1d4ed8;
+    background: #2563eb;
     border-radius: 999px;
     content: '';
     height: calc(100% - 1.5rem);
@@ -4002,7 +4325,7 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 
 .vineta-delivery-kicker {
     align-items: center;
-    color: #64748b;
+    color: #475569;
     display: flex;
     flex-wrap: wrap;
     font-size: 0.72rem;
@@ -4040,8 +4363,8 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 
 .vineta-delivery-worker {
     align-items: center;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid #dbeafe;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     border-radius: 1rem;
     display: flex;
     gap: 0.65rem;
@@ -4052,9 +4375,10 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 
 .vineta-delivery-worker-avatar {
     align-items: center;
-    background: #0f172a;
+    background: #eff6ff;
+    border: 1.5px solid #bfdbfe;
     border-radius: 0.8rem;
-    color: #ffffff;
+    color: #1d4ed8;
     display: inline-flex;
     flex: 0 0 auto;
     font-size: 0.8rem;
@@ -4067,7 +4391,7 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
 .vineta-delivery-worker p {
     color: #0f172a;
     font-size: 0.76rem;
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.18;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4081,7 +4405,7 @@ html.dark-navy .app-sidebar .sidebar-profile-link.sidebar-active span {
     color: #64748b;
     display: block;
     font-size: 0.72rem;
-    font-weight: 800;
+    font-weight: 700;
     margin-top: 0.15rem;
 }
 
@@ -4192,6 +4516,24 @@ html:not(.dark-navy) .vinetas-status-badge {
     border-color: #a7f3d0 !important;
 }
 
+html:not(.dark-navy) .vinetas-id-badge {
+    background: #eff6ff !important;
+    color: #0b1220 !important;
+    border-color: #bfdbfe !important;
+}
+
+html:not(.dark-navy) .vinetas-doc-badge {
+    background: #eff6ff !important;
+    color: #1e40af !important;
+    border-color: #bfdbfe !important;
+}
+
+html:not(.dark-navy) .vinetas-no-doc-badge {
+    background: #f8fafc !important;
+    color: #64748b !important;
+    border-color: #e2e8f0 !important;
+}
+
 .vinetas-print-badge.is-printed {
     background: #eff6ff;
     color: #1d4ed8;
@@ -4217,6 +4559,18 @@ html.dark-navy .vinetas-id-badge {
     background: rgba(56, 189, 248, 0.12) !important;
     color: #7dd3fc !important;
     border-color: rgba(56, 189, 248, 0.28) !important;
+}
+
+html.dark-navy .vinetas-doc-badge {
+    background: rgba(56, 189, 248, 0.08) !important;
+    color: #38bdf8 !important;
+    border-color: rgba(56, 189, 248, 0.22) !important;
+}
+
+html.dark-navy .vinetas-no-doc-badge {
+    background: rgba(148, 163, 184, 0.08) !important;
+    color: #94a3b8 !important;
+    border-color: rgba(148, 163, 184, 0.18) !important;
 }
 
 html.dark-navy .vinetas-status-badge {
@@ -4399,6 +4753,87 @@ html.dark-navy .vineta-delivery-status.is-anulado {
     background: rgba(244, 63, 94, 0.12) !important;
     color: #fda4af !important;
     border-color: rgba(244, 63, 94, 0.28) !important;
+}
+
+html.dark-navy .vineta-view-mode-container {
+    background: #16233d !important;
+    border-color: #263650 !important;
+}
+
+html.dark-navy .vineta-view-mode-btn {
+    color: #94a3b8 !important;
+}
+
+html.dark-navy .vineta-view-mode-btn:hover {
+    color: #f1f5f9 !important;
+    background: rgba(38, 54, 80, 0.5) !important;
+}
+
+html.dark-navy .vineta-view-mode-btn.active {
+    background: #38bdf8 !important;
+    color: #0b1220 !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35) !important;
+}
+
+html.dark-navy .vineta-timeline-vlist::before {
+    background: linear-gradient(180deg, #10b981 0%, #38bdf8 80%, rgba(56, 189, 248, 0.3) 100%) !important;
+}
+
+html.dark-navy .vineta-vitem-dot {
+    border-color: #0f172a !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.dark-navy .vineta-vitem.is-current .vineta-vitem-dot {
+    background: #38bdf8 !important;
+    color: #0b1220 !important;
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.22), 0 6px 16px rgba(56, 189, 248, 0.35) !important;
+}
+
+html.dark-navy .vineta-vcard {
+    background:
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 36%),
+        linear-gradient(135deg, #16233d 0%, #111c33 100%) !important;
+    border-color: #263650 !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.dark-navy .vineta-vitem.is-complete .vineta-vcard::before {
+    background: #10b981 !important;
+}
+
+html.dark-navy .vineta-vitem.is-current .vineta-vcard {
+    border-color: rgba(56, 189, 248, 0.42) !important;
+}
+
+html.dark-navy .vineta-vitem.is-current .vineta-vcard::before {
+    background: #38bdf8 !important;
+}
+
+html.dark-navy .vineta-vitem.is-anulado .vineta-vcard {
+    border-color: rgba(244, 63, 94, 0.28) !important;
+}
+
+html.dark-navy .vineta-vitem.is-anulado .vineta-vcard::before {
+    background: #fb7185 !important;
+}
+
+html.dark-navy .vineta-grid-step-badge.is-current {
+    background: #38bdf8 !important;
+    color: #0b1220 !important;
+}
+
+html.dark-navy .vineta-horizontal-scroll::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.7) !important;
+}
+
+html.dark-navy .vineta-horizontal-scroll::-webkit-scrollbar-thumb {
+    background: #38bdf8 !important;
+}
+
+html.dark-navy .vineta-horizontal-line {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.35), rgba(38, 54, 80, 0.95)) !important;
 }
 
 html.dark-navy .vinetas-print-badge.is-printed {

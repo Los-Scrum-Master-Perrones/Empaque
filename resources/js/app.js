@@ -9,6 +9,9 @@ import 'sweetalert2/dist/sweetalert2.min.css';
 
 window.Swal = Swal;
 
+import QRCode from 'qrcode';
+window.QRCode = QRCode;
+
 window.appSwalTheme = function () {
     const isDark = document.documentElement.classList.contains('dark-navy');
 

@@ -11,39 +11,35 @@
 
     <style>
         .dashboard-shell {
-            background:
-                radial-gradient(circle at 8% 0%, rgba(37, 99, 235, .08), transparent 28rem),
-                linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            background: #ffffff;
         }
 
         html.dark-navy .dashboard-shell {
-            background:
-                radial-gradient(circle at 8% 0%, rgba(56, 189, 248, .08), transparent 28rem),
-                linear-gradient(180deg, #111c33 0%, #0b1220 100%);
+            background: #111c33;
         }
 
         .dashboard-panel {
-            background: rgba(255, 255, 255, .96);
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 14px 38px rgba(15, 23, 42, .055);
+            background: #ffffff;
+            border: none !important;
+            box-shadow: none !important;
         }
 
         html.dark-navy .dashboard-panel {
             background: #111c33;
-            border-color: #263650;
-            box-shadow: none;
+            border: none !important;
+            box-shadow: none !important;
         }
 
         .dashboard-welcome {
             background: #ffffff;
-            border: 1px solid #dbeafe;
-            box-shadow: 0 18px 44px rgba(15, 23, 42, .07);
+            border: none !important;
+            box-shadow: none !important;
         }
 
         html.dark-navy .dashboard-welcome {
             background: #111c33;
-            border-color: #263650;
-            box-shadow: none;
+            border: none !important;
+            box-shadow: none !important;
         }
 
         /* ── Welcome banner avatar + slide reveal animation ── */
@@ -232,6 +228,12 @@
             --area-border: rgba(99, 102, 241, .38);
         }
 
+        .area-card-limpieza {
+            --area-color: #8b5cf6;
+            --area-soft: rgba(139, 92, 246, .12);
+            --area-border: rgba(139, 92, 246, .38);
+        }
+
         html.dark-navy .area-card-rezago {
             --area-color: #38bdf8;
             --area-soft: rgba(56, 189, 248, .13);
@@ -250,10 +252,19 @@
             --area-border: rgba(129, 140, 248, .38);
         }
 
+        html.dark-navy .area-card-limpieza {
+            --area-color: #a78bfa;
+            --area-soft: rgba(167, 139, 250, .14);
+            --area-border: rgba(167, 139, 250, .38);
+        }
+
         .area-card {
             overflow: hidden;
             position: relative;
-            transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+            transition: transform .2s ease;
+            min-width: 0;
+            border: none !important;
+            box-shadow: none !important;
         }
 
         .area-card::before {
@@ -269,9 +280,9 @@
         }
 
         .area-card:hover {
-            border-color: var(--area-border);
-            box-shadow: 0 22px 42px rgba(15, 23, 42, .08);
-            transform: translateY(-3px);
+            border: none !important;
+            box-shadow: none !important;
+            transform: translateY(-2px);
         }
 
         .area-card .area-icon {
@@ -313,76 +324,102 @@
             color: var(--anim-icon-primary);
         }
 
-        /* ── 1. REZAGO: 3 puros verticales, mano selecciona y se retira ── */
+        /* ── 1. LIMPIEZA: puro horizontal, mano con paño pule y destellos brotan en secuencia ── */
+        .area-anim-clean-cigar path,
+        .area-anim-clean-cigar line {
+            stroke-dasharray: 80;
+            stroke-dashoffset: 80;
+            animation: anim-draw-stroke 0.5s ease-out 0.15s forwards;
+        }
+        .area-anim-clean-wipe {
+            animation: anim-clean-wipe-glide 1.1s ease-in-out 0.55s forwards;
+        }
+        .area-anim-clean-sparkle-1 {
+            animation: anim-shine-star 0.65s ease-out 1.0s forwards;
+        }
+        .area-anim-clean-sparkle-2 {
+            animation: anim-shine-star 0.65s ease-out 1.25s forwards;
+        }
+        .area-anim-clean-sparkle-3 {
+            animation: anim-shine-star 0.65s ease-out 1.5s forwards;
+        }
+
+        /* ── 2. REZAGO: 3 puros verticales, mano selecciona y se retira ── */
         .area-anim-cigar-a path,
         .area-anim-cigar-a line {
             stroke-dasharray: 60;
             stroke-dashoffset: 60;
-            animation: anim-draw-stroke 0.45s ease-out 0.15s forwards;
+            animation: anim-draw-stroke 0.4s ease-out 1.9s forwards;
         }
         .area-anim-cigar-b path,
         .area-anim-cigar-b line {
             stroke-dasharray: 60;
             stroke-dashoffset: 60;
-            animation: anim-draw-stroke 0.45s ease-out 0.45s forwards;
+            animation: anim-draw-stroke 0.4s ease-out 2.15s forwards;
         }
         .area-anim-cigar-c path,
         .area-anim-cigar-c line {
             stroke-dasharray: 60;
             stroke-dashoffset: 60;
-            animation: anim-draw-stroke 0.45s ease-out 0.75s forwards;
+            animation: anim-draw-stroke 0.4s ease-out 2.4s forwards;
         }
         .area-anim-hand-pick {
-            animation: anim-hand-pick-and-fade 1.1s ease-in-out 1.1s forwards;
+            animation: anim-hand-pick-and-fade 1.0s ease-in-out 2.7s forwards;
         }
         .area-anim-cigar-b {
             transform-origin: center bottom;
-            animation: anim-cigar-lift 0.65s cubic-bezier(.34,1.35,.64,1) 1.5s forwards;
+            animation: anim-cigar-lift 0.6s cubic-bezier(.34,1.35,.64,1) 3.1s forwards;
         }
 
-        /* ── 2. ANILLADO: puro horizontal, mano coloca anillo y se desvanece ── */
+        /* ── 3. ANILLADO: puro horizontal, mano coloca anillo y se desvanece ── */
         .area-anim-cigar2 path,
         .area-anim-cigar2 line {
             stroke-dasharray: 80;
             stroke-dashoffset: 80;
-            animation: anim-draw-stroke 0.6s ease-out 2.0s forwards;
+            animation: anim-draw-stroke 0.5s ease-out 3.65s forwards;
         }
         .area-anim-hand-ring {
-            animation: anim-hand-place-and-fade 1.1s ease-in-out 2.4s forwards;
+            animation: anim-hand-place-and-fade 1.0s ease-in-out 4.0s forwards;
         }
         .area-anim-ring-painted {
-            animation: anim-ring-painted-drop 0.6s cubic-bezier(.34,1.3,.64,1) 2.5s forwards;
+            animation: anim-ring-painted-drop 0.55s cubic-bezier(.34,1.3,.64,1) 4.1s forwards;
         }
         .area-anim-shine-star {
-            animation: anim-shine-star 0.7s ease-out 3.1s forwards;
+            animation: anim-shine-star 0.65s ease-out 4.65s forwards;
         }
 
-        /* ── 3. LLENADO: caja moderna, puros entrando en cascada, mano se retira ── */
+        /* ── 4. LLENADO: caja moderna, puros entrando en cascada, mano se retira ── */
         .area-anim-cigar-box path,
         .area-anim-cigar-box rect {
             stroke-dasharray: 90;
             stroke-dashoffset: 90;
-            animation: anim-draw-stroke 0.6s ease-out 3.5s forwards;
+            animation: anim-draw-stroke 0.55s ease-out 5.15s forwards;
         }
         .area-anim-pack-hand {
-            animation: anim-hand-pack-glide 1.4s ease-in-out 3.8s forwards;
+            animation: anim-hand-pack-glide 1.3s ease-in-out 5.45s forwards;
         }
         .area-anim-cigar-in-1 {
-            animation: anim-cigar-into-box 0.45s cubic-bezier(.22,1,.36,1) 3.85s forwards;
+            animation: anim-cigar-into-box 0.4s cubic-bezier(.22,1,.36,1) 5.5s forwards;
         }
         .area-anim-cigar-in-2 {
-            animation: anim-cigar-into-box 0.45s cubic-bezier(.22,1,.36,1) 4.25s forwards;
+            animation: anim-cigar-into-box 0.4s cubic-bezier(.22,1,.36,1) 5.85s forwards;
         }
         .area-anim-cigar-in-3 {
-            animation: anim-cigar-into-box 0.45s cubic-bezier(.22,1,.36,1) 4.65s forwards;
+            animation: anim-cigar-into-box 0.4s cubic-bezier(.22,1,.36,1) 6.2s forwards;
         }
         .area-anim-box-sparkle {
-            animation: anim-shine-star 0.7s ease-out 5.05s forwards;
+            animation: anim-shine-star 0.65s ease-out 6.55s forwards;
         }
 
         /* ── Keyframes Limpios ── */
         @keyframes anim-draw-stroke {
             to { stroke-dashoffset: 0; }
+        }
+        @keyframes anim-clean-wipe-glide {
+            0%   { opacity: 0; transform: translateX(-8px) translateY(-3px); }
+            25%  { opacity: 1; transform: translateX(-2px) translateY(0); }
+            70%  { opacity: 1; transform: translateX(7px) translateY(1px); }
+            100% { opacity: 0; transform: translateX(12px) translateY(-3px); }
         }
         @keyframes anim-hand-pick-and-fade {
             0%   { opacity: 0; transform: translateY(-8px); }
@@ -425,7 +462,8 @@
 
 
         html.dark-navy .area-card:hover {
-            box-shadow: none;
+            border: none !important;
+            box-shadow: none !important;
         }
 
         .dashboard-tabs {
@@ -548,6 +586,11 @@
             background: #263650 !important;
         }
 
+        .area-metrics > * {
+            border-color: rgba(226, 232, 240, .75);
+            min-width: 0;
+        }
+
         html.dark-navy .area-metrics > * {
             border-color: rgba(56, 189, 248, .08) !important;
         }
@@ -600,6 +643,7 @@
 
 @php
     $areasMes = $resumenAreas['mes'] ?? [];
+    $totalMesPuros = max((int) collect($areasMes)->sum('puros'), 1);
     $totalMesAreas = max((int) collect($areasMes)->sum('actividades'), 1);
     $hayProduccion = ($produccionTotal['registros'] ?? 0) > 0;
     $periodos = ['dia' => 'Día', 'mes' => 'Mes', 'anio' => 'Año'];
@@ -735,8 +779,8 @@
                                     <span class="h-1.5 w-1.5 rounded-full bg-[#2563eb] animate-pulse"></span>
                                     <span class="theme-text text-[10px] sm:text-[11px] font-black uppercase tracking-[.14em]">Hoy</span>
                                 </div>
-                                <p class="theme-title text-lg sm:text-xl md:text-2xl lg:text-[1.7rem] xl:text-[1.85rem] font-black tracking-tight metric-number-reveal leading-tight">{{ number_format($produccionHoy['actividades'] ?? 0) }}</p>
-                                <p class="theme-text text-[10px] sm:text-[11px] font-bold mt-0.5">actividades</p>
+                                <p class="theme-title text-lg sm:text-xl md:text-2xl lg:text-[1.7rem] xl:text-[1.85rem] font-black tracking-tight metric-number-reveal leading-tight">{{ number_format($produccionHoy['puros'] ?? 0) }}</p>
+                                <p class="theme-text text-[10px] sm:text-[11px] font-bold mt-0.5">puros</p>
                             </div>
 
                             {{-- MES --}}
@@ -745,8 +789,8 @@
                                     <span class="h-1.5 w-1.5 rounded-full bg-[#0891b2]"></span>
                                     <span class="theme-text text-[10px] sm:text-[11px] font-black uppercase tracking-[.14em]">Mes</span>
                                 </div>
-                                <p class="theme-title text-lg sm:text-xl md:text-2xl lg:text-[1.7rem] xl:text-[1.85rem] font-black tracking-tight metric-number-reveal leading-tight">{{ number_format($produccionMes['actividades'] ?? 0) }}</p>
-                                <p class="theme-text text-[10px] sm:text-[11px] font-bold mt-0.5">actividades</p>
+                                <p class="theme-title text-lg sm:text-xl md:text-2xl lg:text-[1.7rem] xl:text-[1.85rem] font-black tracking-tight metric-number-reveal leading-tight">{{ number_format($produccionMes['puros'] ?? 0) }}</p>
+                                <p class="theme-text text-[10px] sm:text-[11px] font-bold mt-0.5">puros</p>
                             </div>
 
                             {{-- AÑO --}}
@@ -755,8 +799,8 @@
                                     <span class="h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span>
                                     <span class="theme-text text-[10px] sm:text-[11px] font-black uppercase tracking-[.14em]">Año</span>
                                 </div>
-                                <p class="theme-title text-lg sm:text-xl md:text-2xl lg:text-[1.7rem] xl:text-[1.85rem] font-black tracking-tight metric-number-reveal leading-tight">{{ number_format($produccionAnio['actividades'] ?? 0) }}</p>
-                                <p class="theme-text text-[10px] sm:text-[11px] font-bold mt-0.5">actividades</p>
+                                <p class="theme-title text-lg sm:text-xl md:text-2xl lg:text-[1.7rem] xl:text-[1.85rem] font-black tracking-tight metric-number-reveal leading-tight">{{ number_format($produccionAnio['puros'] ?? 0) }}</p>
+                                <p class="theme-text text-[10px] sm:text-[11px] font-bold mt-0.5">puros</p>
                             </div>
                         </div>
                     </div>
@@ -831,24 +875,49 @@
                         </div>
                     </div>
 
-                    <div id="areaSummaryCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 transition-opacity duration-200">
+                    <div id="areaSummaryCardsContainer" class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 sm:gap-3 xl:gap-3.5 2xl:gap-4 transition-opacity duration-200">
                         @foreach($areasMes as $area)
-                            @php($share = round(($area['actividades'] / $totalMesAreas) * 100))
-                            <article id="areaCard_{{ $area['key'] }}" class="area-card area-card-{{ $area['key'] }} reveal-item dashboard-panel rounded-[1.6rem] p-5 lg:p-6" style="--item-delay: {{ 80 + ($loop->index * 70) }}ms">
-                                <div class="relative z-10">
-                                    <div class="flex items-center justify-between">
-                                        <h3 class="theme-title text-xl lg:text-2xl font-black tracking-tight">{{ $area['label'] }}</h3>
+                            @php($share = round(($area['puros'] / $totalMesPuros) * 100))
+                            <article id="areaCard_{{ $area['key'] }}" class="area-card area-card-{{ $area['key'] }} reveal-item dashboard-panel rounded-2xl lg:rounded-[1.4rem] xl:rounded-[1.5rem] p-3 sm:p-3.5 lg:p-4 xl:p-4 2xl:p-5.5 min-w-0" style="--item-delay: {{ 80 + ($loop->index * 70) }}ms">
+                                <div class="relative z-10 min-w-0">
+                                    <div class="flex items-center justify-between min-w-0">
+                                        <h3 class="theme-title text-sm sm:text-base xl:text-lg font-black tracking-tight truncate">{{ $area['label'] }}</h3>
                                     </div>
 
-                                    <div class="mt-5 flex items-end justify-between gap-4">
-                                        <div>
-                                            <p data-area-metric="actividades" class="theme-title text-4xl xl:text-[2.7rem] leading-none font-black metric-number-reveal">{{ number_format($area['actividades']) }}</p>
-                                            <p class="theme-text mt-2 text-xs font-bold">Actividades</p>
+                                    <div class="mt-3 sm:mt-3.5 lg:mt-4 flex items-end justify-between gap-1.5 sm:gap-2">
+                                        <div class="min-w-0">
+                                            <p data-area-metric="puros" class="theme-title text-xl sm:text-2xl lg:text-[1.65rem] xl:text-[1.75rem] 2xl:text-3xl leading-none font-black metric-number-reveal truncate">{{ number_format($area['puros']) }}</p>
+                                            <p class="theme-text mt-1 text-[11px] sm:text-xs font-bold truncate">Puros</p>
                                         </div>
-                                        <div class="area-icon area-icon-animated flex items-center justify-center" data-area="{{ $area['key'] }}" data-area-index="{{ $loop->index }}">
-                                            @if($area['key'] === 'rezago')
+                                        <div class="area-icon area-icon-animated flex items-center justify-center shrink-0" data-area="{{ $area['key'] }}" data-area-index="{{ $loop->index }}">
+                                            @if($area['key'] === 'limpieza')
+                                                {{-- Limpieza: puro horizontal, mano con paño pule y destellos brotan en secuencia --}}
+                                                <svg class="h-9 w-9 sm:h-10 sm:w-10 lg:h-11 lg:w-11 xl:h-12 xl:w-12 2xl:h-14 2xl:w-14 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    {{-- Puro horizontal estilizado --}}
+                                                    <g class="area-anim-clean-cigar">
+                                                        <path d="M5 14 C2 14 2 22 5 22 H31 C32 22 33 19 33 18 C33 17 32 14 31 14 H5 Z" fill="currentColor" fill-opacity="0.08"/>
+                                                        <line x1="5" y1="14" x2="5" y2="22" opacity="0.6"/>
+                                                        <line x1="14" y1="14" x2="12" y2="22" opacity="0.4"/>
+                                                        <line x1="22" y1="14" x2="20" y2="22" opacity="0.4"/>
+                                                        <line x1="31" y1="14" x2="31" y2="22" stroke-width="1.8"/>
+                                                    </g>
+
+                                                    {{-- Mano con paño de limpieza puliendo el puro de izquierda a derecha --}}
+                                                    <g class="area-anim-clean-wipe" opacity="0">
+                                                        <path d="M14 4 V8 M18 4 V8" stroke-width="1.4"/>
+                                                        <path d="M11 8 C13 6 19 6 21 8" stroke-width="1.6"/>
+                                                        <path d="M10 8 C9 11 11 13 14 13 H18 C21 13 23 11 22 8" fill="var(--anim-icon-secondary)" stroke="currentColor" stroke-width="1.3"/>
+                                                        <path d="M7 11 C10 10 14 12 18 10" stroke-dasharray="1.5 2" stroke-width="1.2" opacity="0.6"/>
+                                                    </g>
+
+                                                    {{-- Destellos secuenciales al pulir --}}
+                                                    <path class="area-anim-clean-sparkle-1" d="M10 8 L11 10 L13 11 L11 12 L10 14 L9 12 L7 11 L9 10 Z" fill="currentColor" opacity="0"/>
+                                                    <path class="area-anim-clean-sparkle-2" d="M22 6 L23 8.5 L25.5 9.5 L23 10.5 L22 13 L21 10.5 L18.5 9.5 L21 8.5 Z" fill="currentColor" opacity="0"/>
+                                                    <path class="area-anim-clean-sparkle-3" d="M28 21 L28.8 22.5 L30.5 23 L28.8 23.5 L28 25 L27.2 23.5 L25.5 23 L27.2 22.5 Z" fill="currentColor" opacity="0"/>
+                                                </svg>
+                                            @elseif($area['key'] === 'rezago')
                                                 {{-- Rezago: 3 puros verticales estilizados y limpios, el central se levanta como seleccionado --}}
-                                                <svg class="h-16 w-16 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <svg class="h-9 w-9 sm:h-10 sm:w-10 lg:h-11 lg:w-11 xl:h-12 xl:w-12 2xl:h-14 2xl:w-14 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                     {{-- Puro Izquierdo --}}
                                                     <g class="area-anim-cigar-a">
                                                         <path d="M5 11 C5 7 9 7 9 11 V31 H5 Z" fill="currentColor" fill-opacity="0.08"/>
@@ -881,7 +950,7 @@
                                                 </svg>
                                             @elseif($area['key'] === 'anillado')
                                                 {{-- Anillado: puro horizontal limpio, mano coloca anillo y se desvanece por completo --}}
-                                                <svg class="h-16 w-16 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <svg class="h-9 w-9 sm:h-10 sm:w-10 lg:h-11 lg:w-11 xl:h-12 xl:w-12 2xl:h-14 2xl:w-14 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                     {{-- Puro Horizontal con proporciones limpias --}}
                                                     <g class="area-anim-cigar2">
                                                         <path d="M6 14 C2 14 2 22 6 22 H32 V14 H6 Z" fill="currentColor" fill-opacity="0.08"/>
@@ -909,7 +978,7 @@
                                                 </svg>
                                             @else
                                                 {{-- Llenado: caja moderna estilizada y limpia, puros entrando ordenadamente --}}
-                                                <svg class="h-16 w-16 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <svg class="h-9 w-9 sm:h-10 sm:w-10 lg:h-11 lg:w-11 xl:h-12 xl:w-12 2xl:h-14 2xl:w-14 area-anim-svg" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                     {{-- Caja de puros estilizada y limpia sin manchas --}}
                                                     <g class="area-anim-cigar-box">
                                                         {{-- Tapa abierta limpia --}}
@@ -951,22 +1020,18 @@
                                         </div>
                                     </div>
 
-                                    <div class="area-progress-track mt-5 h-1.5 overflow-hidden rounded-full bg-slate-200/70" role="progressbar" aria-label="Participación de {{ $area['label'] }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $share }}">
+                                    <div class="area-progress-track mt-3 sm:mt-3.5 lg:mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200/70" role="progressbar" aria-label="Participación de {{ $area['label'] }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $share }}">
                                         <div data-area-metric="progress" class="area-progress h-full rounded-full transition-all duration-500" style="width: {{ $share }}%; background: var(--area-color)"></div>
                                     </div>
 
-                                    <dl class="area-metrics mt-5 grid grid-cols-3 divide-x theme-border">
-                                        <div class="pr-3">
-                                            <dt class="theme-text text-[10px] font-black uppercase tracking-wider">Empleados</dt>
-                                            <dd data-area-metric="empleados" class="theme-title mt-1 text-base font-black">{{ number_format($area['empleados']) }}</dd>
+                                    <dl class="area-metrics mt-3 sm:mt-3.5 lg:mt-4 grid grid-cols-2 divide-x theme-border text-center">
+                                        <div class="pr-1 sm:pr-1.5 xl:pr-2 min-w-0">
+                                            <dt class="theme-text text-[8.5px] sm:text-[9px] xl:text-[9.5px] 2xl:text-[10px] font-bold uppercase tracking-tight truncate" title="Empleados">Empleados</dt>
+                                            <dd data-area-metric="empleados" class="theme-title mt-0.5 text-xs sm:text-[13px] xl:text-sm 2xl:text-base font-black truncate">{{ number_format($area['empleados']) }}</dd>
                                         </div>
-                                        <div class="px-3">
-                                            <dt class="theme-text text-[10px] font-black uppercase tracking-wider">Registros</dt>
-                                            <dd data-area-metric="registros" class="theme-title mt-1 text-base font-black">{{ number_format($area['registros']) }}</dd>
-                                        </div>
-                                        <div class="pl-3">
-                                            <dt class="theme-text text-[10px] font-black uppercase tracking-wider">Puros</dt>
-                                            <dd data-area-metric="puros" class="theme-title mt-1 text-base font-black">{{ number_format($area['puros']) }}</dd>
+                                        <div class="pl-1 sm:pl-1.5 xl:pl-2 min-w-0">
+                                            <dt class="theme-text text-[8.5px] sm:text-[9px] xl:text-[9.5px] 2xl:text-[10px] font-bold uppercase tracking-tight truncate" title="Actividades">Actividades</dt>
+                                            <dd data-area-metric="actividades" class="theme-title mt-0.5 text-xs sm:text-[13px] xl:text-sm 2xl:text-base font-black truncate">{{ number_format($area['actividades']) }}</dd>
                                         </div>
                                     </dl>
                                 </div>
@@ -1183,8 +1248,8 @@
                 tooltip: isDark ? 'dark' : 'light',
                 empty: isDark ? '#263650' : '#dbeafe',
                 areas: isDark
-                    ? { rezago: '#38bdf8', anillado: '#22d3ee', llenado: '#818cf8' }
-                    : { rezago: '#2563eb', anillado: '#0891b2', llenado: '#6366f1' }
+                    ? { limpieza: '#a78bfa', rezago: '#38bdf8', anillado: '#22d3ee', llenado: '#818cf8' }
+                    : { limpieza: '#8b5cf6', rezago: '#2563eb', anillado: '#0891b2', llenado: '#6366f1' }
             };
         }
 
@@ -1307,7 +1372,7 @@
                         theme: theme.tooltip,
                         shared: true,
                         intersect: false,
-                        y: { formatter: value => Number(value).toLocaleString('es-HN') + ' actividades' }
+                        y: { formatter: value => Number(value).toLocaleString('es-HN') + ' puros' }
                     }
                 });
 
@@ -1622,8 +1687,8 @@
                         const card = document.getElementById(`areaCard_${key}`);
                         if (!card) return;
 
-                        const actEl = card.querySelector('[data-area-metric="actividades"]');
-                        if (actEl) actEl.textContent = area.actividades_formatted;
+                        const purEl = card.querySelector('[data-area-metric="puros"]');
+                        if (purEl) purEl.textContent = area.puros_formatted;
 
                         const progEl = card.querySelector('[data-area-metric="progress"]');
                         if (progEl) {
@@ -1634,11 +1699,11 @@
                         const empEl = card.querySelector('[data-area-metric="empleados"]');
                         if (empEl) empEl.textContent = area.empleados_formatted;
 
+                        const actEl = card.querySelector('[data-area-metric="actividades"]');
+                        if (actEl) actEl.textContent = area.actividades_formatted;
+
                         const regEl = card.querySelector('[data-area-metric="registros"]');
                         if (regEl) regEl.textContent = area.registros_formatted;
-
-                        const purEl = card.querySelector('[data-area-metric="puros"]');
-                        if (purEl) purEl.textContent = area.puros_formatted;
                     });
                 }
             } catch (err) {

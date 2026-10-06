@@ -17,6 +17,7 @@ class VinetaController extends Controller
         $nombre = trim((string) $request->get('nombre', ''));
         $codigoProducto = trim((string) $request->get('codigo_producto', ''));
         $item = trim((string) $request->get('item', ''));
+        $capa = trim((string) $request->get('capa', ''));
         $ordenDelSistema = trim((string) $request->get('orden_del_sistema', ''));
         $ordenCliente = trim((string) $request->get('orden_cliente', ''));
         $orden = $request->get('orden', 'api_id');
@@ -93,6 +94,9 @@ class VinetaController extends Controller
             })
             ->when($item !== '', function ($query) use ($item) {
                 $query->where('vinetas.item', 'like', "%{$item}%");
+            })
+            ->when($capa !== '', function ($query) use ($capa) {
+                $query->where('vinetas.capa', 'like', "%{$capa}%");
             })
             ->when($ordenDelSistema !== '', function ($query) use ($ordenDelSistema) {
                 $query->where('vinetas.orden_del_sistema', 'like', "%{$ordenDelSistema}%");

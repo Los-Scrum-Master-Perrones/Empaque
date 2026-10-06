@@ -43,147 +43,136 @@
                             @include('vineta-registros.partials.resumen')
                         </div>
 
-                        <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow p-3 sm:p-4">
+                        <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow p-3">
                             <form method="GET"
                                   action="{{ route('vineta-registros.index') }}"
-                                  class="vineta-registros-filter-form vineta-registros-ajax-filter-form grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-9 gap-2 items-end">
+                                  class="vineta-registros-filter-form vineta-registros-ajax-filter-form">
 
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">ID viñeta</label>
-                                    <input type="text"
-                                           name="id_vineta"
-                                           value="{{ request('id_vineta') }}"
-                                           placeholder="ID o código"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                <div class="vineta-registros-filter-row flex flex-nowrap items-end gap-1 sm:gap-1.5 w-full min-w-0">
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="ID viñeta">ID viñeta</label>
+                                        <input type="text"
+                                               name="id_vineta"
+                                               value="{{ request('id_vineta') }}"
+                                               placeholder="ID..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Item">Item</label>
+                                        <input type="text"
+                                               name="item"
+                                               value="{{ request('item') }}"
+                                               placeholder="Item..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Orden sistema">Orden sist.</label>
+                                        <input type="text"
+                                               name="orden_del_sistema"
+                                               value="{{ request('orden_del_sistema') }}"
+                                               placeholder="Sistema..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Orden cliente">Orden clie.</label>
+                                        <input type="text"
+                                               name="orden_cliente"
+                                               value="{{ request('orden_cliente') }}"
+                                               placeholder="Cliente..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Código producto">Código prod.</label>
+                                        <input type="text"
+                                               name="codigo_producto"
+                                               value="{{ request('codigo_producto') }}"
+                                               placeholder="Código..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Empleado">Empleado</label>
+                                        <input type="text"
+                                               name="empleado"
+                                               value="{{ request('empleado') }}"
+                                               placeholder="Empleado..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    {{-- Capa: filtro después de Empleado --}}
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Capa">Capa</label>
+                                        <input type="text"
+                                               name="capa"
+                                               value="{{ request('capa') }}"
+                                               placeholder="Capa..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Fecha Inicio">Desde</label>
+                                        <input type="date"
+                                               name="fecha_desde"
+                                               id="filtroFechaDesde"
+                                               value="{{ request('fecha_desde') }}"
+                                               class="w-full rounded-xl border theme-border bg-white px-1 sm:px-1.5 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Fecha Fin">Hasta</label>
+                                        <input type="date"
+                                               name="fecha_hasta"
+                                               id="filtroFechaHasta"
+                                               value="{{ request('fecha_hasta') }}"
+                                               class="w-full rounded-xl border theme-border bg-white px-1 sm:px-1.5 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-[1.25_1_0%]">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate" title="Documento ERP">Documento</label>
+                                        <select name="documento"
+                                                id="filtroDocumento"
+                                                @disabled(!request('fecha_desde') && !request('fecha_hasta'))
+                                                class="w-full rounded-xl border theme-border bg-white px-1.5 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            @if(!request('fecha_desde') && !request('fecha_hasta'))
+                                                <option value="">Seleccione fecha primero</option>
+                                            @else
+                                                <option value="" @selected(($documentoSeleccionado ?? '') === '')>Todos los documentos</option>
+                                                <option value="sin_documento" @selected(($documentoSeleccionado ?? '') === 'sin_documento')>Sin documento</option>
+                                                @foreach(($documentosDisponibles ?? collect()) as $doc)
+                                                    <option value="{{ $doc->numero }}" @selected(($documentoSeleccionado ?? '') === (string)$doc->numero)>
+                                                        Doc. #{{ $doc->numero }}{{ $doc->descripcion ? ' - ' . \Illuminate\Support\Str::limit($doc->descripcion, 24) : '' }}
+                                                    </option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Item</label>
-                                    <input type="text"
-                                           name="item"
-                                           value="{{ request('item') }}"
-                                           placeholder="Item"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Orden del sistema</label>
-                                    <input type="text"
-                                           name="orden_del_sistema"
-                                           value="{{ request('orden_del_sistema') }}"
-                                           placeholder="Orden sistema"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Orden del cliente</label>
-                                    <input type="text"
-                                           name="orden_cliente"
-                                           value="{{ request('orden_cliente') }}"
-                                           placeholder="Orden cliente"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Código producto</label>
-                                    <input type="text"
-                                           name="codigo_producto"
-                                           value="{{ request('codigo_producto') }}"
-                                           placeholder="Código producto"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Empleado</label>
-                                    <input type="text"
-                                           name="empleado"
-                                           value="{{ request('empleado') }}"
-                                           placeholder="Código o nombre"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Grupo actividad</label>
-                                    <select name="actividad_grupo"
-                                            class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                        <option value="" @selected($actividadGrupo === '')>Todos los grupos</option>
-
-                                        <optgroup label="Rezagadoras">
-                                            <option value="rezagadoras_rezago" @selected($actividadGrupo === 'rezagadoras_rezago')>Rezagadoras (Rezago)</option>
-                                            <option value="rezagadoras_anillado" @selected($actividadGrupo === 'rezagadoras_anillado')>Rezagadoras (Anillado)</option>
-                                            <option value="rezagadoras_llenado" @selected($actividadGrupo === 'rezagadoras_llenado')>Rezagadoras (Llenado)</option>
-                                            <option value="rezagadoras_hora" @selected($actividadGrupo === 'rezagadoras_hora')>Rezagadoras (Hora)</option>
-                                        </optgroup>
-
-                                        <optgroup label="Anilladoras">
-                                            <option value="anilladoras_anillado" @selected($actividadGrupo === 'anilladoras_anillado')>Anilladoras (Anillado)</option>
-                                            <option value="anilladoras_rezago" @selected($actividadGrupo === 'anilladoras_rezago')>Anilladoras (Rezago)</option>
-                                            <option value="anilladoras_llenado" @selected($actividadGrupo === 'anilladoras_llenado')>Anilladoras (Llenado)</option>
-                                            <option value="anilladoras_hora" @selected($actividadGrupo === 'anilladoras_hora')>Anilladoras (Hora)</option>
-                                        </optgroup>
-
-                                        <optgroup label="Llenadoras">
-                                            <option value="llenadoras_llenado" @selected($actividadGrupo === 'llenadoras_llenado')>Llenadoras (Llenado)</option>
-                                            <option value="llenadoras_rezago" @selected($actividadGrupo === 'llenadoras_rezago')>Llenadoras (Rezago)</option>
-                                            <option value="llenadoras_anillado" @selected($actividadGrupo === 'llenadoras_anillado')>Llenadoras (Anillado)</option>
-                                            <option value="llenadoras_hora" @selected($actividadGrupo === 'llenadoras_hora')>Llenadoras (Hora)</option>
-                                        </optgroup>
-
-                                        <optgroup label="Limpiadoras">
-                                            <option value="limpiadoras_limpieza" @selected($actividadGrupo === 'limpiadoras_limpieza')>Limpiadoras (Limpieza)</option>
-                                            <option value="limpiadoras_rezago" @selected($actividadGrupo === 'limpiadoras_rezago')>Limpiadoras (Rezago)</option>
-                                            <option value="limpiadoras_anillado" @selected($actividadGrupo === 'limpiadoras_anillado')>Limpiadoras (Anillado)</option>
-                                            <option value="limpiadoras_llenado" @selected($actividadGrupo === 'limpiadoras_llenado')>Limpiadoras (Llenado)</option>
-                                            <option value="limpiadoras_hora" @selected($actividadGrupo === 'limpiadoras_hora')>Limpiadoras (Hora)</option>
-                                        </optgroup>
-
-                                        <optgroup label="Actividades Generales">
-                                            <option value="rezago" @selected($actividadGrupo === 'rezago')>Rezago (General)</option>
-                                            <option value="anillado" @selected($actividadGrupo === 'anillado')>Anillado (General)</option>
-                                            <option value="llenado" @selected($actividadGrupo === 'llenado')>Llenado (General)</option>
-                                            <option value="limpieza" @selected($actividadGrupo === 'limpieza')>Limpieza (General)</option>
-                                            <option value="por_hora" @selected($actividadGrupo === 'por_hora')>Por hora (General)</option>
-                                        </optgroup>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Desde</label>
-                                    <input type="date"
-                                           name="fecha_desde"
-                                           value="{{ request('fecha_desde') }}"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div>
-                                    <label class="theme-text block text-xs font-semibold mb-1">Hasta</label>
-                                    <input type="date"
-                                           name="fecha_hasta"
-                                           value="{{ request('fecha_hasta') }}"
-                                           class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                                </div>
-
-                                <div class="sm:col-span-2 xl:col-span-9 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 pt-1">
+                                <div class="vineta-registros-filter-actions flex items-center justify-end gap-2 mt-2.5 pt-0.5">
                                     <a href="{{ route('vineta-registros.index') }}"
-                                       class="vineta-registros-ajax-clear gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-2.5 rounded-xl bg-white text-[#0b1220] text-sm font-bold border theme-border hover:bg-[#f1f5f9] transition">
+                                       class="vineta-registros-ajax-clear gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#0b1220] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#f1f5f9] transition whitespace-nowrap">
                                         Limpiar
                                     </a>
 
+                                    <button type="submit"
+                                            class="gooey-action inline-flex items-center justify-center px-4 py-1.5 rounded-xl bg-[#0f172a] text-white text-xs sm:text-sm font-semibold hover:bg-[#1e293b] transition whitespace-nowrap">
+                                        Filtrar
+                                    </button>
+
                                     <button type="button"
                                             id="vinetaRegistrosExportOpen"
-                                            class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-2.5 rounded-xl bg-white text-[#5b3a1e] text-sm font-black border theme-border hover:bg-[#f3efe7] transition">
+                                            class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#5b3a1e] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#f3efe7] transition whitespace-nowrap">
                                         Exportar Excel
                                     </button>
 
                                     <button type="button"
                                             id="vinetaRegistrosWeeklyReportOpen"
-                                            class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-2.5 rounded-xl bg-white text-[#0f766e] text-sm font-black border theme-border hover:bg-[#ecfdf5] transition">
+                                            class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#0f766e] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#ecfdf5] transition whitespace-nowrap">
                                         Reporte semanal
-                                    </button>
-
-                                    <button type="submit"
-                                            class="gooey-action inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#0f172a] text-white text-sm font-black hover:bg-[#1e293b] transition">
-                                        Filtrar
                                     </button>
                                 </div>
                             </form>
@@ -333,26 +322,63 @@
                     </button>
                 </div>
 
-                <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div class="theme-badge rounded-2xl border px-3 py-2">
-                        <p class="theme-text text-[11px] font-semibold">Movimientos</p>
-                        <p id="seguimientoVinetaMovimientos" class="theme-title text-lg font-black">0</p>
+                <div class="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div class="grid grid-cols-3 gap-2 flex-1">
+                        <div class="theme-badge rounded-2xl border px-3 py-2">
+                            <p class="theme-text text-[11px] font-semibold">Movimientos</p>
+                            <p id="seguimientoVinetaMovimientos" class="theme-title text-lg font-black">0</p>
+                        </div>
+
+                        <div class="theme-badge rounded-2xl border px-3 py-2">
+                            <p class="theme-text text-[11px] font-semibold">Activos</p>
+                            <p id="seguimientoVinetaActivos" class="theme-title text-lg font-black">0</p>
+                        </div>
+
+                        <div class="theme-badge rounded-2xl border px-3 py-2">
+                            <p class="theme-text text-[11px] font-semibold">Puros cajón</p>
+                            <p id="seguimientoVinetaPuros" class="theme-title text-lg font-black">0</p>
+                        </div>
                     </div>
 
-                    <div class="theme-badge rounded-2xl border px-3 py-2">
-                        <p class="theme-text text-[11px] font-semibold">Activos</p>
-                        <p id="seguimientoVinetaActivos" class="theme-title text-lg font-black">0</p>
+                    <div class="flex items-center gap-2 self-start md:self-center shrink-0">
+                        <span class="theme-text text-xs font-black uppercase tracking-wider">Vista:</span>
+                        <div class="vineta-view-mode-container inline-flex rounded-2xl p-1 border theme-border">
+                            <button type="button"
+                                    class="vineta-view-mode-btn rounded-xl px-3 py-1.5 text-xs font-black transition flex items-center gap-1.5 active"
+                                    data-mode="timeline"
+                                    title="Línea de tiempo vertical detallada">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m0-12a2 2 0 100-4 2 2 0 000 4zm0 12a2 2 0 100 4 2 2 0 000-4zM6 12h12" />
+                                </svg>
+                                Línea de tiempo
+                            </button>
+                            <button type="button"
+                                    class="vineta-view-mode-btn rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
+                                    data-mode="grid"
+                                    title="Cuadrícula de tarjetas ordenadas">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                                </svg>
+                                Cuadrícula
+                            </button>
+                            <button type="button"
+                                    class="vineta-view-mode-btn rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
+                                    data-mode="horizontal"
+                                    title="Carrusel horizontal deslizable">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                                Horizontal
+                            </button>
+                        </div>
                     </div>
-
-                    <div class="theme-badge rounded-2xl border px-3 py-2">
-                        <p class="theme-text text-[11px] font-semibold">Puros cajón</p>
-                        <p id="seguimientoVinetaPuros" class="theme-title text-lg font-black">0</p>
-                    </div>
-
                 </div>
             </div>
 
-            <div class="overflow-y-auto px-5 py-5">
+            <div id="seguimientoScrollArea" class="overflow-y-auto px-5 py-5 bg-white">
                 <div id="seguimientoVinetaTimeline" class="space-y-0"></div>
             </div>
         </div>
@@ -973,12 +999,55 @@
                     getFilterForm()?.querySelectorAll('input, select').forEach((field) => {
                         field.value = '';
                     });
+                    const docSelect = document.getElementById('filtroDocumento');
+                    if (docSelect) {
+                        docSelect.innerHTML = '<option value="">Seleccione fecha primero</option>';
+                        docSelect.disabled = true;
+                    }
                 }
 
                 loadTable(link.href, isSortLink);
             });
 
             document.addEventListener('submit', (event) => {
+                const formEliminar = event.target.closest('.form-eliminar-vineta-registro');
+                if (formEliminar) {
+                    event.preventDefault();
+                    appSwal({
+                        title: '¿Eliminar registro?',
+                        text: 'Esta acción no se puede deshacer.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, eliminar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#ef4444'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            formEliminar.submit();
+                        }
+                    });
+                    return;
+                }
+
+                const formEliminarHora = event.target.closest('.form-eliminar-hora-ordinaria');
+                if (formEliminarHora) {
+                    event.preventDefault();
+                    appSwal({
+                        title: '¿Eliminar hora ordinaria?',
+                        text: 'Esta acción no se puede deshacer.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, eliminar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#ef4444'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            formEliminarHora.submit();
+                        }
+                    });
+                    return;
+                }
+
                 const filterForm = event.target.closest('.vineta-registros-ajax-filter-form');
                 const perPageForm = event.target.closest('.vineta-registros-ajax-per-page-form');
 
@@ -993,6 +1062,52 @@
                 params.delete('page');
                 loadTable(`${form.action}?${params.toString()}`);
             });
+
+            const fechaDesdeInput = document.getElementById('filtroFechaDesde');
+            const fechaHastaInput = document.getElementById('filtroFechaHasta');
+            const documentoSelect = document.getElementById('filtroDocumento');
+
+            const actualizarDocumentosPorFecha = async () => {
+                const desde = fechaDesdeInput?.value || '';
+                const hasta = fechaHastaInput?.value || '';
+
+                if (!documentoSelect) return;
+
+                if (!desde && !hasta) {
+                    documentoSelect.innerHTML = '<option value="">Seleccione fecha primero</option>';
+                    documentoSelect.disabled = true;
+                    return;
+                }
+
+                documentoSelect.disabled = true;
+                const currentVal = documentoSelect.value;
+                documentoSelect.innerHTML = '<option value="">Cargando documentos...</option>';
+
+                try {
+                    const url = new URL(@json(route('vineta-registros.documentos')), window.location.origin);
+                    if (desde) url.searchParams.set('fecha_desde', desde);
+                    if (hasta) url.searchParams.set('fecha_hasta', hasta);
+
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (res.ok) {
+                        const docs = await res.json();
+                        let html = '<option value="">Todos los documentos</option><option value="sin_documento">Sin documento</option>';
+                        docs.forEach(doc => {
+                            const desc = doc.descripcion ? ' - ' + (doc.descripcion.length > 24 ? doc.descripcion.substring(0, 24) + '...' : doc.descripcion) : '';
+                            const selected = (currentVal === String(doc.numero)) ? ' selected' : '';
+                            html += `<option value="${doc.numero}"${selected}>Doc. #${doc.numero}${desc}</option>`;
+                        });
+                        documentoSelect.innerHTML = html;
+                        documentoSelect.disabled = false;
+                    }
+                } catch (e) {
+                    console.error('Error cargando documentos por fecha:', e);
+                    documentoSelect.disabled = false;
+                }
+            };
+
+            fechaDesdeInput?.addEventListener('change', actualizarDocumentosPorFecha);
+            fechaHastaInput?.addEventListener('change', actualizarDocumentosPorFecha);
 
             window.addEventListener('popstate', () => loadTable(window.location.href));
             initTableFeatures();
@@ -1045,7 +1160,35 @@
                 modal.classList.remove('flex');
             };
 
+            let currentTimelineItems = [];
+            let currentTimelineMode = localStorage.getItem('vineta_seguimiento_mode') || '';
+            const horizontalNav = document.getElementById('vinetaHorizontalNav');
+            const viewModeButtons = document.querySelectorAll('.vineta-view-mode-btn');
+
+            const updateViewButtons = (mode) => {
+                viewModeButtons.forEach((btn) => {
+                    const isActive = btn.dataset.mode === mode;
+                    btn.classList.toggle('active', isActive);
+                });
+            };
+
+            const setTimelineMode = (mode) => {
+                currentTimelineMode = mode;
+                localStorage.setItem('vineta_seguimiento_mode', mode);
+                updateViewButtons(mode);
+                if (currentTimelineItems && currentTimelineItems.length) {
+                    renderTimeline(currentTimelineItems);
+                }
+            };
+
+            viewModeButtons.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    setTimelineMode(btn.dataset.mode);
+                });
+            });
+
             const renderTimeline = (items) => {
+                currentTimelineItems = items;
                 if (!items.length) {
                     timelineContainer.innerHTML = `
                         <div class="theme-soft rounded-2xl border theme-border px-4 py-8 text-center">
@@ -1056,57 +1199,207 @@
                     return;
                 }
 
-                timelineContainer.innerHTML = `<div class="vineta-delivery-scroll"><div class="vineta-delivery-track" style="--vineta-steps: ${items.length}">${items.map((item, index) => {
-                    const isLast = index === items.length - 1;
-                    const isAnulado = item.estado === 'anulado';
-                    const stateClass = isAnulado ? 'is-anulado' : (isLast ? 'is-current' : 'is-complete');
-                    const statusText = isAnulado ? 'Anulado' : (isLast ? 'Ultimo movimiento' : 'Completado');
-                    const paso = index + 1;
+                const savedMode = localStorage.getItem('vineta_seguimiento_mode');
+                const effectiveMode = currentTimelineMode || savedMode || (items.length > 3 ? 'timeline' : 'horizontal');
+                currentTimelineMode = effectiveMode;
+                updateViewButtons(effectiveMode);
 
-                    return `
-                        <div class="vineta-delivery-step ${stateClass} ${isLast ? 'is-last' : ''}">
-                            <div class="vineta-delivery-rail">
-                                <span class="vineta-delivery-dot">${isAnulado ? '!' : paso}</span>
-                                ${isLast ? '' : '<span class="vineta-delivery-line" aria-hidden="true"></span>'}
-                            </div>
+                if (effectiveMode === 'grid') {
+                    timelineContainer.innerHTML = `
+                        <div class="vineta-grid-list">
+                            ${items.map((item, index) => {
+                                const isLast = index === items.length - 1;
+                                const isAnulado = item.estado === 'anulado';
+                                const stateClass = isAnulado ? 'is-anulado' : (isLast ? 'is-current' : 'is-complete');
+                                const statusText = isAnulado ? 'Anulado' : (isLast ? 'Ultimo movimiento' : 'Completado');
+                                const paso = index + 1;
+                                const initial = escapeHtml(String(item.empleado || '?').slice(0, 1).toUpperCase());
 
-                            <div class="vineta-delivery-card">
-                                <div class="vineta-delivery-card-head">
-                                    <div class="min-w-0">
-                                        <div class="vineta-delivery-kicker">
-                                            <span>Paso ${paso}</span>
-                                            <span class="vineta-delivery-status ${stateClass}">
-                                                ${statusText}
-                                            </span>
+                                return `
+                                    <div class="vineta-delivery-card vineta-grid-card ${stateClass}">
+                                        <div>
+                                            <div class="flex items-center justify-between gap-2 border-b theme-border pb-2">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="vineta-grid-step-badge ${stateClass}">${isAnulado ? '!' : paso}</span>
+                                                    <span class="vineta-delivery-status ${stateClass}">
+                                                        ${statusText}
+                                                    </span>
+                                                </div>
+                                                <span class="vineta-delivery-kicker text-[11px]">Paso ${paso}</span>
+                                            </div>
+
+                                            <div class="mt-2.5">
+                                                <h4 class="vineta-delivery-title text-sm font-black line-clamp-2" title="${escapeHtml(item.actividad || '')}">
+                                                    ${escapeHtml(item.actividad || 'Actividad sin nombre')}
+                                                </h4>
+                                                <p class="vineta-delivery-date text-[11px] mt-1">
+                                                    ${escapeHtml(item.fecha || 'N/A')}
+                                                </p>
+                                            </div>
                                         </div>
 
-                                        <p class="vineta-delivery-title">
-                                            ${escapeHtml(item.actividad || 'Actividad sin nombre')}
-                                        </p>
+                                        <div class="mt-3">
+                                            <div class="vineta-delivery-worker">
+                                                <span class="vineta-delivery-worker-avatar">
+                                                    ${initial}
+                                                </span>
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="truncate">${escapeHtml(item.empleado || 'N/A')}</p>
+                                                    <span>Cód. ${escapeHtml(item.empleado_codigo || 'N/A')}</span>
+                                                </div>
+                                                ${item.puros ? `<span class="text-[11px] font-black theme-title ml-auto shrink-0">${numberFormat.format(item.puros)} p</span>` : ''}
+                                            </div>
 
-                                        <p class="vineta-delivery-date">
-                                            ${escapeHtml(item.fecha || 'N/A')}
-                                        </p>
-                                    </div>
-
-                                    <div class="vineta-delivery-worker">
-                                        <span class="vineta-delivery-worker-avatar">
-                                            ${escapeHtml(String(item.empleado || '?').slice(0, 1).toUpperCase())}
-                                        </span>
-
-                                        <div class="min-w-0">
-                                            <p>${escapeHtml(item.empleado || 'N/A')}</p>
-                                            <span>${escapeHtml(item.empleado_codigo || 'N/A')}</span>
+                                            ${item.motivo_anulacion ? `
+                                                <p class="vineta-timeline-alert mt-2.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold">
+                                                    Anulado: ${escapeHtml(item.motivo_anulacion)}
+                                                </p>
+                                            ` : ''}
                                         </div>
                                     </div>
-                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } else if (effectiveMode === 'horizontal') {
+                    timelineContainer.innerHTML = `
+                        <div class="vineta-horizontal-scroll" id="vinetaHorizontalScrollContainer">
+                            <div class="vineta-horizontal-track">
+                                ${items.map((item, index) => {
+                                    const isLast = index === items.length - 1;
+                                    const isAnulado = item.estado === 'anulado';
+                                    const stateClass = isAnulado ? 'is-anulado' : (isLast ? 'is-current' : 'is-complete');
+                                    const statusText = isAnulado ? 'Anulado' : (isLast ? 'Ultimo movimiento' : 'Completado');
+                                    const paso = index + 1;
+                                    const initial = escapeHtml(String(item.empleado || '?').slice(0, 1).toUpperCase());
 
-                                ${item.motivo_anulacion ? `<p class="vineta-timeline-alert mt-3 rounded-xl border px-3 py-2 text-xs font-semibold">Anulado: ${escapeHtml(item.motivo_anulacion)}</p>` : ''}
+                                    return `
+                                        <div class="vineta-horizontal-step ${stateClass} ${isLast ? 'is-last' : ''}">
+                                            <div class="vineta-horizontal-rail">
+                                                <span class="vineta-delivery-dot">${isAnulado ? '!' : paso}</span>
+                                                ${isLast ? '' : '<span class="vineta-horizontal-line" aria-hidden="true"></span>'}
+                                            </div>
 
+                                            <div class="vineta-delivery-card flex flex-col justify-between h-full">
+                                                <div class="vineta-delivery-card-head">
+                                                    <div class="min-w-0">
+                                                        <div class="vineta-delivery-kicker">
+                                                            <span>Paso ${paso}</span>
+                                                            <span class="vineta-delivery-status ${stateClass}">
+                                                                ${statusText}
+                                                            </span>
+                                                        </div>
+
+                                                        <p class="vineta-delivery-title" style="min-height: 2.8rem;">
+                                                            ${escapeHtml(item.actividad || 'Actividad sin nombre')}
+                                                        </p>
+
+                                                        <p class="vineta-delivery-date">
+                                                            ${escapeHtml(item.fecha || 'N/A')}
+                                                        </p>
+                                                    </div>
+
+                                                    <div class="vineta-delivery-worker mt-2">
+                                                        <span class="vineta-delivery-worker-avatar">
+                                                            ${initial}
+                                                        </span>
+
+                                                        <div class="min-w-0">
+                                                            <p>${escapeHtml(item.empleado || 'N/A')}</p>
+                                                            <span>Cód. ${escapeHtml(item.empleado_codigo || 'N/A')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                ${item.motivo_anulacion ? `
+                                                    <p class="vineta-timeline-alert mt-3 rounded-xl border px-3 py-2 text-xs font-semibold">
+                                                        Anulado: ${escapeHtml(item.motivo_anulacion)}
+                                                    </p>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
                             </div>
                         </div>
                     `;
-                }).join('')}</div></div>`;
+                } else {
+                    timelineContainer.innerHTML = `
+                        <div class="vineta-timeline-vlist">
+                            ${items.map((item, index) => {
+                                const isLast = index === items.length - 1;
+                                const isAnulado = item.estado === 'anulado';
+                                const stateClass = isAnulado ? 'is-anulado' : (isLast ? 'is-current' : 'is-complete');
+                                const statusText = isAnulado ? 'Anulado' : (isLast ? 'Ultimo movimiento' : 'Completado');
+                                const paso = index + 1;
+                                const initial = escapeHtml(String(item.empleado || '?').slice(0, 1).toUpperCase());
+
+                                return `
+                                    <div class="vineta-vitem ${stateClass} ${isLast ? 'is-last' : ''}">
+                                        <div class="vineta-vitem-dot">${isAnulado ? '!' : paso}</div>
+
+                                        <div class="vineta-vcard">
+                                            <div class="flex flex-wrap items-center justify-between gap-2 border-b theme-border pb-2.5">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="vineta-delivery-kicker text-xs font-black">Paso ${paso}</span>
+                                                    <span class="vineta-delivery-status ${stateClass}">
+                                                        ${statusText}
+                                                    </span>
+                                                </div>
+                                                <div class="vineta-delivery-date flex items-center gap-1.5 text-xs font-bold">
+                                                    <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                                                        <path stroke-linecap="round" stroke-width="2" d="M12 6v6l4 2"/>
+                                                    </svg>
+                                                    ${escapeHtml(item.fecha || 'N/A')}
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                <div class="min-w-0 flex-1">
+                                                    <h4 class="vineta-delivery-title text-base font-black">
+                                                        ${escapeHtml(item.actividad || 'Actividad sin nombre')}
+                                                    </h4>
+
+                                                    <div class="vineta-delivery-worker mt-2.5 max-w-sm">
+                                                        <span class="vineta-delivery-worker-avatar">
+                                                            ${initial}
+                                                        </span>
+                                                        <div class="min-w-0">
+                                                            <p>${escapeHtml(item.empleado || 'N/A')}</p>
+                                                            <span>Código: ${escapeHtml(item.empleado_codigo || 'N/A')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                                    ${item.puros ? `
+                                                        <div class="theme-badge shrink-0 rounded-2xl border px-3 py-2 text-center">
+                                                            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Puros</span>
+                                                            <strong class="text-sm font-black theme-title">${numberFormat.format(item.puros)}</strong>
+                                                        </div>
+                                                    ` : ''}
+                                                    ${item.tiempo_trabajado_texto ? `
+                                                        <div class="theme-badge shrink-0 rounded-2xl border px-3 py-2 text-center">
+                                                            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Tiempo</span>
+                                                            <strong class="text-sm font-black theme-title">${escapeHtml(item.tiempo_trabajado_texto)}</strong>
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                            </div>
+
+                                            ${item.motivo_anulacion ? `
+                                                <p class="vineta-timeline-alert mt-3 rounded-xl border px-3 py-2 text-xs font-semibold">
+                                                    Anulado: ${escapeHtml(item.motivo_anulacion)}
+                                                </p>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
             };
 
             const renderSeguimiento = (items, summary) => {

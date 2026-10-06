@@ -1,8 +1,8 @@
 {
     "version_name": "2.0.0",
-    "version_code": 23,
-    "release_notes": "• Ranking mensual de empleados por área (Anillado, Rezago y Llenado) con podio Top 3\n• Filtro estricto por puesto de trabajo (anilladoras/celofanadoras en Anillado, rezagadoras y 8219/8217 en Rezago, llenadoras de paquetes en Llenado)\n• Selector interactivo de mes",
+    "version_code": 40,
+    "release_notes": "• Escaneo múltiple: Diferenciación de documentos de empaque ERP mediante puntos de color por categoría (anilladoras, rezagadoras, llenadoras, limpiadoras, prensadoras, rolado, indirectos) y visualización completa y clara de la descripción del documento.",
     "apk_filename": "app-arm64-v8a-release.apk",
     "force_update": false,
-    "published_at": "2026-09-02 08:50:00"
+    "published_at": "2026-10-02 07:44:00"
 }

@@ -61,6 +61,8 @@ class VinetaRegistroController extends Controller
                 'hasHorasOrdinarias' => $hasHorasOrdinarias,
                 'perPageOptions' => $perPageOptions,
                 'perPageSelected' => $perPageSelected,
+                'documentosDisponibles' => collect(),
+                'documentoSeleccionado' => '',
             ];
 
             if ($request->ajax()) {
@@ -69,6 +71,10 @@ class VinetaRegistroController extends Controller
 
             return view('vineta-registros.index', $viewData);
         }
+
+        $this->asegurarSecuenciaLimpieza();
+        $this->asegurarSecuenciaPrensado();
+        $this->asegurarSecuenciaRolado();
 
         $hasCantidadActividades = Schema::hasColumn('vineta_registros', 'cantidad_actividades');
         $hasMinutosTrabajados = Schema::hasColumn('vineta_registros', 'minutos_trabajados');
@@ -119,27 +125,23 @@ class VinetaRegistroController extends Controller
 
         $query = $this->filteredQuery($request);
 
-        $horasOrdinariasQuery = $hasHorasOrdinarias
-            ? $this->filteredHorasOrdinariasQuery($request)
-            : null;
+        $horasOrdinariasQuery = null;
         $totalesQuery = clone $query;
         $totalMinutosCajones = $this->totalMinutos($totalesQuery, $hasMinutosTrabajados);
-        $totalMinutosOrdinarios = $horasOrdinariasQuery
-            ? (int) (clone $horasOrdinariasQuery)->sum('minutos')
-            : 0;
-        $totalMinutos = $totalMinutosCajones + $totalMinutosOrdinarios;
+        $totalMinutosOrdinarios = 0;
+        $totalMinutos = $totalMinutosCajones;
         $totales = [
-            'registros' => (clone $totalesQuery)->count() + ($horasOrdinariasQuery ? (clone $horasOrdinariasQuery)->count() : 0),
-            'ordinarias' => $horasOrdinariasQuery ? (clone $horasOrdinariasQuery)->count() : 0,
+            'registros' => (clone $totalesQuery)->count(),
+            'ordinarias' => 0,
             'puros' => (clone $totalesQuery)->sum('cantidad_puros'),
             'cajones' => (clone $totalesQuery)->sum('cantidad_cajones'),
             'actividades' => $this->totalActividades($totalesQuery, $hasCantidadActividades),
             'minutos' => $totalMinutos,
             'minutos_cajones' => $totalMinutosCajones,
-            'minutos_ordinarios' => $totalMinutosOrdinarios,
+            'minutos_ordinarios' => 0,
             'tiempo' => VinetaRegistro::minutosATiempoTexto($totalMinutos),
             'tiempo_cajones' => VinetaRegistro::minutosATiempoTexto($totalMinutosCajones),
-            'tiempo_ordinario' => VinetaRegistro::minutosATiempoTexto($totalMinutosOrdinarios),
+            'tiempo_ordinario' => VinetaRegistro::minutosATiempoTexto(0),
             'monto' => $this->totalMonto($totalesQuery),
         ];
         $perPageOptions = PerPageOptions::forTotal($totales['registros']);
@@ -148,7 +150,7 @@ class VinetaRegistroController extends Controller
 
         $registros = $this->paginarRegistrosCombinados(
             $query,
-            $horasOrdinariasQuery,
+            null,
             $orden,
             $direccion,
             $perPage,
@@ -163,6 +165,53 @@ class VinetaRegistroController extends Controller
                     ->pluck('vineta_id')
             )
             : ['timelines' => [], 'resumenes' => []];
+
+        $fechaDesde = $this->dateInput($request->get('fecha_desde'));
+        $fechaHasta = $this->dateInput($request->get('fecha_hasta'));
+
+        $documentosDisponibles = collect();
+        if ($fechaDesde || $fechaHasta) {
+            if (Schema::hasTable('documento_empaques')) {
+                $documentosQuery = \App\Models\DocumentoEmpaque::query();
+                if ($fechaDesde) {
+                    $documentosQuery->whereDate('fecha', '>=', $fechaDesde);
+                }
+                if ($fechaHasta) {
+                    $documentosQuery->whereDate('fecha', '<=', $fechaHasta);
+                }
+                $documentosEmpaque = $documentosQuery->orderByDesc('fecha')->orderBy('numero')->get();
+                foreach ($documentosEmpaque as $doc) {
+                    $documentosDisponibles->put((string) $doc->numero, (object) [
+                        'numero' => (string) $doc->numero,
+                        'descripcion' => $doc->descripcion,
+                        'fecha' => $doc->fecha?->toDateString(),
+                    ]);
+                }
+            }
+
+            if (Schema::hasColumn('vineta_registros', 'documento_numero')) {
+                $registrosDocNumeros = VinetaRegistro::query()
+                    ->when($fechaDesde, fn ($q) => $q->whereDate('fecha_registro', '>=', $fechaDesde))
+                    ->when($fechaHasta, fn ($q) => $q->whereDate('fecha_registro', '<=', $fechaHasta))
+                    ->whereNotNull('documento_numero')
+                    ->where('documento_numero', '!=', '')
+                    ->distinct()
+                    ->pluck('documento_numero');
+
+                foreach ($registrosDocNumeros as $num) {
+                    if (! $documentosDisponibles->has((string) $num)) {
+                        $documentosDisponibles->put((string) $num, (object) [
+                            'numero' => (string) $num,
+                            'descripcion' => null,
+                            'fecha' => null,
+                        ]);
+                    }
+                }
+            }
+        }
+
+        $documentosDisponibles = $documentosDisponibles->values();
+        $documentoSeleccionado = trim((string) $request->get('documento', ''));
 
         $viewData = compact(
             'registros',
@@ -179,6 +228,8 @@ class VinetaRegistroController extends Controller
             'hasHorasOrdinarias' => $hasHorasOrdinarias,
             'perPageOptions' => $perPageOptions,
             'perPageSelected' => $perPageSelected,
+            'documentosDisponibles' => $documentosDisponibles,
+            'documentoSeleccionado' => $documentoSeleccionado,
         ];
 
         if ($request->ajax()) {
@@ -336,7 +387,22 @@ class VinetaRegistroController extends Controller
             'America/Tegucigalpa'
         );
 
-        $duplicado = VinetaRegistro::query()
+        $isLimpieza = (string) $vinetaRegistro->actividad_codigo === '103'
+            || str_contains(strtolower((string) $vinetaRegistro->actividad_nombre), 'limpiez')
+            || str_contains(strtolower((string) $vinetaRegistro->actividad_nombre), 'limpiad')
+            || str_starts_with(strtolower((string) $vinetaRegistro->codigo_vineta), 'l-');
+
+        $isPrensado = (string) $vinetaRegistro->actividad_codigo === '1'
+            || str_contains(strtolower((string) $vinetaRegistro->actividad_nombre), 'prens')
+            || str_starts_with(strtolower((string) $vinetaRegistro->codigo_vineta), 'p-');
+
+        $isRolado = (string) $vinetaRegistro->actividad_codigo === '171'
+            || str_contains(strtolower((string) $vinetaRegistro->actividad_nombre), 'rola')
+            || str_starts_with(strtolower((string) $vinetaRegistro->codigo_vineta), 'r-');
+
+        $isEspecial = $isLimpieza || $isPrensado || $isRolado;
+
+        $duplicado = ! $isEspecial && VinetaRegistro::query()
             ->where('id', '!=', $vinetaRegistro->id)
             ->where('vineta_id', $vinetaRegistro->vineta_id)
             ->where('fecha_registro', $registradoEn->toDateString())
@@ -383,6 +449,57 @@ class VinetaRegistroController extends Controller
         $vinetaRegistro->update($payload);
 
         return back()->with('success', 'Registro actualizado correctamente.');
+    }
+
+    public function documentosPorFecha(Request $request)
+    {
+        $fechaDesde = $this->dateInput($request->get('fecha_desde'));
+        $fechaHasta = $this->dateInput($request->get('fecha_hasta'));
+
+        if (! $fechaDesde && ! $fechaHasta) {
+            return response()->json([]);
+        }
+
+        $documentosDisponibles = collect();
+        if (Schema::hasTable('documento_empaques')) {
+            $documentosQuery = \App\Models\DocumentoEmpaque::query();
+            if ($fechaDesde) {
+                $documentosQuery->whereDate('fecha', '>=', $fechaDesde);
+            }
+            if ($fechaHasta) {
+                $documentosQuery->whereDate('fecha', '<=', $fechaHasta);
+            }
+            $documentosEmpaque = $documentosQuery->orderByDesc('fecha')->orderBy('numero')->get();
+            foreach ($documentosEmpaque as $doc) {
+                $documentosDisponibles->put((string) $doc->numero, [
+                    'numero' => (string) $doc->numero,
+                    'descripcion' => $doc->descripcion,
+                    'fecha' => $doc->fecha?->toDateString(),
+                ]);
+            }
+        }
+
+        if (Schema::hasColumn('vineta_registros', 'documento_numero')) {
+            $registrosDocNumeros = VinetaRegistro::query()
+                ->when($fechaDesde, fn ($q) => $q->whereDate('fecha_registro', '>=', $fechaDesde))
+                ->when($fechaHasta, fn ($q) => $q->whereDate('fecha_registro', '<=', $fechaHasta))
+                ->whereNotNull('documento_numero')
+                ->where('documento_numero', '!=', '')
+                ->distinct()
+                ->pluck('documento_numero');
+
+            foreach ($registrosDocNumeros as $num) {
+                if (! $documentosDisponibles->has((string) $num)) {
+                    $documentosDisponibles->put((string) $num, [
+                        'numero' => (string) $num,
+                        'descripcion' => null,
+                        'fecha' => null,
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($documentosDisponibles->values());
     }
 
     public function empleado(Request $request)
@@ -468,6 +585,7 @@ class VinetaRegistroController extends Controller
             'anillado' => ['empleados' => []],
             'rezago' => ['empleados' => []],
             'llenado' => ['empleados' => []],
+            'limpieza' => ['empleados' => []],
         ];
 
         $empleadosMap = Empleado::query()
@@ -494,7 +612,7 @@ class VinetaRegistroController extends Controller
             $cargo = $empleadoObj?->cargo;
 
             $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
-            $grupoArea = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado'], true)
+            $grupoArea = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
                 ? $grupoPuesto
                 : ($this->grupoActividadProceso(
                     $registro->actividad_nombre,
@@ -518,11 +636,11 @@ class VinetaRegistroController extends Controller
                 $registro->empleado_codigo,
                 $porHora ? 'Viñeta por hora' : 'Viñeta',
                 $registro->vineta_api_id ? 'ID '.$registro->vineta_api_id : $registro->codigo_vineta,
-                $this->valorExport($registro->producto_codigo),
-                $this->valorExport($registro->marca),
-                $this->valorExport($registro->producto_item),
-                $this->valorExport($registro->orden_del_sistema),
-                $this->valorExport($registro->orden),
+                $this->valorExport($registro->productoCodigoReporte()),
+                $this->valorExport($registro->marcaReporte()),
+                $this->valorExport($registro->productoItemReporte()),
+                $this->valorExport($registro->ordenDelSistemaReporte()),
+                $this->valorExport($registro->ordenReporte()),
                 $registro->actividad_nombre,
                 $registro->cantidad_puros,
                 $estadistico,
@@ -555,12 +673,17 @@ class VinetaRegistroController extends Controller
                 $hora->observacion,
             ];
 
+            $cargoHora = $hora->empleado?->cargo ?? $hora->empleado?->area;
+            if (empty($cargoHora)) {
+                $cargoHora = $empleadosMap->get(trim((string) $hora->empleado_codigo))?->cargo;
+            }
+
             $this->acumularHoraOrdinariaAreaExport(
                 $areaData,
                 $hora->empleado_nombre,
                 $hora->empleado_codigo,
                 $minutos,
-                $hora->empleado?->cargo ?? $hora->empleado?->area
+                $cargoHora
             );
         }
 
@@ -605,6 +728,11 @@ class VinetaRegistroController extends Controller
                 'name' => 'Resumen Llenado',
                 'rows' => $this->resumenLlenadoExportRows($areaData['llenado']['empleados'], $fechaTexto),
                 'format' => 'pivot_llenado',
+            ],
+            [
+                'name' => 'Resumen Limpieza',
+                'rows' => $this->resumenLimpiezaExportRows($areaData['limpieza']['empleados'], $fechaTexto),
+                'format' => 'pivot_limpieza',
             ],
         ];
 
@@ -666,7 +794,7 @@ class VinetaRegistroController extends Controller
     ): void {
         $key = $codigo.'|'.$nombre;
 
-        foreach (['llenado', 'rezago', 'anillado'] as $grupo) {
+        foreach (['llenado', 'rezago', 'anillado', 'limpieza'] as $grupo) {
             if (isset($areaData[$grupo]['empleados'][$key])) {
                 $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
 
@@ -676,7 +804,7 @@ class VinetaRegistroController extends Controller
 
         $empCodigo = trim((string) $codigo);
         $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
-        $grupo = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado'], true)
+        $grupo = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
             ? $grupoPuesto
             : 'anillado';
 
@@ -715,7 +843,15 @@ class VinetaRegistroController extends Controller
 
         $rows = [$headers];
 
+        $totalEstadisticoGeneral = 0;
+        $totalMinutosGeneral = 0;
+        $totalMinutosOrdinariosGeneral = 0;
+
         foreach ($empleados as $row) {
+            $totalEstadisticoGeneral += (int) ($row['estadistico'] ?? 0);
+            $totalMinutosGeneral += (int) ($row['minutos'] ?? 0);
+            $totalMinutosOrdinariosGeneral += (int) ($row['minutos_ordinarios'] ?? 0);
+
             $horasTarea = round($row['minutos'] / 60, 2);
             $fila = [
                 $row['empleado'],
@@ -730,6 +866,19 @@ class VinetaRegistroController extends Controller
 
             $rows[] = $fila;
         }
+
+        $totalFila = [
+            'Total general',
+            '',
+            $totalEstadisticoGeneral,
+            round($totalMinutosGeneral / 60, 2),
+        ];
+
+        if ($hasHorasOrdinarias) {
+            $totalFila[] = round($totalMinutosOrdinariosGeneral / 60, 2);
+        }
+
+        $rows[] = $totalFila;
 
         return $rows;
     }
@@ -752,10 +901,18 @@ class VinetaRegistroController extends Controller
             ],
         ];
 
+        $totalPurosGeneral = 0;
+        $totalMinutosGeneral = 0;
+        $totalMinutosOrdinariosGeneral = 0;
+
         foreach ($empleados as $emp) {
             $totalPuros = (int) $emp['puros'];
             $totalHoras = round($emp['minutos'] / 60, 2);
             $totalOrdinarias = round(($emp['minutos_ordinarios'] ?? 0) / 60, 2);
+
+            $totalPurosGeneral += $totalPuros;
+            $totalMinutosGeneral += (int) $emp['minutos'];
+            $totalMinutosOrdinariosGeneral += (int) ($emp['minutos_ordinarios'] ?? 0);
 
             $rows[] = [
                 $emp['empleado'],
@@ -786,6 +943,13 @@ class VinetaRegistroController extends Controller
             }
         }
 
+        $rows[] = [
+            'Total general',
+            $totalPurosGeneral,
+            round($totalMinutosGeneral / 60, 2),
+            round($totalMinutosOrdinariosGeneral / 60, 2),
+        ];
+
         return $rows;
     }
 
@@ -807,10 +971,18 @@ class VinetaRegistroController extends Controller
             ],
         ];
 
+        $totalEstadisticoGeneral = 0;
+        $totalMinutosGeneral = 0;
+        $totalMinutosOrdinariosGeneral = 0;
+
         foreach ($empleados as $emp) {
             $totalEstadistico = (int) $emp['estadistico'];
             $totalHoras = round($emp['minutos'] / 60, 2);
             $totalOrdinarias = round(($emp['minutos_ordinarios'] ?? 0) / 60, 2);
+
+            $totalEstadisticoGeneral += $totalEstadistico;
+            $totalMinutosGeneral += (int) $emp['minutos'];
+            $totalMinutosOrdinariosGeneral += (int) ($emp['minutos_ordinarios'] ?? 0);
 
             $rows[] = [
                 $emp['empleado'],
@@ -841,6 +1013,83 @@ class VinetaRegistroController extends Controller
             }
         }
 
+        $rows[] = [
+            'Total general',
+            $totalEstadisticoGeneral,
+            round($totalMinutosGeneral / 60, 2),
+            round($totalMinutosOrdinariosGeneral / 60, 2),
+        ];
+
+        return $rows;
+    }
+
+    private function resumenLimpiezaExportRows(array $empleados, string $fechaTexto): array
+    {
+        uasort($empleados, function (array $a, array $b) {
+            return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
+                <=> [$this->normalizarTextoReporte($b['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])];
+        });
+
+        $rows = [
+            ['REPORTE DE LIMPIEZA '.$fechaTexto.'.'],
+            [],
+            [
+                'Etiquetas de fila',
+                'Suma de Cantidad Procesada',
+                'Suma de Horas Trabajadas',
+                'Suma de Horas Ordinarias',
+            ],
+        ];
+
+        $totalEstadisticoGeneral = 0;
+        $totalMinutosGeneral = 0;
+        $totalMinutosOrdinariosGeneral = 0;
+
+        foreach ($empleados as $emp) {
+            $totalEstadistico = (int) ($emp['estadistico'] ?? 0);
+            $totalHoras = round($emp['minutos'] / 60, 2);
+            $totalOrdinarias = round(($emp['minutos_ordinarios'] ?? 0) / 60, 2);
+
+            $totalEstadisticoGeneral += $totalEstadistico;
+            $totalMinutosGeneral += (int) $emp['minutos'];
+            $totalMinutosOrdinariosGeneral += (int) ($emp['minutos_ordinarios'] ?? 0);
+
+            $rows[] = [
+                $emp['empleado'],
+                $totalEstadistico,
+                $totalHoras,
+                $totalOrdinarias,
+            ];
+
+            $rows[] = [
+                '   '.$emp['codigo_empleado'],
+                $totalEstadistico,
+                $totalHoras,
+                $totalOrdinarias,
+            ];
+
+            $actividades = $emp['actividades'];
+            uksort($actividades, 'strnatcasecmp');
+            $first = true;
+
+            foreach ($actividades as $act) {
+                $rows[] = [
+                    '      '.$act['nombre'],
+                    (int) ($act['estadistico'] ?? 0),
+                    round($act['minutos'] / 60, 2),
+                    $first ? $totalOrdinarias : 0,
+                ];
+                $first = false;
+            }
+        }
+
+        $rows[] = [
+            'Total general',
+            $totalEstadisticoGeneral,
+            round($totalMinutosGeneral / 60, 2),
+            round($totalMinutosOrdinariosGeneral / 60, 2),
+        ];
+
         return $rows;
     }
 
@@ -861,6 +1110,9 @@ class VinetaRegistroController extends Controller
                 || str_contains($nombreNorm, 'lamina')
             ) {
                 return 'anillado';
+            }
+            if (str_contains($nombreNorm, 'limpi') && ! str_contains($nombreNorm, 'llenado de bolsa')) {
+                return 'limpieza';
             }
             if (
                 str_contains($nombreNorm, 'llenad')
@@ -898,6 +1150,10 @@ class VinetaRegistroController extends Controller
             return 'anillado';
         }
 
+        if ((str_contains($texto, 'limpi') || str_contains($texto, '103') || trim((string) $codigo) === '103') && ! str_contains($texto, 'llenado de bolsa')) {
+            return 'limpieza';
+        }
+
         if (
             str_contains($texto, 'llenad')
             || str_contains($texto, 'kretek')
@@ -933,11 +1189,11 @@ class VinetaRegistroController extends Controller
         $fecha = $registro->fecha_registro?->format('Y-m-d') ?? 'N/A';
         $empleado = $registro->empleado_nombre;
         $codigoEmpleado = $registro->empleado_codigo;
-        $codigoProducto = $this->valorExport($registro->producto_codigo);
-        $marca = $this->valorExport($registro->marca);
-        $item = $this->valorExport($registro->producto_item);
-        $ordenSistema = $this->valorExport($registro->orden_del_sistema);
-        $ordenCliente = $this->valorExport($registro->orden);
+        $codigoProducto = $this->valorExport($registro->productoCodigoReporte());
+        $marca = $this->valorExport($registro->marcaReporte());
+        $item = $this->valorExport($registro->productoItemReporte());
+        $ordenSistema = $this->valorExport($registro->ordenDelSistemaReporte());
+        $ordenCliente = $this->valorExport($registro->ordenReporte());
         $actividad = trim((string) $registro->actividad_nombre);
         $actividad = $actividad !== '' ? $actividad : 'Sin actividad';
         $empleadoKey = $codigoEmpleado.'|'.$empleado;
@@ -1139,7 +1395,10 @@ class VinetaRegistroController extends Controller
             ->where('activo', true)
             ->where(function ($query) {
                 $query->whereRaw('LOWER(area) LIKE ?', ['%empaque%tarea%permanente%'])
-                    ->orWhereRaw('LOWER(area) LIKE ?', ['%empaque%brocha%permanente%']);
+                    ->orWhereRaw('LOWER(area) LIKE ?', ['%empaque%brocha%permanente%'])
+                    ->orWhereRaw('LOWER(area) LIKE ?', ['%brocha%'])
+                    ->orWhereRaw('LOWER(cargo) LIKE ?', ['%brocha%'])
+                    ->orWhereIn('codigo', ['8217', '8219']);
             })
             ->orderBy('nombre')
             ->orderBy('codigo')
@@ -1174,22 +1433,41 @@ class VinetaRegistroController extends Controller
                     && ! $this->empleadoEsLlenadoReporte($empleado))
                 ->sortBy(fn (Empleado $empleado) => mb_strtolower((string) $empleado->nombre).'|'.$empleado->codigo)
                 ->values();
-            $rows = $this->reporteSemanalAreaRows(
-                $areaTitulo,
-                $inicio,
-                $fin,
-                $empleadosArea,
-                $registrosPorEmpleado,
-                $horasPorEmpleado
-            );
 
-            $sheets[] = [
-                'name' => $areaKey === 'tarea' ? 'Empaque tarea' : 'Empaque brocha',
-                'rows' => $rows,
-                'format' => 'weekly_report',
-                'paper_size' => 'letter',
-                'employees_per_page' => 3,
-            ];
+            if ($areaKey === 'brocha') {
+                $rows = $this->reporteSemanalBrochaRows(
+                    $inicio,
+                    $fin,
+                    $empleadosArea,
+                    $registrosPorEmpleado,
+                    $horasPorEmpleado
+                );
+
+                $sheets[] = [
+                    'name' => 'Empaque brocha',
+                    'rows' => $rows,
+                    'format' => 'weekly_report',
+                    'paper_size' => 'legal',
+                    'employees_per_page' => 1,
+                ];
+            } else {
+                $rows = $this->reporteSemanalAreaRows(
+                    $areaTitulo,
+                    $inicio,
+                    $fin,
+                    $empleadosArea,
+                    $registrosPorEmpleado,
+                    $horasPorEmpleado
+                );
+
+                $sheets[] = [
+                    'name' => 'Empaque tarea',
+                    'rows' => $rows,
+                    'format' => 'weekly_report',
+                    'paper_size' => 'letter',
+                    'employees_per_page' => 3,
+                ];
+            }
         }
 
         if ($empleadosLlenado->isNotEmpty()) {
@@ -1480,19 +1758,397 @@ class VinetaRegistroController extends Controller
         return $rows;
     }
 
+    private function reporteSemanalBrochaRows(
+        Carbon $inicio,
+        Carbon $fin,
+        $empleados,
+        $registrosPorEmpleado,
+        $horasPorEmpleado
+    ): array {
+        $columnasActividad = $this->columnasActividadBrochaReporte();
+        $precios = $this->preciosActividadBrochaReporte($columnasActividad);
+        $header = array_merge([
+            'Dia',
+            'Inc.',
+            'Per',
+            'S.S.',
+            'Lact.',
+            'HD',
+            'HO',
+        ], array_values($columnasActividad), [
+            'Total',
+            'Precios',
+            'Actividades',
+            'Otros Ing.',
+        ]);
+        $totalIndex = 7 + count($columnasActividad);
+        $precioIndex = $totalIndex + 1;
+        $actividadPrecioIndex = $totalIndex + 2;
+        $otroIngresoIndex = $totalIndex + 3;
+        $rows = [
+            ['Tabacos de Oriente "El Paraiso"'],
+            ['Periodo del '.$this->fechaLarga($inicio).' al '.$this->fechaLarga($fin)],
+            ['Empaque de Brocha Permanente'],
+            [],
+        ];
+
+        if ($empleados->isEmpty()) {
+            $rows[] = ['No hay empleados activos en esta area.'];
+
+            return $rows;
+        }
+
+        foreach ($empleados as $empleado) {
+            $registrosEmpleado = $registrosPorEmpleado->get($empleado->codigo, collect());
+            $horasEmpleado = $horasPorEmpleado->get($empleado->codigo, collect());
+            $empleadoRow = array_fill(0, count($header), '');
+            $empleadoRow[0] = 'COD: '.$empleado->codigo;
+            $empleadoRow[1] = $empleado->nombre;
+            $empleadoRow[15] = 'Puesto:';
+            $empleadoRow[16] = $this->puestoReporteEmpleado($empleado, 'brocha');
+
+            $rows[] = $empleadoRow;
+            $rows[] = $header;
+
+            $totalesActividad = array_fill_keys(array_keys($columnasActividad), 0);
+            $totalGeneral = 0;
+            $totalHo = 0.0;
+            $dias = [];
+
+            for ($date = $inicio->copy(); $date->lte($fin); $date->addDay()) {
+                $dias[] = [$this->diaSemanaCorto($date), $date->toDateString()];
+            }
+
+            $lineas = max(count($dias), count($precios));
+
+            for ($index = 0; $index < $lineas; $index++) {
+                $row = array_fill(0, count($header), '');
+
+                if (isset($dias[$index])) {
+                    [$dia, $fecha] = $dias[$index];
+                    $actividadDia = array_fill_keys(array_keys($columnasActividad), 0);
+                    $registrosDia = $registrosEmpleado->filter(
+                        fn (VinetaRegistro $registro) => $registro->fecha_registro?->format('Y-m-d') === $fecha
+                    );
+
+                    foreach ($registrosDia as $registro) {
+                        $columna = $this->columnaActividadBrochaRegistroReporte($registro);
+
+                        if ($columna !== null && array_key_exists($columna, $actividadDia)) {
+                            $actividadDia[$columna] += (int) $registro->total_actividades;
+                        }
+                    }
+
+                    $ho = $this->horasOrdinariasDia($horasEmpleado, $fecha);
+                    $totalDia = (int) array_sum($actividadDia);
+                    $row[0] = $dia;
+                    $row[6] = $this->numeroReporte($ho);
+                    $totalHo += $ho;
+                    $totalGeneral += $totalDia;
+
+                    $columnIndex = 7;
+
+                    foreach ($columnasActividad as $key => $label) {
+                        $valor = $actividadDia[$key] ?? 0;
+                        $row[$columnIndex++] = $this->numeroReporte($valor);
+                        $totalesActividad[$key] += $valor;
+                    }
+
+                    $row[$totalIndex] = $this->totalDiaReporte($totalDia, $ho);
+
+                    if ($index < 5) {
+                        $row[$otroIngresoIndex] = 'L 0.00';
+                    }
+                }
+
+                if (isset($precios[$index])) {
+                    $row[$precioIndex] = $precios[$index]['precio'];
+                    $row[$actividadPrecioIndex] = $precios[$index]['actividad'];
+                }
+
+                $rows[] = $row;
+            }
+
+            $totalRow = array_fill(0, count($header), '');
+            $totalRow[0] = 'Total Semanal';
+            $totalRow[6] = $this->numeroReporte($totalHo);
+            $columnIndex = 7;
+
+            foreach ($columnasActividad as $key => $label) {
+                $totalRow[$columnIndex++] = $this->numeroReporte($totalesActividad[$key] ?? 0);
+            }
+
+            $totalRow[$totalIndex] = $this->numeroReporte($totalGeneral);
+            $totalRow[$actividadPrecioIndex] = 'Totales';
+            $rows[] = $totalRow;
+            $rows[] = [];
+        }
+
+        return $rows;
+    }
+
+    private function columnasActividadBrochaReporte(): array
+    {
+        return [
+            '1_phm' => '1/PHM',
+            '2_phm' => '2/PHM',
+            '3_phm' => '3/PHM',
+            '3_pp' => '3/PP',
+            '4_shm' => '4/SHM',
+            '5_shm' => '5/SHM',
+            '6_7_ph' => '6,7/PH',
+            'ani_cel_sel' => 'Ani/Cel/Sel',
+            'costu_brocha' => 'Costu/brocha',
+            'eng_limpi' => 'Eng/Limpi',
+            'limpi_gom' => 'Limpi/Gom',
+            'limp_llenado' => 'Limp/Llenado',
+            'limp_puros' => 'Limp/puros',
+            'llen_bol_5' => 'Llen/bol/5',
+            'llen_bol_8' => 'Llen/bol/8',
+            'llen_disp' => 'Llen/Disp',
+            'petaca_4' => 'Petaca 4',
+            'rez_bro' => 'Rez/Bro',
+            'rolado' => 'Rolado',
+            'rez_pur' => 'Rez/pur',
+        ];
+    }
+
+    private function fuentesPrecioBrochaReporte(): array
+    {
+        return [
+            '1_phm' => ['1/PHM', '1 PHM'],
+            '2_phm' => ['2/PHM', '2 PHM'],
+            '3_phm' => ['3/PHM', '3 PHM'],
+            '3_pp' => ['3/PP', '3 PP', '1/PP'],
+            '4_shm' => ['4/SHM', '4 SHM'],
+            '5_shm' => ['5/SHM', '5 SHM'],
+            '6_7_ph' => ['6,7/PH', '6 y 7/PH', '6/7 PHM', '7/PPHM'],
+            'ani_cel_sel' => ['Anillado', 'Celofanado', 'Pegado de Sellos en Celofan', '2 Anillo, Celofan, Cello'],
+            'costu_brocha' => ['Costura de Brocha', 'Costura Brocha', 'Costur/Broc'],
+            'eng_limpi' => ['Engomado y Limpieza', 'Rasurado Brocha', 'Eng. Limp. Ras/Broc.'],
+            'limpi_gom' => ['Limpieza y Gomado de Brochas', 'Limp/Gom/Br'],
+            'limp_llenado' => ['Limp/Llen/Bol', 'Limpieza y Llenado'],
+            'limp_puros' => ['Limpia Puros', 'Limpieza de Puros', 'Limp/Pur'],
+            'llen_bol_5' => ['Llenado de Bolsas 5 Puros (Kretek)', 'Llen/Bol/5'],
+            'llen_bol_8' => ['Llenado de Bolsas 8 Puros (Kretek)', 'Llen/Bol/8'],
+            'llen_disp' => ['Llenado de Display', 'Llen/Disp/Br'],
+            'petaca_4' => ['Petaca 4 Puros', 'Petaca 4'],
+            'rez_bro' => ['Rezago Brocha', 'Rez/Bro'],
+            'rolado' => ['Rolado'],
+            'rez_pur' => ['Rezago Puros', 'Rezagado', 'Rez/pur'],
+        ];
+    }
+
+    private function preciosActividadBrochaReporte(array $columnasActividad): array
+    {
+        $precios = [
+            '1_phm' => 0.0769643,
+            '2_phm' => 0.0897917,
+            '3_phm' => 0.0769643,
+            '3_pp' => 0.1795833,
+            '4_shm' => 0.2155000,
+            '5_shm' => 0.2693750,
+            '6_7_ph' => 0.1077500,
+            'ani_cel_sel' => 0.0899603,
+            'costu_brocha' => 0.0415702,
+            'eng_limpi' => 0.0391818,
+            'limpi_gom' => 0.0689600,
+            'limp_llenado' => 0.0633032,
+            'limp_puros' => 0.0503622,
+            'llen_bol_5' => 0.0333767,
+            'llen_bol_8' => 0.0377739,
+            'llen_disp' => 0.0269375,
+            'petaca_4' => 0.0897917,
+            'rez_bro' => 0.0377739,
+            'rolado' => 1.2314286,
+            'rez_pur' => 0.0749956,
+        ];
+
+        try {
+            DB::table('actividad_producto')
+                ->join('actividades', 'actividades.id', '=', 'actividad_producto.actividad_id')
+                ->whereNotNull('actividad_producto.precio_mo')
+                ->where('actividad_producto.precio_mo', '>', 0)
+                ->orderBy('actividades.nombre')
+                ->get(['actividades.nombre', 'actividad_producto.precio_mo'])
+                ->each(function ($actividad) use (&$precios) {
+                    $key = $this->columnaActividadBrochaTextoReporte((string) $actividad->nombre);
+                    $precio = (float) $actividad->precio_mo;
+
+                    if ($key !== null && array_key_exists($key, $precios) && $precio > 0) {
+                        $precios[$key] = $precio;
+                    }
+                });
+
+            foreach ($this->fuentesPrecioBrochaReporte() as $key => $nombres) {
+                if (! array_key_exists($key, $precios)) {
+                    continue;
+                }
+
+                $precio = $this->precioActividadPorNombres($nombres);
+
+                if ($precio !== null && $precio > 0) {
+                    $precios[$key] = $precio;
+                }
+            }
+        } catch (\Throwable) {
+            // DB fallback
+        }
+
+        $rows = [
+            ['precio' => 'L53.88', 'actividad' => 'H. O.'],
+            ['precio' => 'L431.00', 'actividad' => 'Al Dia'],
+        ];
+
+        foreach ($columnasActividad as $key => $label) {
+            $rows[] = [
+                'precio' => isset($precios[$key]) ? $this->monedaReporte((float) $precios[$key], 7) : '',
+                'actividad' => $label,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function columnaActividadBrochaRegistroReporte(VinetaRegistro $registro): ?string
+    {
+        return $this->columnaActividadBrochaTextoReporte($this->textoActividadReporte($registro));
+    }
+
+    private function columnaActividadBrochaTextoReporte(string $texto): ?string
+    {
+        $texto = $this->normalizarTextoReporte($texto);
+
+        if ($texto === '') {
+            return null;
+        }
+
+        if (str_contains($texto, '1/phm') || str_contains($texto, '1 phm')) {
+            return '1_phm';
+        }
+
+        if (str_contains($texto, '2/phm') || str_contains($texto, '2 phm')) {
+            return '2_phm';
+        }
+
+        if (str_contains($texto, '3/phm') || str_contains($texto, '3 phm')) {
+            return '3_phm';
+        }
+
+        if (str_contains($texto, '3/pp') || str_contains($texto, '3 pp') || str_contains($texto, '1/pp') || str_contains($texto, '1 pp')) {
+            return '3_pp';
+        }
+
+        if (str_contains($texto, '4/shm') || str_contains($texto, '4 shm')) {
+            return '4_shm';
+        }
+
+        if (str_contains($texto, '5/shm') || str_contains($texto, '5 shm')) {
+            return '5_shm';
+        }
+
+        if ($this->esActividadSeisSieteReporte($texto)) {
+            return '6_7_ph';
+        }
+
+        if (str_contains($texto, 'petaca')) {
+            return 'petaca_4';
+        }
+
+        if (str_contains($texto, 'rolad')) {
+            return 'rolado';
+        }
+
+        if (str_contains($texto, 'costu') || str_contains($texto, 'costur')) {
+            return 'costu_brocha';
+        }
+
+        if ((str_contains($texto, 'bols') || str_contains($texto, 'bol')) && str_contains($texto, '5')) {
+            return 'llen_bol_5';
+        }
+
+        if ((str_contains($texto, 'bols') || str_contains($texto, 'bol')) && str_contains($texto, '8')) {
+            return 'llen_bol_8';
+        }
+
+        if (str_contains($texto, 'disp')) {
+            return 'llen_disp';
+        }
+
+        if ((str_contains($texto, 'rez') || str_contains($texto, 'resag') || str_contains($texto, 'rezag') || str_contains($texto, 'rezad')) && (str_contains($texto, 'bro') || str_contains($texto, 'broc'))) {
+            return 'rez_bro';
+        }
+
+        if (str_contains($texto, 'rez') || str_contains($texto, 'resag') || str_contains($texto, 'rezag') || str_contains($texto, 'rezad')) {
+            return 'rez_pur';
+        }
+
+        if (str_contains($texto, 'rasur') || (str_contains($texto, 'eng') && str_contains($texto, 'limp')) || str_contains($texto, 'engom')) {
+            return 'eng_limpi';
+        }
+
+        if ((str_contains($texto, 'gom') && str_contains($texto, 'broc')) || (str_contains($texto, 'limp') && str_contains($texto, 'gom')) || str_contains($texto, 'limpi/gom')) {
+            return 'limpi_gom';
+        }
+
+        if (str_contains($texto, 'limp') && (str_contains($texto, 'llen') || str_contains($texto, 'bolsa') || str_contains($texto, 'paquet'))) {
+            return 'limp_llenado';
+        }
+
+        if (str_contains($texto, 'limp') && (str_contains($texto, 'puro') || str_contains($texto, 'pur'))) {
+            return 'limp_puros';
+        }
+
+        if (
+            str_contains($texto, 'anill')
+            || str_contains($texto, 'anil')
+            || str_contains($texto, 'celof')
+            || str_contains($texto, 'sello')
+            || str_contains($texto, 'sell')
+            || str_contains($texto, 'esponj')
+            || str_contains($texto, 'lamina')
+        ) {
+            return 'ani_cel_sel';
+        }
+
+        if (str_contains($texto, 'limp') && str_contains($texto, 'broc')) {
+            return 'limpi_gom';
+        }
+
+        if (str_contains($texto, 'llen')) {
+            return 'limp_llenado';
+        }
+
+        return null;
+    }
+
     private function empleadoPerteneceAreaReporte(Empleado $empleado, string $areaKey): bool
     {
         $area = $this->normalizarTextoReporte($empleado->area);
+        $cargo = $this->normalizarTextoReporte($empleado->cargo);
+        $codigoTrim = trim((string) $empleado->codigo);
 
-        return match ($areaKey) {
-            'tarea' => str_contains($area, 'empaque')
-                && str_contains($area, 'tarea')
-                && str_contains($area, 'permanente'),
-            'brocha' => str_contains($area, 'empaque')
-                && str_contains($area, 'brocha')
-                && str_contains($area, 'permanente'),
-            default => false,
-        };
+        if ($areaKey === 'brocha') {
+            if ($codigoTrim === '8217' || $codigoTrim === '8219') {
+                return true;
+            }
+
+            if (str_contains($cargo, 'brocha')) {
+                return true;
+            }
+
+            return str_contains($area, 'brocha');
+        }
+
+        if ($areaKey === 'tarea') {
+            if ($codigoTrim === '8217' || $codigoTrim === '8219' || str_contains($cargo, 'brocha') || str_contains($area, 'brocha')) {
+                return false;
+            }
+
+            return (str_contains($area, 'empaque') && str_contains($area, 'tarea')) || ! str_contains($area, 'brocha');
+        }
+
+        return false;
     }
 
     private function empleadoEsLlenadoReporte(Empleado $empleado): bool
@@ -1577,6 +2233,7 @@ class VinetaRegistroController extends Controller
             'anillado' => 'Anilladora / Celofanadora',
             'limpia' => 'Limpia Puros',
             'llenado' => 'Llenado de Cajas y Paquetes',
+            'brocha' => 'Limpia Brochas',
             default => 'Empaque',
         };
     }
@@ -1701,9 +2358,9 @@ class VinetaRegistroController extends Controller
         return $precio === null ? null : (float) $precio;
     }
 
-    private function monedaReporte(float $value): string
+    private function monedaReporte(float $value, int $decimals = 6): string
     {
-        return 'L'.number_format($value, 6, '.', '');
+        return 'L'.number_format($value, $decimals, '.', '');
     }
 
     private function columnaActividadLlenadoRegistroReporte(VinetaRegistro $registro): ?string
@@ -2108,7 +2765,7 @@ class VinetaRegistroController extends Controller
                     $styleId = $paperSize === 'legal' ? 10 : 7;
                 }
 
-                if (in_array($format, ['pivot_rezago', 'pivot_llenado'], true)) {
+                if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza'], true)) {
                     if ($rowIndex === 2) {
                         $styleId = $columnIndex === 0 ? 11 : 12;
                     } elseif ($rowIndex >= 3) {
@@ -2120,6 +2777,10 @@ class VinetaRegistroController extends Controller
                             $styleId = $columnIndex === 0 ? null : null;
                         }
                     }
+                }
+
+                if ($format === 'anillado_summary' && str_starts_with((string) ($row[0] ?? ''), 'Total')) {
+                    $styleId = $columnIndex <= 1 ? 1 : 5;
                 }
 
                 $style = $styleId === null ? '' : ' s="'.$styleId.'"';
@@ -2150,13 +2811,18 @@ class VinetaRegistroController extends Controller
             foreach ($rows as $rowIndex => $row) {
                 if ($this->xlsxEsFilaEmpleadoReporte($row)) {
                     $rowNumber = $rowIndex + 1;
-                    $merges[] = 'B'.$rowNumber.':K'.$rowNumber;
-
                     $puestoIndex = array_search('Puesto:', $row, true);
+
+                    if ($puestoIndex !== false && $puestoIndex > 2) {
+                        $nameEndCol = $this->xlsxColumnName($puestoIndex);
+                        $merges[] = 'B'.$rowNumber.':'.$nameEndCol.$rowNumber;
+                    } else {
+                        $merges[] = 'B'.$rowNumber.':K'.$rowNumber;
+                    }
 
                     if ($puestoIndex !== false && isset($row[$puestoIndex + 1])) {
                         $cargoIndex = $puestoIndex + 1;
-                        $cargoEndIndex = min($cargoIndex + 2, $columnCount - 1);
+                        $cargoEndIndex = min($cargoIndex + 4, $columnCount - 1);
 
                         if ($cargoEndIndex > $cargoIndex) {
                             $merges[] = $this->xlsxColumnName($cargoIndex + 1).$rowNumber
@@ -2176,7 +2842,7 @@ class VinetaRegistroController extends Controller
             $mergeXml .= '</mergeCells>';
         }
 
-        $autoFilter = in_array($format, ['weekly_report', 'pivot_rezago', 'pivot_llenado'], true) ? '' : '<autoFilter ref="A1:'.$lastCell.'"/>';
+        $autoFilter = in_array($format, ['weekly_report', 'pivot_rezago', 'pivot_llenado', 'pivot_limpieza'], true) ? '' : '<autoFilter ref="A1:'.$lastCell.'"/>';
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
@@ -2253,10 +2919,14 @@ class VinetaRegistroController extends Controller
         }
 
         if ($format === 'anillado_summary') {
-            return $rowIndex === 0 ? 1 : null;
+            if ($rowIndex === 0 || str_starts_with((string) ($row[0] ?? ''), 'Total')) {
+                return 1;
+            }
+
+            return null;
         }
 
-        if ($format === 'pivot_rezago' || $format === 'pivot_llenado') {
+        if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza'], true)) {
             if ($rowIndex === 0) {
                 return 1;
             }
@@ -2320,7 +2990,7 @@ class VinetaRegistroController extends Controller
             return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
         }
 
-        if ($format === 'pivot_rezago') {
+        if ($format === 'pivot_rezago' || $format === 'pivot_limpieza') {
             return [45, 28, 26, 26];
         }
 
@@ -2338,6 +3008,8 @@ class VinetaRegistroController extends Controller
 
                 for ($index = 7; $index < $columnCount; $index++) {
                     $base[$index] = match (true) {
+                        $index === $columnCount - 2 => 14.0,
+                        $index === $columnCount - 3 => 10.5,
                         $index >= $columnCount - 4 => 8.8,
                         default => 7.2,
                     };
@@ -2519,14 +3191,49 @@ class VinetaRegistroController extends Controller
             ->whereNotNull('precio_mo')
             ->where('precio_mo', '>', 0)
             ->groupBy('actividad_id');
+        $productoCodigoOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.codigo_producto, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.codigo_producto
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.producto_codigo, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.producto_codigo
+            ELSE ''
+        END";
+        $marcaOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.marca, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.marca
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.marca, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.marca
+            ELSE ''
+        END";
         $productoNombreOrden = "CASE
             WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.nombre, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.nombre
             WHEN LOWER(TRIM(COALESCE(vineta_registros.producto_nombre, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.producto_nombre
             ELSE ''
         END";
+        $vitolaOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.vitola, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.vitola
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.vitola, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.vitola
+            ELSE ''
+        END";
+        $capaOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.capa, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.capa
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.capa, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.capa
+            ELSE ''
+        END";
         $tipoEmpaqueOrden = "CASE
             WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.tipo_empaque, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.tipo_empaque
             WHEN LOWER(TRIM(COALESCE(vineta_registros.tipo_empaque, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.tipo_empaque
+            ELSE ''
+        END";
+        $productoItemOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.item, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.item
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.producto_item, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.producto_item
+            ELSE ''
+        END";
+        $ordenDelSistemaOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.orden_del_sistema, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.orden_del_sistema
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.orden_del_sistema, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.orden_del_sistema
+            ELSE ''
+        END";
+        $ordenOrden = "CASE
+            WHEN LOWER(TRIM(COALESCE(vinetas_paginacion.orden, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vinetas_paginacion.orden
+            WHEN LOWER(TRIM(COALESCE(vineta_registros.orden, ''))) NOT IN ('', 'ninguna', 'ninguno', 'n/a', 'na', 'null') THEN vineta_registros.orden
             ELSE ''
         END";
         $vinetas = clone $vinetaQuery;
@@ -2546,15 +3253,15 @@ class VinetaRegistroController extends Controller
                 'vineta_registros.codigo_vineta as codigo_vineta_orden',
                 'vineta_registros.vineta_api_id as vineta_api_id_orden',
                 DB::raw("COALESCE(presentaciones_paginacion.nombre, '') as presentacion_orden"),
-                DB::raw("COALESCE(vineta_registros.producto_codigo, '') as producto_codigo_orden"),
-                DB::raw("COALESCE(vineta_registros.marca, '') as marca_orden"),
+                DB::raw("{$productoCodigoOrden} as producto_codigo_orden"),
+                DB::raw("{$marcaOrden} as marca_orden"),
                 DB::raw("{$productoNombreOrden} as producto_nombre_orden"),
-                DB::raw("COALESCE(vineta_registros.vitola, '') as vitola_orden"),
-                DB::raw("COALESCE(vineta_registros.capa, '') as capa_orden"),
+                DB::raw("{$vitolaOrden} as vitola_orden"),
+                DB::raw("{$capaOrden} as capa_orden"),
                 DB::raw("{$tipoEmpaqueOrden} as tipo_empaque_orden"),
-                DB::raw("COALESCE(vineta_registros.producto_item, '') as producto_item_orden"),
-                DB::raw("COALESCE(vineta_registros.orden_del_sistema, '') as orden_del_sistema_orden"),
-                DB::raw("COALESCE(vineta_registros.orden, '') as orden_orden"),
+                DB::raw("{$productoItemOrden} as producto_item_orden"),
+                DB::raw("{$ordenDelSistemaOrden} as orden_del_sistema_orden"),
+                DB::raw("{$ordenOrden} as orden_orden"),
                 'vineta_registros.empleado_nombre as empleado_nombre_orden',
                 'vineta_registros.actividad_nombre as actividad_nombre_orden',
                 DB::raw('COALESCE(precios_paginacion.precio_actividad, vineta_registros.precio_mo, 0) as precio_mo_orden'),
@@ -2693,9 +3400,11 @@ class VinetaRegistroController extends Controller
         $ordenCliente = trim((string) $request->get('orden_cliente', ''));
         $codigoProducto = trim((string) $request->get('codigo_producto', ''));
         $empleado = trim((string) $request->get('empleado', ''));
+        $capa = trim((string) $request->get('capa', ''));
         $actividadGrupo = $this->actividadGrupo($request->get('actividad_grupo'));
         $fechaDesde = $this->dateInput($request->get('fecha_desde'));
         $fechaHasta = $this->dateInput($request->get('fecha_hasta'));
+        $documento = trim((string) $request->get('documento', ''));
 
         return VinetaRegistro::query()
             ->when($idVineta !== '', function ($query) use ($idVineta) {
@@ -2724,9 +3433,18 @@ class VinetaRegistroController extends Controller
                         ->orWhere('vineta_registros.empleado_nombre', 'like', $like);
                 });
             })
+            ->when($capa !== '', fn ($query) => $query->where('vineta_registros.capa', 'like', '%'.$capa.'%'))
             ->when($actividadGrupo !== '', function ($query) use ($actividadGrupo) {
-                if (str_ends_with($actividadGrupo, '_hora') || in_array($actividadGrupo, ['por_hora', 'hora'], true)) {
-                    $query->whereRaw('0 = 1');
+                if (in_array($actividadGrupo, ['por_hora', 'hora'], true)) {
+                    $this->applyPorHoraCondition($query);
+
+                    return;
+                }
+
+                if (str_ends_with($actividadGrupo, '_hora')) {
+                    $empleadoGrupo = substr($actividadGrupo, 0, -5);
+                    $this->applyEmpleadoGrupoFilter($query, $empleadoGrupo);
+                    $this->applyPorHoraCondition($query);
 
                     return;
                 }
@@ -2735,8 +3453,22 @@ class VinetaRegistroController extends Controller
                     [$empleadoGrupo, $actGrupo] = explode('_', $actividadGrupo, 2);
                     $this->applyEmpleadoGrupoFilter($query, $empleadoGrupo);
                     $this->applyActividadGrupo($query, $actGrupo);
+                    $this->applyNoPorHoraCondition($query);
+                } elseif ($actividadGrupo === 'indirectos') {
+                    $this->applyEmpleadoGrupoFilter($query, 'indirectos');
                 } else {
                     $this->applyActividadGrupo($query, $actividadGrupo);
+                    $this->applyNoPorHoraCondition($query);
+                }
+            })
+            ->when($documento !== '', function ($query) use ($documento) {
+                if ($documento === 'sin_documento') {
+                    $query->where(function ($q) {
+                        $q->whereNull('vineta_registros.documento_numero')
+                            ->orWhere('vineta_registros.documento_numero', '');
+                    });
+                } else {
+                    $query->where('vineta_registros.documento_numero', $documento);
                 }
             })
             ->when($fechaDesde, fn ($query) => $query->whereDate('vineta_registros.fecha_registro', '>=', $fechaDesde))
@@ -2750,12 +3482,14 @@ class VinetaRegistroController extends Controller
         $actividadGrupo = $this->actividadGrupo($request->get('actividad_grupo'));
         $fechaDesde = $this->dateInput($request->get('fecha_desde'));
         $fechaHasta = $this->dateInput($request->get('fecha_hasta'));
+        $documento = trim((string) $request->get('documento', ''));
         $tieneFiltrosVineta = collect([
             $request->get('id_vineta'),
             $request->get('item'),
             $request->get('orden_del_sistema'),
             $request->get('orden_cliente'),
             $request->get('codigo_producto'),
+            $request->get('capa'),
         ])->contains(fn ($value) => trim((string) $value) !== '');
 
         return EmpleadoHoraOrdinaria::query()
@@ -2773,6 +3507,12 @@ class VinetaRegistroController extends Controller
                     return;
                 }
 
+                if ($actividadGrupo === 'indirectos') {
+                    $this->applyEmpleadoGrupoFilter($query, 'indirectos');
+
+                    return;
+                }
+
                 if (str_ends_with($actividadGrupo, '_hora')) {
                     $empleadoGrupo = substr($actividadGrupo, 0, -5);
                     $this->applyEmpleadoGrupoFilter($query, $empleadoGrupo);
@@ -2781,6 +3521,16 @@ class VinetaRegistroController extends Controller
                 }
 
                 $query->whereRaw('0 = 1');
+            })
+            ->when($documento !== '', function ($query) use ($documento) {
+                if ($documento === 'sin_documento') {
+                    $query->where(function ($q) {
+                        $q->whereNull('empleado_horas_ordinarias.documento_numero')
+                            ->orWhere('empleado_horas_ordinarias.documento_numero', '');
+                    });
+                } else {
+                    $query->where('empleado_horas_ordinarias.documento_numero', $documento);
+                }
             })
             ->when($fechaDesde, fn ($query) => $query->whereDate('fecha', '>=', $fechaDesde))
             ->when($fechaHasta, fn ($query) => $query->whereDate('fecha', '<=', $fechaHasta));
@@ -2814,6 +3564,12 @@ class VinetaRegistroController extends Controller
             'limpiadoras_anillado',
             'limpiadoras_llenado',
             'limpiadoras_hora',
+            'indirectos',
+            'indirectos_rezago',
+            'indirectos_anillado',
+            'indirectos_llenado',
+            'indirectos_limpieza',
+            'indirectos_hora',
         ];
 
         return in_array($value, $validGroups, true) ? $value : '';
@@ -2869,6 +3625,26 @@ class VinetaRegistroController extends Controller
                             ->orWhereRaw('LOWER(cargo) LIKE ?', ['%limpi%']);
                     });
             }),
+            'indirectos', 'indirecto' => $query->where(function ($q) {
+                $q->whereNotIn('codigo', ['8219', '8217'])
+                    ->where(function ($sub) {
+                        $sub->whereNull('cargo')
+                            ->orWhere(function ($c) {
+                                $c->whereRaw('LOWER(cargo) NOT LIKE ?', ['%rezag%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%resag%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%anill%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%celofan%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%etiquet%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%pega%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%llenad%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%embasad%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%paquet%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%sellado%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%limpia%'])
+                                    ->whereRaw('LOWER(cargo) NOT LIKE ?', ['%limpi%']);
+                            });
+                    });
+            }),
             default => null,
         };
     }
@@ -2922,7 +3698,8 @@ class VinetaRegistroController extends Controller
                     ->whereRaw('LOWER(vineta_registros.actividad_nombre) NOT LIKE ?', ['%celof%'])
                     ->whereRaw('LOWER(vineta_registros.actividad_nombre) NOT LIKE ?', ['%cello%'])
                     ->whereRaw('LOWER(vineta_registros.actividad_nombre) NOT LIKE ?', ['%lamina%'])
-                    ->whereRaw('LOWER(vineta_registros.actividad_nombre) NOT LIKE ?', ['%esponj%']);
+                    ->whereRaw('LOWER(vineta_registros.actividad_nombre) NOT LIKE ?', ['%esponj%'])
+                    ->whereRaw('LOWER(vineta_registros.actividad_nombre) NOT LIKE ?', ['%limpi%']);
                 }),
                 'limpieza' => $query->where(function ($query) {
                     $query->whereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%limpi%'])
@@ -2931,6 +3708,22 @@ class VinetaRegistroController extends Controller
                 default => null,
             };
         });
+    }
+
+    private function applyPorHoraCondition($query): void
+    {
+        $query->where(function ($q) {
+            $q->where('vineta_registros.raw_payload->modo_registro', 'por_hora')
+                ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) = ?', ['control por hora']);
+        });
+    }
+
+    private function applyNoPorHoraCondition($query): void
+    {
+        $query->where(function ($q) {
+            $q->whereNull('vineta_registros.raw_payload->modo_registro')
+                ->orWhere('vineta_registros.raw_payload->modo_registro', '!=', 'por_hora');
+        })->whereRaw('LOWER(vineta_registros.actividad_nombre) != ?', ['control por hora']);
     }
 
     private function totalActividades($query, bool $hasCantidadActividades): int
@@ -3023,11 +3816,13 @@ class VinetaRegistroController extends Controller
 
             $resumenes[(string) $vinetaId] = [
                 'vineta' => $ultimo?->vineta_api_id ? 'ID '.$ultimo->vineta_api_id : 'ID '.$vinetaId,
-                'producto' => $ultimo?->producto_nombre ?? 'Sin producto',
-                'producto_codigo' => $ultimo?->producto_codigo ?? 'N/A',
-                'producto_item' => $ultimo?->producto_item ?? 'N/A',
-                'marca' => $ultimo?->marca ?? 'N/A',
-                'orden' => $ultimo?->orden ?? $ultimo?->orden_del_sistema ?? 'N/A',
+                'producto' => $ultimo?->productoNombreReporte() ?? 'Sin producto',
+                'producto_codigo' => $ultimo?->productoCodigoReporte() ?? 'N/A',
+                'producto_item' => $ultimo?->productoItemReporte() ?? 'N/A',
+                'marca' => $ultimo?->marcaReporte() ?? 'N/A',
+                'orden' => ($ultimo && $ultimo->ordenReporte() !== 'N/A')
+                    ? $ultimo->ordenReporte()
+                    : ($ultimo?->ordenDelSistemaReporte() ?? 'N/A'),
                 'vineta_fecha' => $ultimo?->vineta_fecha?->format('d/m/Y') ?? 'N/A',
                 'ultimo_movimiento' => $ultimo?->actividad_nombre ?? 'Sin movimientos',
                 'ultimo_empleado' => $ultimo?->empleado_nombre ?? 'N/A',
@@ -3068,5 +3863,159 @@ class VinetaRegistroController extends Controller
         }
 
         return $value;
+    }
+
+    private function asegurarSecuenciaLimpieza(): void
+    {
+        $pendientes = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('actividad_codigo', '103')
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%limpiez%'])
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%limpiad%']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('codigo_vineta')
+                  ->orWhere(function ($sub) {
+                      $sub->where('codigo_vineta', 'not like', 'l-%')
+                          ->where('codigo_vineta', 'not like', 'L-%');
+                  });
+            })
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($pendientes->isEmpty()) {
+            return;
+        }
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'l-%')
+                  ->orWhere('codigo_vineta', 'like', 'L-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^l-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        foreach ($pendientes as $reg) {
+            $maxNum++;
+            DB::table('vineta_registros')
+                ->where('id', $reg->id)
+                ->update([
+                    'codigo_vineta' => 'l-' . $maxNum,
+                    'vineta_api_id' => null,
+                ]);
+        }
+    }
+
+    private function asegurarSecuenciaPrensado(): void
+    {
+        $pendientes = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('actividad_codigo', '1')
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%prens%']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('codigo_vineta')
+                  ->orWhere(function ($sub) {
+                      $sub->where('codigo_vineta', 'not like', 'p-%')
+                          ->where('codigo_vineta', 'not like', 'P-%');
+                  });
+            })
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($pendientes->isEmpty()) {
+            return;
+        }
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'p-%')
+                  ->orWhere('codigo_vineta', 'like', 'P-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^p-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        foreach ($pendientes as $reg) {
+            $maxNum++;
+            DB::table('vineta_registros')
+                ->where('id', $reg->id)
+                ->update([
+                    'codigo_vineta' => 'p-' . $maxNum,
+                    'vineta_api_id' => null,
+                ]);
+        }
+    }
+
+    private function asegurarSecuenciaRolado(): void
+    {
+        $pendientes = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('actividad_codigo', '171')
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%rola%']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('codigo_vineta')
+                  ->orWhere(function ($sub) {
+                      $sub->where('codigo_vineta', 'not like', 'r-%')
+                          ->where('codigo_vineta', 'not like', 'R-%');
+                  });
+            })
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($pendientes->isEmpty()) {
+            return;
+        }
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'r-%')
+                  ->orWhere('codigo_vineta', 'like', 'R-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^r-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        foreach ($pendientes as $reg) {
+            $maxNum++;
+            DB::table('vineta_registros')
+                ->where('id', $reg->id)
+                ->update([
+                    'codigo_vineta' => 'r-' . $maxNum,
+                    'vineta_api_id' => null,
+                ]);
+        }
     }
 }

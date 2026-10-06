@@ -512,7 +512,537 @@
                 loadTableHtml(window.location.href, { pushState: false });
             });
 
+            window.reloadVinetasPorOrdenTable = () => {
+                loadTableHtml(window.location.href, { pushState: false });
+            };
+
             initTableFeatures();
+        });
+    </script>
+
+    <!-- Modal Ver QR -->
+    <div id="vinetaQrModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
+        <div class="theme-card w-full max-w-xs overflow-hidden rounded-3xl border theme-border shadow-2xl">
+            <div class="flex items-center justify-between border-b theme-border px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <span class="theme-badge inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold border">
+                        QR
+                    </span>
+                    <h2 class="theme-title text-base font-bold" id="modalQrTitle">
+                        QR
+                    </h2>
+                </div>
+                <button type="button"
+                        id="vinetaQrModalClose"
+                        class="theme-button-secondary inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border theme-border text-base font-bold transition hover:opacity-80 cursor-pointer"
+                        aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="p-6 flex flex-col items-center justify-center">
+                <!-- QR Code (fondo blanco para lectura óptima del escáner) -->
+                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center">
+                    <canvas id="modalQrCanvas" class="w-52 h-52 block"></canvas>
+                </div>
+
+                <div class="w-full mt-5">
+                    <button type="button"
+                            id="vinetaQrModalCloseBtn"
+                            class="w-full py-2 px-3 rounded-xl border theme-border text-xs font-semibold theme-button-secondary transition text-center cursor-pointer">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Estilos Dark Navy para el modal de Crear Viñeta */
+        html.dark-navy #crearVinetaPorOrdenModal .theme-card {
+            background-color: #111c33 !important;
+            border-color: #263650 !important;
+            color: #e5e7eb !important;
+        }
+
+        html.dark-navy #crearVinetaPorOrdenModal .crear-modal-header,
+        html.dark-navy #crearVinetaPorOrdenModal .crear-modal-footer {
+            background-color: #16233d !important;
+            border-color: #263650 !important;
+        }
+
+        html.dark-navy #crearVinetaPorOrdenModal .crear-modal-body {
+            background-color: #111c33 !important;
+        }
+
+        html.dark-navy #crearVinetaPorOrdenModal .crear-modal-input {
+            background-color: rgba(15, 23, 42, 0.95) !important;
+            border-color: #263650 !important;
+            color: #f8fafc !important;
+        }
+
+        html.dark-navy #crearVinetaPorOrdenModal .crear-modal-input:focus {
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+        }
+
+        html.dark-navy #crearVinetaPorOrdenModal .crear-modal-badge {
+            background-color: #16233d !important;
+            border-color: #263650 !important;
+            color: #94a3b8 !important;
+        }
+
+        html.dark-navy #crearVinetaPorOrdenModal #crearModalErrorAlert {
+            background-color: rgba(153, 27, 27, 0.25) !important;
+            border-color: rgba(239, 68, 68, 0.4) !important;
+            color: #fca5a5 !important;
+        }
+
+        /* Estilos Light para el modal de Crear Viñeta */
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .theme-card {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            color: #0b1220 !important;
+        }
+
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .crear-modal-header,
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .crear-modal-footer {
+            background-color: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .crear-modal-body {
+            background-color: #ffffff !important;
+        }
+
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .crear-modal-input {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0b1220 !important;
+        }
+
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .crear-modal-input:focus {
+            border-color: #2563eb !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+        }
+
+        html:not(.dark-navy) #crearVinetaPorOrdenModal .crear-modal-badge {
+            background-color: #f1f5f9 !important;
+            border-color: #e2e8f0 !important;
+            color: #475569 !important;
+        }
+
+        html:not(.dark-navy) #crearVinetaPorOrdenModal #crearModalErrorAlert {
+            background-color: #fef2f2 !important;
+            border-color: #fecaca !important;
+            color: #991b1b !important;
+        }
+    </style>
+
+    <!-- Modal Crear Viñeta por Orden -->
+    @if(!auth()->user()?->esSoloSupervisor())
+    <div id="crearVinetaPorOrdenModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm overflow-y-auto">
+        <div class="theme-card w-full max-w-2xl rounded-3xl border theme-border shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
+            <!-- Modal Header -->
+            <div class="crear-modal-header flex items-start justify-between border-b theme-border px-6 py-4 shrink-0">
+                <div>
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <span class="crear-modal-badge inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold border">
+                            Crear Viñeta
+                        </span>
+                        <span class="text-xs theme-text font-medium">
+                            A partir del registro <strong id="crearModalOrigenBadge" class="theme-title font-bold">#</strong>
+                        </span>
+                    </div>
+
+                    <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span class="crear-modal-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border">
+                            Nuevo ID: <strong id="crearModalNuevoId" class="theme-title font-bold">#{{ $siguienteId ?? '' }}</strong>
+                        </span>
+                        <span class="crear-modal-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border">
+                            Nuevo QR: <strong id="crearModalNuevoQr" class="theme-title font-bold">{{ $siguienteQr ?? '' }}</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <button type="button"
+                        id="crearVinetaPorOrdenClose"
+                        class="theme-button-secondary inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border theme-border text-xl font-bold transition hover:opacity-80 cursor-pointer"
+                        aria-label="Cerrar">×</button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <form id="crearVinetaPorOrdenForm" method="POST" action="{{ route('vinetas-por-orden.store') }}" class="flex flex-col flex-1 overflow-hidden">
+                @csrf
+                <input type="hidden" name="origen_id" id="modal_origen_id">
+                <input type="hidden" name="fecha" id="modal_fecha">
+                <input type="hidden" name="cantidad_puros" id="modal_cantidad_puros">
+                <input type="hidden" name="estado" id="modal_estado">
+
+                <div class="crear-modal-body p-6 overflow-y-auto space-y-4 flex-1">
+                    <!-- Error Alert -->
+                    <div id="crearModalErrorAlert" class="hidden p-3 rounded-xl text-xs font-semibold flex items-start gap-2.5 border">
+                        <svg class="w-4 h-4 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span id="crearModalErrorText"></span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Item</label>
+                            <input type="text"
+                                   name="item"
+                                   id="modal_item"
+                                   placeholder="Item..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Código producto</label>
+                            <input type="text"
+                                   name="codigo_producto"
+                                   id="modal_codigo_producto"
+                                   placeholder="P-01947..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Marca</label>
+                            <input type="text"
+                                   name="marca"
+                                   id="modal_marca"
+                                   placeholder="Marca..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Nombre</label>
+                            <input type="text"
+                                   name="nombre"
+                                   id="modal_nombre"
+                                   placeholder="Nombre..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Vitola</label>
+                            <input type="text"
+                                   name="vitola"
+                                   id="modal_vitola"
+                                   placeholder="6-1/8X50..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Capa</label>
+                            <input type="text"
+                                   name="capa"
+                                   id="modal_capa"
+                                   placeholder="INDONESIA..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Orden sistema</label>
+                            <input type="text"
+                                   name="orden_del_sistema"
+                                   id="modal_orden_del_sistema"
+                                   placeholder="3606..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Orden cliente</label>
+                            <input type="text"
+                                   name="orden"
+                                   id="modal_orden"
+                                   placeholder="111394..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Tipo de empaque</label>
+                            <input type="text"
+                                   name="tipo_empaque"
+                                   id="modal_tipo_empaque"
+                                   placeholder="Display/24..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="theme-text block text-xs font-bold mb-1">Mes</label>
+                            <input type="text"
+                                   name="mes"
+                                   id="modal_mes"
+                                   placeholder="MAYO 2026..."
+                                   class="crear-modal-input theme-input w-full rounded-xl border px-3 py-2 text-xs sm:text-sm theme-title outline-none transition">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="crear-modal-footer flex items-center justify-end gap-3 border-t theme-border px-6 py-3.5 shrink-0">
+                    <button type="button"
+                            id="crearVinetaPorOrdenCancel"
+                            class="px-4 py-2 rounded-xl border theme-border text-xs sm:text-sm font-semibold theme-button-secondary transition text-center cursor-pointer">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            id="btnGuardarVinetaOrden"
+                            class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0f172a] text-white text-xs sm:text-sm font-bold hover:bg-[#1e293b] shadow-sm transition cursor-pointer">
+                        <svg class="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Guardar Viñeta</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const qrModal = document.getElementById('vinetaQrModal');
+            const qrCanvas = document.getElementById('modalQrCanvas');
+            const qrTitle = document.getElementById('modalQrTitle');
+
+            const openQrModal = (btn) => {
+                const qrCode = btn.dataset.qrCode;
+                if (!qrCode) return;
+
+                if (qrTitle) qrTitle.textContent = qrCode;
+
+                if (window.QRCode && qrCanvas) {
+                    window.QRCode.toCanvas(qrCanvas, String(qrCode), {
+                        width: 208,
+                        margin: 1,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    }, function (error) {
+                        if (error) console.error(error);
+                    });
+                }
+
+                if (qrModal) {
+                    qrModal.classList.remove('hidden');
+                    qrModal.classList.add('flex');
+                }
+            };
+
+            const closeQrModal = () => {
+                if (qrModal) {
+                    qrModal.classList.add('hidden');
+                    qrModal.classList.remove('flex');
+                }
+            };
+
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-ver-qr');
+                if (btn) {
+                    e.preventDefault();
+                    openQrModal(btn);
+                }
+            });
+
+            document.getElementById('vinetaQrModalClose')?.addEventListener('click', closeQrModal);
+            document.getElementById('vinetaQrModalCloseBtn')?.addEventListener('click', closeQrModal);
+
+            qrModal?.addEventListener('click', (e) => {
+                if (e.target === qrModal) {
+                    closeQrModal();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && qrModal && !qrModal.classList.contains('hidden')) {
+                    closeQrModal();
+                }
+            });
+
+            // Lógica para Modal Crear Viñeta por Orden
+            const crearModal = document.getElementById('crearVinetaPorOrdenModal');
+            const crearForm = document.getElementById('crearVinetaPorOrdenForm');
+            const errorAlert = document.getElementById('crearModalErrorAlert');
+            const errorText = document.getElementById('crearModalErrorText');
+            const btnGuardar = document.getElementById('btnGuardarVinetaOrden');
+
+            let registroOriginal = {};
+
+            const openCrearModal = async (btn) => {
+                if (errorAlert) errorAlert.classList.add('hidden');
+
+                registroOriginal = {
+                    id: btn.dataset.id || '',
+                    codigo_qr: btn.dataset.codigoQr || '',
+                    fecha: btn.dataset.fecha || '',
+                    item: (btn.dataset.item || '').trim(),
+                    codigo_producto: (btn.dataset.codigoProducto || '').trim(),
+                    marca: (btn.dataset.marca || '').trim(),
+                    nombre: (btn.dataset.nombre || '').trim(),
+                    vitola: (btn.dataset.vitola || '').trim(),
+                    capa: (btn.dataset.capa || '').trim(),
+                    orden_del_sistema: (btn.dataset.ordenDelSistema || '').trim(),
+                    orden: (btn.dataset.orden || '').trim(),
+                    tipo_empaque: (btn.dataset.tipoEmpaque || '').trim(),
+                    mes: (btn.dataset.mes || '').trim(),
+                    cantidad_puros: parseInt(btn.dataset.cantidadPuros || '0', 10),
+                    estado: (btn.dataset.estado || 'activo').trim().toLowerCase(),
+                };
+
+                document.getElementById('modal_origen_id').value = registroOriginal.id;
+                document.getElementById('modal_fecha').value = registroOriginal.fecha;
+                document.getElementById('modal_cantidad_puros').value = registroOriginal.cantidad_puros;
+                document.getElementById('modal_estado').value = registroOriginal.estado || 'activo';
+
+                document.getElementById('modal_item').value = registroOriginal.item;
+                document.getElementById('modal_codigo_producto').value = registroOriginal.codigo_producto;
+                document.getElementById('modal_marca').value = registroOriginal.marca;
+                document.getElementById('modal_nombre').value = registroOriginal.nombre;
+                document.getElementById('modal_vitola').value = registroOriginal.vitola;
+                document.getElementById('modal_capa').value = registroOriginal.capa;
+                document.getElementById('modal_orden_del_sistema').value = registroOriginal.orden_del_sistema;
+                document.getElementById('modal_orden').value = registroOriginal.orden;
+                document.getElementById('modal_tipo_empaque').value = registroOriginal.tipo_empaque;
+                document.getElementById('modal_mes').value = registroOriginal.mes;
+
+                document.getElementById('crearModalOrigenBadge').textContent = '#' + registroOriginal.id + ' (' + (registroOriginal.codigo_qr || 'N/A') + ')';
+
+                try {
+                    const resp = await fetch('{{ route('vinetas-por-orden.siguiente-info') }}');
+                    if (resp.ok) {
+                        const info = await resp.json();
+                        document.getElementById('crearModalNuevoId').textContent = '#' + info.siguiente_id;
+                        document.getElementById('crearModalNuevoQr').textContent = info.siguiente_qr;
+                    }
+                } catch (e) {
+                    console.error('Error fetching siguiente info:', e);
+                }
+
+                if (crearModal) {
+                    crearModal.classList.remove('hidden');
+                    crearModal.classList.add('flex');
+                }
+            };
+
+            const closeCrearModal = () => {
+                if (crearModal) {
+                    crearModal.classList.add('hidden');
+                    crearModal.classList.remove('flex');
+                }
+            };
+
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-crear-vineta-orden');
+                if (btn) {
+                    e.preventDefault();
+                    openCrearModal(btn);
+                }
+            });
+
+            document.getElementById('crearVinetaPorOrdenClose')?.addEventListener('click', closeCrearModal);
+            document.getElementById('crearVinetaPorOrdenCancel')?.addEventListener('click', closeCrearModal);
+
+            crearModal?.addEventListener('click', (e) => {
+                if (e.target === crearModal) {
+                    closeCrearModal();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && crearModal && !crearModal.classList.contains('hidden')) {
+                    closeCrearModal();
+                }
+            });
+
+            crearForm?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                if (errorAlert) errorAlert.classList.add('hidden');
+
+                const currentData = {
+                    item: document.getElementById('modal_item').value.trim(),
+                    codigo_producto: document.getElementById('modal_codigo_producto').value.trim(),
+                    marca: document.getElementById('modal_marca').value.trim(),
+                    nombre: document.getElementById('modal_nombre').value.trim(),
+                    vitola: document.getElementById('modal_vitola').value.trim(),
+                    capa: document.getElementById('modal_capa').value.trim(),
+                    orden_del_sistema: document.getElementById('modal_orden_del_sistema').value.trim(),
+                    orden: document.getElementById('modal_orden').value.trim(),
+                    tipo_empaque: document.getElementById('modal_tipo_empaque').value.trim(),
+                    mes: document.getElementById('modal_mes').value.trim(),
+                };
+
+                let hasChanges = false;
+                for (const key of Object.keys(currentData)) {
+                    if (currentData[key].toLowerCase() !== (registroOriginal[key] || '').toLowerCase()) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+
+                if (!hasChanges) {
+                    if (errorAlert && errorText) {
+                        errorText.textContent = 'No puedes crear la viñeta con exactamente los mismos datos. Debes modificar al menos un campo.';
+                        errorAlert.classList.remove('hidden');
+                    }
+                    return false;
+                }
+
+                btnGuardar.disabled = true;
+                const originalBtnHtml = btnGuardar.innerHTML;
+                btnGuardar.innerHTML = '<span>Guardando...</span>';
+
+                try {
+                    const formData = new FormData(crearForm);
+                    const response = await fetch(crearForm.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        const msg = result.errors?.general?.[0] || result.message || 'Error al guardar la viñeta.';
+                        if (errorAlert && errorText) {
+                            errorText.textContent = msg;
+                            errorAlert.classList.remove('hidden');
+                        }
+                        return;
+                    }
+
+                    closeCrearModal();
+
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast('success', result.message);
+                    } else if (typeof appSwal === 'function') {
+                        appSwal({ icon: 'success', title: 'Éxito', text: result.message });
+                    }
+
+                    if (window.reloadVinetasPorOrdenTable) {
+                        window.reloadVinetasPorOrdenTable();
+                    } else {
+                        window.location.reload();
+                    }
+                } catch (err) {
+                    console.error(err);
+                    if (errorAlert && errorText) {
+                        errorText.textContent = 'Ocurrió un error al procesar la solicitud.';
+                        errorAlert.classList.remove('hidden');
+                    }
+                } finally {
+                    btnGuardar.disabled = false;
+                    btnGuardar.innerHTML = originalBtnHtml;
+                }
+            });
         });
     </script>
 </body>

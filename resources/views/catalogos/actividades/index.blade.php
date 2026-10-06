@@ -44,6 +44,7 @@
                             </div>
 
                             <div class="flex flex-wrap items-center gap-3">
+                                @can('productos.sincronizar')
                                 <form method="POST" action="{{ route('catalogos.actividades.sincronizar') }}">
                                     @csrf
                                     <button type="submit"
@@ -54,6 +55,7 @@
                                         Sincronizar actividades
                                     </button>
                                 </form>
+                                @endcan
 
                                 <form method="GET" action="{{ route('catalogos.actividades.index') }}" class="catalogo-ajax-filter-form flex gap-2">
                                     <div class="relative">

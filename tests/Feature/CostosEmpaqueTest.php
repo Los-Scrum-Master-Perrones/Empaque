@@ -6,11 +6,18 @@ use App\Models\User;
 use App\Models\Vineta;
 use App\Models\VinetaRegistro;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class CostosEmpaqueTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Permission::firstOrCreate(['name' => 'costos-empaque.ver']);
+    }
 
     public function test_costos_empaque_requiere_autenticacion(): void
     {
@@ -18,9 +25,17 @@ class CostosEmpaqueTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
+    public function test_costos_empaque_requiere_permiso(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('costos-empaque.index'));
+        $response->assertForbidden();
+    }
+
     public function test_costos_empaque_muestra_vista_y_agrupa_registros_correctamente(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('costos-empaque.ver');
         $vineta = Vineta::create(['api_id' => 1001, 'impreso' => true]);
 
         // 2 registros para el mismo empleado y producto
@@ -110,6 +125,7 @@ class CostosEmpaqueTest extends TestCase
     public function test_costos_empaque_filtros_funcionan(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('costos-empaque.ver');
         $vineta = Vineta::create(['api_id' => 1002, 'impreso' => true]);
 
         $this->createRegistro($vineta, [
@@ -162,6 +178,7 @@ class CostosEmpaqueTest extends TestCase
     public function test_costos_empaque_ajax_tabla(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('costos-empaque.ver');
 
         $response = $this->actingAs($user)->get(route('costos-empaque.index'), [
             'X-Requested-With' => 'XMLHttpRequest',

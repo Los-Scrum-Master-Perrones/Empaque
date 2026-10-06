@@ -155,7 +155,7 @@ class VinetaController extends Controller
     private function isVinetaPorOrden(Vineta $vineta): bool
     {
         $idPendiente = strtolower(trim((string) $vineta->id_pendiente_empaque));
-        if (str_starts_with($idPendiente, 'or-') || str_starts_with($idPendiente, 'o-')) {
+        if (str_starts_with($idPendiente, 'or-') || str_starts_with($idPendiente, 'o-') || str_starts_with($idPendiente, 'li-')) {
             return true;
         }
 
@@ -222,6 +222,43 @@ class VinetaController extends Controller
 
             if ($vineta) {
                 return $vineta;
+            }
+        }
+
+        // 3. Viñeta pendiente format (LI-1, li-1, etc.)
+        if (preg_match('/^li-(\d+)$/i', $candidate, $m)) {
+            $num = (int) $m[1];
+            $vineta = Vineta::query()
+                ->whereRaw('LOWER(id_pendiente_empaque) = ?', ['li-' . $num])
+                ->first();
+
+            if ($vineta) {
+                return $vineta;
+            }
+
+            $pendienteService = app(\App\Services\VinetaPendienteService::class);
+            $item = $pendienteService->findByQrOrNumber($num);
+
+            if ($item) {
+                return Vineta::updateOrCreate(
+                    ['id_pendiente_empaque' => 'li-' . $num],
+                    [
+                        'api_id' => 800000 + $num,
+                        'item' => $item->item,
+                        'codigo_producto' => $item->codigo_producto,
+                        'orden_del_sistema' => $item->orden_del_sistema,
+                        'mes' => $item->mes,
+                        'orden' => $item->orden,
+                        'marca' => $item->marca,
+                        'nombre' => $item->nombre,
+                        'capa' => $item->capa,
+                        'vitola' => $item->vitola,
+                        'tipo_empaque' => $item->tipo_empaque,
+                        'cantidad_puros' => $item->cantidad_puros,
+                        'estado' => 'activo',
+                        'impreso' => true,
+                    ]
+                );
             }
         }
 
@@ -311,6 +348,73 @@ class VinetaController extends Controller
         return null;
     }
 
+    public function resolveUltimaCantidadPuros(Vineta $vineta): ?int
+    {
+        // 1. Buscar en registros activos de esta viñeta específica (por vineta_id o api_id)
+        $ultimoRegistroVineta = VinetaRegistro::query()
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->where('cantidad_puros', '>', 0)
+            ->where(function ($query) use ($vineta) {
+                $query->where('vineta_id', $vineta->id);
+                if ($vineta->api_id) {
+                    $query->orWhere('vineta_api_id', $vineta->api_id);
+                }
+            })
+            ->latest('id')
+            ->value('cantidad_puros');
+
+        if ($ultimoRegistroVineta !== null && $ultimoRegistroVineta > 0) {
+            return (int) $ultimoRegistroVineta;
+        }
+
+        // 2. Coincidencia estricta: producto_item, orden_del_sistema, orden y producto_codigo
+        $query = VinetaRegistro::query()
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->where('cantidad_puros', '>', 0);
+
+        if (!empty($vineta->item) && !empty($vineta->orden_del_sistema) && !empty($vineta->orden) && !empty($vineta->codigo_producto)) {
+            $strict = (clone $query)
+                ->where('producto_item', $vineta->item)
+                ->where('orden_del_sistema', $vineta->orden_del_sistema)
+                ->where('orden', $vineta->orden)
+                ->where('producto_codigo', $vineta->codigo_producto)
+                ->latest('id')
+                ->value('cantidad_puros');
+
+            if ($strict !== null && $strict > 0) {
+                return (int) $strict;
+            }
+        }
+
+        // 3. Coincidencia secundaria: item y orden del sistema
+        if (!empty($vineta->item) && !empty($vineta->orden_del_sistema)) {
+            $secundario = (clone $query)
+                ->where('producto_item', $vineta->item)
+                ->where('orden_del_sistema', $vineta->orden_del_sistema)
+                ->latest('id')
+                ->value('cantidad_puros');
+
+            if ($secundario !== null && $secundario > 0) {
+                return (int) $secundario;
+            }
+        }
+
+        // 4. Coincidencia por código de producto y orden del sistema
+        if (!empty($vineta->codigo_producto) && !empty($vineta->orden_del_sistema)) {
+            $terciario = (clone $query)
+                ->where('producto_codigo', $vineta->codigo_producto)
+                ->where('orden_del_sistema', $vineta->orden_del_sistema)
+                ->latest('id')
+                ->value('cantidad_puros');
+
+            if ($terciario !== null && $terciario > 0) {
+                return (int) $terciario;
+            }
+        }
+
+        return $vineta->cantidad_puros;
+    }
+
     private function vinetaPayload(Vineta $vineta, $scannedAt = null): array
     {
         $scannedAt ??= now('America/Tegucigalpa');
@@ -336,7 +440,7 @@ class VinetaController extends Controller
             'orden_del_sistema' => $vineta->orden_del_sistema,
             'mes' => $vineta->mes,
             'orden' => $vineta->orden,
-            'cantidad_puros' => $vineta->cantidad_puros,
+            'cantidad_puros' => $this->resolveUltimaCantidadPuros($vineta) ?? $vineta->cantidad_puros,
             'estado' => $vineta->estado,
             'impreso' => (bool) $vineta->impreso,
             'api_created_at' => $vineta->api_created_at?->toISOString(),

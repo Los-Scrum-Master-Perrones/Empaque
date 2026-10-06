@@ -33,6 +33,9 @@ class VinetaPorOrdenScanTest extends TestCase
         $response->assertOk();
         $response->assertSee('or-1');
         $response->assertSee('or-10');
+        $response->assertSee('or-11');
+        $response->assertSee('3606');
+        $response->assertSee('111394');
         $response->assertSee('Cuban Rounds');
         $response->assertSee('The Edge Connecticut');
         $response->assertSee('Smoker Friendly');
@@ -59,6 +62,31 @@ class VinetaPorOrdenScanTest extends TestCase
         $response->assertJsonPath('vineta.nombre', 'Robusto');
         $response->assertJsonPath('vineta.es_por_orden', true);
         $response->assertJsonPath('vineta.proceso.puede_llenar', true);
+    }
+
+    public function test_api_scan_detecta_or_11_con_os_3606_y_oc_111394(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/vinetas/scan', [
+            'qr' => 'or-11',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('vineta.api_id', 11);
+        $response->assertJsonPath('vineta.codigo_qr', 'or-11');
+        $response->assertJsonPath('vineta.item', '151997');
+        $response->assertJsonPath('vineta.codigo_producto', 'P-01947');
+        $response->assertJsonPath('vineta.orden_del_sistema', '3606');
+        $response->assertJsonPath('vineta.orden', '111394');
+        $response->assertJsonPath('vineta.marca', 'Cuban Rounds');
+        $response->assertJsonPath('vineta.nombre', 'Toro');
+        $response->assertJsonPath('vineta.capa', 'INDONESIA');
+        $response->assertJsonPath('vineta.vitola', '6-1/8X50');
+        $response->assertJsonPath('vineta.tipo_empaque', 'Display/24');
+        $response->assertJsonPath('vineta.mes', 'MAYO 2026');
+        $response->assertJsonPath('vineta.es_por_orden', true);
     }
 
     public function test_api_scan_detecta_qr_case_insensitive(): void

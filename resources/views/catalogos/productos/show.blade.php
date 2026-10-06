@@ -380,21 +380,28 @@
                                         </td>
 
                                         <td class="px-6 py-4 text-right whitespace-nowrap">
-                                            <form method="POST"
-                                                  action="{{ route('catalogos.productos.actividades.toggle', ['producto' => $producto->id, 'actividad' => $actividad->id]) }}"
-                                                  class="inline-block">
-                                                @csrf
-                                                <input type="hidden" name="tipo_empaque_id" value="{{ $actividad->pivot->tipo_empaque_id }}">
+                                            @can('productos.sincronizar')
+                                                <form method="POST"
+                                                      action="{{ route('catalogos.productos.actividades.toggle', ['producto' => $producto->id, 'actividad' => $actividad->id]) }}"
+                                                      class="inline-block">
+                                                    @csrf
+                                                    <input type="hidden" name="tipo_empaque_id" value="{{ $actividad->pivot->tipo_empaque_id }}">
 
-                                                <button type="button"
-                                                        @click="toggleActividad({{ $actividad->id }}, {{ $actividad->pivot->tipo_empaque_id ?? 'null' }}, $el)"
-                                                        :disabled="loadingActivityId === {{ $actividad->id }}"
-                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm {{ $esActivo ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-red-50 hover:text-red-700 hover:border-red-300' : 'bg-gray-200 text-gray-700 border border-gray-300 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300' }}"
-                                                        title="{{ $esActivo ? 'Clic para desactivar esta actividad en este producto' : 'Clic para activar esta actividad en este producto' }}">
+                                                    <button type="button"
+                                                            @click="toggleActividad({{ $actividad->id }}, {{ $actividad->pivot->tipo_empaque_id ?? 'null' }}, $el)"
+                                                            :disabled="loadingActivityId === {{ $actividad->id }}"
+                                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm {{ $esActivo ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-red-50 hover:text-red-700 hover:border-red-300' : 'bg-gray-200 text-gray-700 border border-gray-300 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300' }}"
+                                                            title="{{ $esActivo ? 'Clic para desactivar esta actividad en este producto' : 'Clic para activar esta actividad en este producto' }}">
+                                                        <span class="inline-block w-2 h-2 rounded-full {{ $esActivo ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                                                        <span>{{ $esActivo ? 'Activa (Desactivar)' : 'Inactiva (Activar)' }}</span>
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold {{ $esActivo ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-gray-200 text-gray-700 border border-gray-300' }}">
                                                     <span class="inline-block w-2 h-2 rounded-full {{ $esActivo ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
-                                                    <span>{{ $esActivo ? 'Activa (Desactivar)' : 'Inactiva (Activar)' }}</span>
-                                                </button>
-                                            </form>
+                                                    <span>{{ $esActivo ? 'Activa' : 'Inactiva' }}</span>
+                                                </span>
+                                            @endcan
                                         </td>
                                     </tr>
                                 @empty

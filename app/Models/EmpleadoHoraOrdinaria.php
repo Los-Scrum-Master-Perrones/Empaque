@@ -10,6 +10,12 @@ class EmpleadoHoraOrdinaria extends Model
 
     protected $fillable = [
         'empleado_id',
+        'documento_empaque_id',
+        'documento_numero',
+        'sucursal',
+        'erp_enviado',
+        'erp_enviado_en',
+        'erp_respuesta',
         'registrado_por_user_id',
         'empleado_codigo',
         'empleado_nombre',
@@ -22,7 +28,16 @@ class EmpleadoHoraOrdinaria extends Model
     protected $casts = [
         'fecha' => 'date',
         'minutos' => 'integer',
+        'sucursal' => 'integer',
+        'erp_enviado' => 'boolean',
+        'erp_enviado_en' => 'datetime',
+        'erp_respuesta' => 'array',
     ];
+
+    public function documentoEmpaque(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(DocumentoEmpaque::class, 'documento_empaque_id');
+    }
 
     public function getReporteTipoAttribute(): string
     {

@@ -57,6 +57,7 @@
                                     </div>
                                 </div>
 
+                                @if(!auth()->user()?->esSoloSupervisor())
                                 <div class="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                                     <div class="relative">
                                         <button type="button"
@@ -130,6 +131,7 @@
                                         </button>
                                     </form>
                                 </div>
+                                @endif
                             </div>
                         </div>
 
@@ -137,82 +139,88 @@
                             <form method="GET"
                                   action="{{ route('vinetas.index') }}"
                                   class="vinetas-ajax-filter-form">
-                                <div class="vinetas-filter-row grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2 items-end">
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">ID API</label>
+                                <div class="vinetas-filter-row flex flex-nowrap items-end gap-1.5 xl:gap-2 w-full">
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">ID API</label>
                                         <input type="text"
                                                name="buscar"
                                                value="{{ request('buscar') }}"
                                                placeholder="ID API..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
 
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">Marca</label>
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Marca</label>
                                         <input type="text"
                                                name="marca"
                                                value="{{ request('marca') }}"
                                                placeholder="Marca..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
 
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">Nombre</label>
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Nombre</label>
                                         <input type="text"
                                                name="nombre"
                                                value="{{ request('nombre') }}"
                                                placeholder="Nombre..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
 
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">Código producto</label>
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Código producto</label>
                                         <input type="text"
                                                name="codigo_producto"
                                                value="{{ request('codigo_producto') }}"
                                                placeholder="Código..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
 
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">Item</label>
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Capa</label>
+                                        <input type="text"
+                                               name="capa"
+                                               value="{{ request('capa') }}"
+                                               placeholder="Capa..."
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Item</label>
                                         <input type="text"
                                                name="item"
                                                value="{{ request('item') }}"
                                                placeholder="Item..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
 
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">Orden sistema</label>
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Orden sistema</label>
                                         <input type="text"
                                                name="orden_del_sistema"
                                                value="{{ request('orden_del_sistema') }}"
                                                placeholder="Orden sistema..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
 
-                                    <div>
-                                        <label class="theme-text block text-xs font-semibold mb-1 whitespace-nowrap">Orden</label>
+                                    <div class="min-w-0 flex-1">
+                                        <label class="theme-text block text-[11px] sm:text-xs font-semibold mb-1 truncate">Orden</label>
                                         <input type="text"
                                                name="orden_cliente"
                                                value="{{ request('orden_cliente') }}"
                                                placeholder="Orden..."
-                                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                                               class="w-full rounded-xl border theme-border bg-white px-2 py-1.5 text-xs sm:text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
                                     </div>
                                 </div>
 
-                                <div class="vinetas-filter-actions mt-3"
-                                     style="display: flex !important; grid-column: auto !important; justify-content: flex-end; gap: 0.5rem; padding-top: 0 !important;">
+                                <div class="vinetas-filter-actions flex items-center justify-end gap-2 mt-2.5 pt-0.5">
                                     <a href="{{ route('vinetas.index') }}"
-                                       class="vinetas-ajax-clear-filters gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-2 rounded-xl bg-white text-[#0b1220] text-sm font-semibold border theme-border hover:bg-[#f1f5f9] transition"
-                                       style="width: auto !important; white-space: nowrap;">
+                                       class="vinetas-ajax-clear-filters gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#0b1220] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#f1f5f9] transition whitespace-nowrap">
                                         Limpiar
                                     </a>
 
                                     <button type="submit"
-                                            class="gooey-action inline-flex items-center justify-center px-3 py-2 rounded-xl bg-[#0f172a] text-white text-sm font-semibold hover:bg-[#1e293b] transition"
-                                            style="width: auto !important; white-space: nowrap;">
+                                            class="gooey-action inline-flex items-center justify-center px-4 py-1.5 rounded-xl bg-[#0f172a] text-white text-xs sm:text-sm font-semibold hover:bg-[#1e293b] transition whitespace-nowrap">
                                         Filtrar
                                     </button>
                                 </div>
@@ -270,6 +278,42 @@
                 <p class="theme-text text-xs leading-tight mt-0.5">
                     Cargando viñetas...
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ver QR -->
+    <div id="vinetaQrModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
+        <div class="theme-card w-full max-w-xs overflow-hidden rounded-3xl border theme-border shadow-2xl">
+            <div class="flex items-center justify-between border-b theme-border px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <span class="theme-badge inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold border">
+                        QR
+                    </span>
+                    <h2 class="theme-title text-base font-bold" id="modalQrTitle">
+                        ID 23792
+                    </h2>
+                </div>
+                <button type="button"
+                        id="vinetaQrModalClose"
+                        class="theme-button-secondary inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border theme-border text-base font-bold transition hover:opacity-80 cursor-pointer"
+                        aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="p-6 flex flex-col items-center justify-center">
+                <!-- QR Code (fondo blanco para lectura óptima del escáner) -->
+                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center">
+                    <canvas id="modalQrCanvas" class="w-52 h-52 block"></canvas>
+                </div>
+
+                <div class="w-full mt-5">
+                    <button type="button"
+                            id="vinetaQrModalCloseBtn"
+                            class="w-full py-2 px-3 rounded-xl border theme-border text-xs font-semibold theme-button-secondary transition text-center cursor-pointer">
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -820,6 +864,69 @@
                         overlay.classList.add('flex');
                     }
                 });
+            });
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const qrModal = document.getElementById('vinetaQrModal');
+            const qrCanvas = document.getElementById('modalQrCanvas');
+            const qrTitle = document.getElementById('modalQrTitle');
+
+            const openQrModal = (btn) => {
+                const apiId = btn.dataset.apiId;
+                if (!apiId) return;
+
+                if (qrTitle) qrTitle.textContent = `ID ${apiId}`;
+
+                if (window.QRCode && qrCanvas) {
+                    window.QRCode.toCanvas(qrCanvas, String(apiId), {
+                        width: 208,
+                        margin: 1,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    }, function (error) {
+                        if (error) console.error(error);
+                    });
+                }
+
+                if (qrModal) {
+                    qrModal.classList.remove('hidden');
+                    qrModal.classList.add('flex');
+                }
+            };
+
+            const closeQrModal = () => {
+                if (qrModal) {
+                    qrModal.classList.add('hidden');
+                    qrModal.classList.remove('flex');
+                }
+            };
+
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-ver-qr');
+                if (btn) {
+                    e.preventDefault();
+                    openQrModal(btn);
+                }
+            });
+
+            document.getElementById('vinetaQrModalClose')?.addEventListener('click', closeQrModal);
+            document.getElementById('vinetaQrModalCloseBtn')?.addEventListener('click', closeQrModal);
+
+            qrModal?.addEventListener('click', (e) => {
+                if (e.target === qrModal) {
+                    closeQrModal();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && qrModal && !qrModal.classList.contains('hidden')) {
+                    closeQrModal();
+                }
             });
         });
     </script>

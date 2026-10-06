@@ -21,102 +21,367 @@ class EmpleadoHoraOrdinariaController extends Controller
 
     public function resumenEmpleados(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'fecha' => ['required', 'date_format:Y-m-d'],
-        ]);
+        try {
+            $data = $request->validate([
+                'fecha' => ['required', 'date_format:Y-m-d'],
+                'sucursal' => ['nullable', 'integer'],
+            ]);
 
-        $fecha = $data['fecha'];
-        $tablaDisponible = Schema::hasTable('empleado_horas_ordinarias');
-        $registros = collect();
+            $fecha = $data['fecha'];
+            $sucursal = isset($data['sucursal']) && (int) $data['sucursal'] > 0 ? (int) $data['sucursal'] : null;
+            $tablaDisponible = Schema::hasTable('empleado_horas_ordinarias');
+            $hasDocColumnOrdinaria = $tablaDisponible && Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero');
+            $hasDocColumnVineta = Schema::hasTable('vineta_registros') && Schema::hasColumn('vineta_registros', 'documento_numero');
+            $hasDocEmpaquesTable = Schema::hasTable('documento_empaques');
 
-        if (Schema::hasTable('vineta_registros')) {
-            $registros = VinetaRegistro::query()
-                ->whereDate('fecha_registro', $fecha)
-                ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
-                ->orderBy('hora_registro')
-                ->orderBy('id')
-                ->get()
+            // 1. Sync ERP documents safely if service is available
+            $docsInfo = collect();
+            if ($hasDocEmpaquesTable) {
+                try {
+                    if (class_exists(\App\Services\ErpApiService::class)) {
+                        app(\App\Services\ErpApiService::class)->obtenerDocumentosEmpaques($fecha, $sucursal ?? 2);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('ERP obtenerDocumentosEmpaques in resumenEmpleados: ' . $e->getMessage());
+                }
+
+                try {
+                    $docsInfo = \App\Models\DocumentoEmpaque::whereDate('fecha', $fecha)
+                        ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+                        ->get()
+                        ->keyBy(fn ($d) => trim((string)$d->numero));
+                } catch (\Throwable $e) {
+                    $docsInfo = collect();
+                }
+            }
+
+            $todosRegistros = collect();
+            if (Schema::hasTable('vineta_registros')) {
+                $todosRegistros = VinetaRegistro::query()
+                    ->whereDate('fecha_registro', $fecha)
+                    ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                    ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                    ->orderBy('hora_registro')
+                    ->orderBy('id')
+                    ->get();
+            }
+
+            $registros = $todosRegistros
                 ->filter(fn (VinetaRegistro $registro) => ! $registro->esPorHoraOrdinario())
                 ->values();
-        }
 
-        $codigos = $registros
-            ->map(fn (VinetaRegistro $registro) => trim((string) $registro->empleado_codigo))
-            ->filter()
-            ->unique()
-            ->values();
-        $empleados = Empleado::query()
-            ->whereIn('codigo', $codigos)
-            ->get()
-            ->keyBy(fn (Empleado $empleado) => trim((string) $empleado->codigo));
-        $gruposEmpleados = $this->gruposProduccionEmpleados($registros, $empleados);
+            $registrosPorHora = $todosRegistros
+                ->filter(fn (VinetaRegistro $registro) => $registro->esPorHoraOrdinario())
+                ->values();
 
-        $minutosOrdinarios = collect();
+            $codigosOrdinarios = collect();
+            if ($tablaDisponible) {
+                try {
+                    $codigosOrdinarios = EmpleadoHoraOrdinaria::query()
+                        ->whereDate('fecha', $fecha)
+                        ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                        ->pluck('empleado_codigo')
+                        ->map(fn ($c) => trim((string) $c))
+                        ->filter()
+                        ->unique();
+                } catch (\Throwable $e) {
+                    $codigosOrdinarios = collect();
+                }
+            }
 
-        if ($tablaDisponible && $codigos->isNotEmpty()) {
-            $minutosOrdinarios = EmpleadoHoraOrdinaria::query()
-                ->whereIn('empleado_codigo', $codigos)
-                ->whereDate('fecha', $fecha)
-                ->selectRaw('empleado_codigo, COALESCE(SUM(minutos), 0) as minutos')
-                ->groupBy('empleado_codigo')
-                ->pluck('minutos', 'empleado_codigo');
-        }
+            $codigos = $todosRegistros
+                ->map(fn (VinetaRegistro $registro) => trim((string) $registro->empleado_codigo))
+                ->concat($codigosOrdinarios)
+                ->filter()
+                ->unique()
+                ->values();
+            $empleados = Empleado::query()
+                ->whereIn('codigo', $codigos)
+                ->get()
+                ->keyBy(fn (Empleado $empleado) => trim((string) $empleado->codigo));
+            $gruposEmpleados = $this->gruposProduccionEmpleados($registros, $empleados);
 
-        $items = collect(['rezago', 'anillado', 'llenado', 'limpieza'])
-            ->flatMap(function (string $grupo) use ($registros, $empleados, $gruposEmpleados, $minutosOrdinarios) {
-                return $registros
-                    ->filter(
-                        fn (VinetaRegistro $registro) => $gruposEmpleados->get(
-                            trim((string) $registro->empleado_codigo)
-                        ) === $grupo
-                    )
-                    ->groupBy(fn (VinetaRegistro $registro) => trim((string) $registro->empleado_codigo))
-                    ->map(function (Collection $registrosEmpleado, $codigo) use ($grupo, $empleados, $minutosOrdinarios) {
-                        /** @var Empleado|null $empleado */
-                        $empleado = $empleados->get($codigo);
+            $minutosOrdinarios = collect();
+            if ($tablaDisponible && $codigos->isNotEmpty()) {
+                try {
+                    $minutosOrdinarios = EmpleadoHoraOrdinaria::query()
+                        ->whereIn('empleado_codigo', $codigos)
+                        ->whereDate('fecha', $fecha)
+                        ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                        ->selectRaw('empleado_codigo, COALESCE(SUM(minutos), 0) as minutos')
+                        ->groupBy('empleado_codigo')
+                        ->pluck('minutos', 'empleado_codigo');
+                } catch (\Throwable $e) {
+                    $minutosOrdinarios = collect();
+                }
+            }
 
-                        if (! $empleado) {
-                            return null;
+            $itemsRegulares = collect(['rezago', 'anillado', 'llenado', 'limpieza'])
+                ->flatMap(function (string $grupo) use ($registros, $empleados, $gruposEmpleados, $minutosOrdinarios) {
+                    return $registros
+                        ->filter(
+                            fn (VinetaRegistro $registro) => $gruposEmpleados->get(
+                                trim((string) $registro->empleado_codigo)
+                            ) === $grupo
+                        )
+                        ->groupBy(fn (VinetaRegistro $registro) => trim((string) $registro->empleado_codigo))
+                        ->map(function (Collection $registrosEmpleado, $codigo) use ($grupo, $empleados, $minutosOrdinarios) {
+                            /** @var Empleado|null $empleado */
+                            $empleado = $empleados->get((string) $codigo);
+
+                            if (! $empleado) {
+                                return null;
+                            }
+
+                            $minOrdinario = (int) ($minutosOrdinarios->get(trim((string)$empleado->codigo), 0));
+
+                            return [
+                                'grupo' => $grupo,
+                                'empleado' => $this->empleadoPayload($empleado),
+                                'resumen' => $this->resumenRegistrosPayload(
+                                    $registrosEmpleado,
+                                    $minOrdinario
+                                ),
+                            ];
+                        })
+                        ->filter()
+                        ->sortBy(fn (array $item) => Str::lower($item['empleado']['nombre']))
+                        ->values();
+                })
+                ->values();
+
+            $itemsHora = $registrosPorHora
+                ->groupBy(fn (VinetaRegistro $registro) => trim((string) $registro->empleado_codigo))
+                ->map(function (Collection $registrosEmpleado, $codigo) use ($empleados, $minutosOrdinarios) {
+                    /** @var Empleado|null $empleado */
+                    $empleado = $empleados->get((string) $codigo);
+
+                    if (! $empleado) {
+                        return null;
+                    }
+
+                    $minOrdinario = (int) ($minutosOrdinarios->get(trim((string)$empleado->codigo), 0));
+
+                    return [
+                        'grupo' => 'hora',
+                        'empleado' => $this->empleadoPayload($empleado),
+                        'resumen' => $this->resumenRegistrosPayload(
+                            $registrosEmpleado,
+                            $minOrdinario
+                        ),
+                    ];
+                })
+                ->filter()
+                ->sortBy(fn (array $item) => Str::lower($item['empleado']['nombre']))
+                ->values();
+
+            foreach ($codigosOrdinarios as $codigoOrdinario) {
+                /** @var Empleado|null $empleado */
+                $empleado = $empleados->get((string) $codigoOrdinario);
+                if (! $empleado) {
+                    continue;
+                }
+
+                $alreadyInRegulares = $itemsRegulares->contains(fn ($it) => $it['empleado']['codigo'] === $codigoOrdinario);
+                $alreadyInHora = $itemsHora->contains(fn ($it) => $it['empleado']['codigo'] === $codigoOrdinario);
+
+                if (! $alreadyInRegulares && ! $alreadyInHora) {
+                    $grupoPuesto = EmployeeProductionGroup::fromCargo($empleado->cargo, $empleado->codigo);
+                    $grupoDestino = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
+                        ? $grupoPuesto
+                        : 'hora';
+
+                    $minOrdinario = (int) ($minutosOrdinarios->get(trim((string)$empleado->codigo), 0));
+
+                    $itemOrdinario = [
+                        'grupo' => $grupoDestino,
+                        'empleado' => $this->empleadoPayload($empleado),
+                        'resumen' => $this->resumenRegistrosPayload(
+                            collect(),
+                            $minOrdinario
+                        ),
+                    ];
+
+                    if ($grupoDestino === 'hora') {
+                        $itemsHora->push($itemOrdinario);
+                    } else {
+                        $itemsRegulares->push($itemOrdinario);
+                    }
+                }
+            }
+
+            // Documents aggregation
+            $docNumerosRegistros = collect();
+            if ($hasDocColumnVineta) {
+                $docNumerosRegistros = $todosRegistros->map(function (VinetaRegistro $registro) {
+                    $doc = trim((string) ($registro->documento_numero ?? ''));
+                    return $doc !== '' ? $doc : 'sin_documento';
+                })->unique();
+            }
+
+            $docNumerosOrdinarios = collect();
+            if ($hasDocColumnOrdinaria) {
+                try {
+                    $docNumerosOrdinarios = EmpleadoHoraOrdinaria::query()
+                        ->whereDate('fecha', $fecha)
+                        ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                        ->pluck('documento_numero')
+                        ->map(fn ($doc) => ($doc !== null && trim((string)$doc) !== '') ? trim((string)$doc) : 'sin_documento')
+                        ->unique();
+                } catch (\Throwable $e) {
+                    $docNumerosOrdinarios = collect();
+                }
+            }
+
+            $docNumerosEmpaques = $docsInfo->keys()->map(fn ($n) => trim((string)$n))->filter()->unique();
+
+            $allDocKeys = $docNumerosEmpaques
+                ->concat($docNumerosRegistros)
+                ->concat($docNumerosOrdinarios)
+                ->unique()
+                ->values();
+
+            if ($allDocKeys->isEmpty()) {
+                $allDocKeys = collect(['sin_documento']);
+            }
+
+            $itemsPorDocumento = collect();
+            $documentCounts = [];
+
+            foreach ($allDocKeys as $docKey) {
+                $registrosDoc = collect();
+                if ($hasDocColumnVineta) {
+                    $registrosDoc = $todosRegistros->filter(function (VinetaRegistro $r) use ($docKey) {
+                        $doc = trim((string) ($r->documento_numero ?? ''));
+                        if ($docKey === 'sin_documento') {
+                            return $doc === '';
                         }
+                        return $doc === (string) $docKey;
+                    });
+                } elseif ($docKey === 'sin_documento') {
+                    $registrosDoc = $todosRegistros;
+                }
 
-                        return [
-                            'grupo' => $grupo,
-                            'empleado' => $this->empleadoPayload($empleado),
-                            'resumen' => $this->resumenRegistrosPayload(
-                                $registrosEmpleado,
-                                (int) ($minutosOrdinarios[$empleado->codigo] ?? 0)
-                            ),
-                        ];
-                    })
-                    ->filter()
-                    ->sortBy(fn (array $item) => Str::lower($item['empleado']['nombre']))
-                    ->values();
-            })
-            ->values();
+                $codigosDoc = $registrosDoc->map(fn (VinetaRegistro $r) => trim((string) $r->empleado_codigo))->unique();
 
-        return response()->json([
-            'message' => 'Resumen de horas ordinarias encontrado.',
-            'fecha' => $fecha,
-            'tabla_disponible' => $tablaDisponible,
-            'grupos' => [
-                'rezago' => $items->where('grupo', 'rezago')->count(),
-                'anillado' => $items->where('grupo', 'anillado')->count(),
-                'llenado' => $items->where('grupo', 'llenado')->count(),
-                'limpieza' => $items->where('grupo', 'limpieza')->count(),
-            ],
-            'empleados' => $items,
-        ]);
+                $minutosOrdinariosDoc = collect();
+                if ($hasDocColumnOrdinaria) {
+                    try {
+                        $minutosOrdinariosDoc = EmpleadoHoraOrdinaria::query()
+                            ->whereDate('fecha', $fecha)
+                            ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                            ->when($docKey === 'sin_documento', function ($q) {
+                                $q->where(fn ($sub) => $sub->whereNull('documento_numero')->orWhere('documento_numero', ''));
+                            }, function ($q) use ($docKey) {
+                                $q->where('documento_numero', $docKey);
+                            })
+                            ->selectRaw('empleado_codigo, COALESCE(SUM(minutos), 0) as minutos')
+                            ->groupBy('empleado_codigo')
+                            ->pluck('minutos', 'empleado_codigo');
+
+                        $codigosDoc = $codigosDoc->concat($minutosOrdinariosDoc->keys()->map(fn ($k) => trim((string)$k)))->unique();
+                    } catch (\Throwable $e) {
+                        $minutosOrdinariosDoc = collect();
+                    }
+                }
+
+                $empleadosEnDoc = $codigosDoc->map(function ($codigo) use ($docKey, $empleados, $registrosDoc, $minutosOrdinariosDoc) {
+                    $empleado = $empleados->get((string) $codigo);
+                    if (! $empleado) {
+                        return null;
+                    }
+
+                    $regsEmp = $registrosDoc->where('empleado_codigo', $codigo);
+                    $minOrdDoc = (int) ($minutosOrdinariosDoc->get(trim((string)$empleado->codigo), 0));
+
+                    return [
+                        'grupo' => (string) $docKey,
+                        'documento_numero' => $docKey === 'sin_documento' ? null : (string) $docKey,
+                        'empleado' => $this->empleadoPayload($empleado),
+                        'resumen' => $this->resumenRegistrosPayload(
+                            $regsEmp,
+                            $minOrdDoc
+                        ),
+                    ];
+                })->filter()->sortBy(fn (array $item) => Str::lower($item['empleado']['nombre']))->values();
+
+                $documentCounts[(string) $docKey] = $empleadosEnDoc->count();
+                $itemsPorDocumento = $itemsPorDocumento->concat($empleadosEnDoc);
+            }
+
+            $grupoFiltro = $request->get('grupo');
+            if ($grupoFiltro && $itemsPorDocumento->contains('grupo', $grupoFiltro)) {
+                $items = $itemsPorDocumento->where('grupo', $grupoFiltro)->values();
+            } else {
+                $items = $itemsPorDocumento->values();
+            }
+
+            $documentosLista = $allDocKeys->map(function ($k) use ($documentCounts, $docsInfo) {
+                $docModel = $docsInfo->get((string) $k);
+                $obs = $docModel?->observaciones ? trim($docModel->observaciones) : null;
+                $desc = $docModel?->descripcion ? trim($docModel->descripcion) : null;
+                $displayText = $obs ?: $desc;
+
+                return [
+                    'key' => (string) $k,
+                    'label' => $k === 'sin_documento'
+                        ? 'Sin documento'
+                        : ($displayText ? 'Doc. #' . $k . ' · ' . $displayText : 'Doc. #' . $k),
+                    'numero' => $k === 'sin_documento' ? null : (string) $k,
+                    'descripcion' => $docModel?->descripcion,
+                    'observaciones' => $docModel?->observaciones,
+                    'total' => $docModel ? (int) $docModel->total : null,
+                    'count' => $documentCounts[(string) $k] ?? 0,
+                ];
+            })->values();
+
+            $legacyGrupos = [
+                'rezago' => $itemsRegulares->where('grupo', 'rezago')->count(),
+                'anillado' => $itemsRegulares->where('grupo', 'anillado')->count(),
+                'llenado' => $itemsRegulares->where('grupo', 'llenado')->count(),
+                'limpieza' => $itemsRegulares->where('grupo', 'limpieza')->count(),
+                'hora' => $itemsHora->count(),
+            ];
+
+            return response()->json([
+                'message' => 'Resumen de horas ordinarias encontrado.',
+                'fecha' => $fecha,
+                'tabla_disponible' => $tablaDisponible,
+                'grupos' => array_merge($legacyGrupos, $documentCounts),
+                'documentos' => $documentosLista,
+                'empleados' => $items,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Error en resumenEmpleados: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'Error al cargar el resumen de horas ordinarias: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+                'fecha' => $request->query('fecha', date('Y-m-d')),
+                'tabla_disponible' => false,
+                'grupos' => [],
+                'documentos' => [
+                    [
+                        'key' => 'sin_documento',
+                        'label' => 'Sin documento',
+                        'count' => 0,
+                    ],
+                ],
+                'empleados' => [],
+            ], 200);
+        }
     }
 
     public function index(Request $request, Empleado $empleado): JsonResponse
     {
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'grupo' => ['nullable', 'string', 'in:rezago,anillado,llenado,limpieza'],
+            'grupo' => ['nullable', 'string', 'max:50'],
+            'sucursal' => ['nullable', 'integer'],
         ]);
 
         $fecha = $data['fecha'];
         $grupo = $data['grupo'] ?? null;
+        $sucursal = isset($data['sucursal']) && (int) $data['sucursal'] > 0 ? (int) $data['sucursal'] : null;
         $tablaDisponible = Schema::hasTable('empleado_horas_ordinarias');
         $ordinarias = collect();
 
@@ -124,6 +389,7 @@ class EmpleadoHoraOrdinariaController extends Controller
             $ordinarias = EmpleadoHoraOrdinaria::query()
                 ->where('empleado_codigo', $empleado->codigo)
                 ->whereDate('fecha', $fecha)
+                ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
                 ->orderBy('created_at')
                 ->orderBy('id')
                 ->get();
@@ -131,12 +397,57 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         $cajones = collect();
 
-        if (Schema::hasTable('vineta_registros') && Schema::hasColumn('vineta_registros', 'minutos_trabajados')) {
-            $cajones = $this->registrosTareaEmpleado($empleado, $fecha);
-            $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $cajones);
+        if (Schema::hasTable('vineta_registros')) {
+            if ($grupo === 'hora') {
+                $cajones = VinetaRegistro::query()
+                    ->where('empleado_codigo', $empleado->codigo)
+                    ->whereDate('fecha_registro', $fecha)
+                    ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                    ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                    ->orderBy('hora_registro')
+                    ->orderBy('id')
+                    ->get()
+                    ->filter(fn (VinetaRegistro $registro) => $registro->esPorHoraOrdinario())
+                    ->values();
+            } else if ($grupo === 'sin_documento') {
+                $cajones = VinetaRegistro::query()
+                    ->where('empleado_codigo', $empleado->codigo)
+                    ->whereDate('fecha_registro', $fecha)
+                    ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                    ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                    ->where(fn ($q) => $q->whereNull('documento_numero')->orWhere('documento_numero', ''))
+                    ->orderBy('hora_registro')
+                    ->orderBy('id')
+                    ->get();
+            } else if ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+                if (Schema::hasColumn('vineta_registros', 'documento_numero')) {
+                    $cajones = VinetaRegistro::query()
+                        ->where('empleado_codigo', $empleado->codigo)
+                        ->whereDate('fecha_registro', $fecha)
+                        ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                        ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                        ->where('documento_numero', (string) $grupo)
+                        ->orderBy('hora_registro')
+                        ->orderBy('id')
+                        ->get();
+                } else {
+                    $cajones = collect();
+                }
+            } else if (Schema::hasColumn('vineta_registros', 'minutos_trabajados')) {
+                $cajones = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
+                $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $cajones);
 
-            if ($grupo !== null && $grupoEmpleado !== $grupo) {
-                $cajones = collect();
+                if ($grupo !== null && $grupo !== 'todos' && $grupoEmpleado !== $grupo) {
+                    $cajones = collect();
+                }
+            }
+        }
+
+        if ($tablaDisponible && $grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'hora'], true)) {
+            if ($grupo === 'sin_documento') {
+                $ordinarias = $ordinarias->filter(fn ($o) => empty($o->documento_numero))->values();
+            } else {
+                $ordinarias = $ordinarias->filter(fn ($o) => (string) $o->documento_numero === (string) $grupo)->values();
             }
         }
 
@@ -148,10 +459,23 @@ class EmpleadoHoraOrdinariaController extends Controller
             'empleado' => $this->empleadoPayload($empleado),
             'fecha' => $fecha,
             'grupo' => $grupo,
-            'resumen' => $this->resumenRegistrosPayload($cajones, $minutosOrdinarios),
+            'resumen' => $this->resumenPayload(
+                $grupo === 'hora' ? 0 : (int) $cajones->sum('minutos_trabajados'),
+                $minutosOrdinarios,
+                $cajones->count(),
+                (int) $cajones->sum('cantidad_puros'),
+                (int) $cajones->sum(fn (VinetaRegistro $registro) => $registro->total_actividades)
+            ),
+            'summary' => $this->resumenPayload(
+                $grupo === 'hora' ? 0 : (int) $cajones->sum('minutos_trabajados'),
+                $minutosOrdinarios,
+                $cajones->count(),
+                (int) $cajones->sum('cantidad_puros'),
+                (int) $cajones->sum(fn (VinetaRegistro $registro) => $registro->total_actividades)
+            ),
+            'jornada_laboral' => $grupo === 'hora' ? null : $this->jornadaLaboralPayload($cajones),
             'cajones' => $cajones->map(fn (VinetaRegistro $registro) => $this->cajonPayload($registro))->values(),
             'horas_ordinarias' => $ordinarias->map(fn (EmpleadoHoraOrdinaria $hora) => $this->horaPayload($hora))->values(),
-            'jornada_laboral' => $this->jornadaLaboralPayload($cajones),
         ]);
     }
 
@@ -164,8 +488,10 @@ class EmpleadoHoraOrdinariaController extends Controller
         }
 
         $data = $this->validatedHoraData($request);
+        $sucursal = $request->input('sucursal') ? (int) $request->input('sucursal') : null;
+        $documentoNumero = $request->input('documento_numero');
 
-        $hora = EmpleadoHoraOrdinaria::create([
+        $payload = [
             'empleado_id' => $empleado->id,
             'registrado_por_user_id' => $request->user()?->id,
             'empleado_codigo' => $empleado->codigo,
@@ -173,8 +499,14 @@ class EmpleadoHoraOrdinariaController extends Controller
             'fecha' => $data['fecha'],
             'minutos' => $data['minutos_total'],
             'observacion' => $data['observacion'],
+            'sucursal' => $sucursal,
             'registrado_por_nombre' => $request->user()?->name,
-        ]);
+        ];
+        if (Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero')) {
+            $payload['documento_numero'] = $documentoNumero;
+        }
+
+        $hora = EmpleadoHoraOrdinaria::create($payload);
 
         return response()->json([
             'message' => 'Hora ordinaria agregada correctamente.',
@@ -227,11 +559,17 @@ class EmpleadoHoraOrdinariaController extends Controller
         $fecha = $data['fecha'];
         $grupo = $data['grupo'] ?? null;
         $totalMinutes = $data['minutos_total'];
-        $registros = $this->registrosTareaEmpleado($empleado, $fecha);
-        $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $registros);
-
-        if ($grupo !== null && $grupoEmpleado !== $grupo) {
-            $registros = collect();
+        $sucursal = $request->input('sucursal') ? (int) $request->input('sucursal') : null;
+        $registros = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
+        if ($grupo === 'sin_documento') {
+            $registros = $registros->filter(fn ($r) => empty($r->documento_numero));
+        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+            $registros = $registros->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
+        } elseif ($grupo !== null && $grupo !== 'todos') {
+            $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $registros);
+            if ($grupoEmpleado !== $grupo) {
+                $registros = collect();
+            }
         }
 
         if ($registros->isEmpty()) {
@@ -311,10 +649,12 @@ class EmpleadoHoraOrdinariaController extends Controller
         $fecha = $data['fecha'];
         $grupo = $data['grupo'] ?? null;
         $totalMinutes = $data['minutos_total'];
+        $sucursal = $request->input('sucursal') ? (int) $request->input('sucursal') : null;
 
         $registros = VinetaRegistro::query()
             ->whereDate('fecha_registro', $fecha)
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
             ->orderBy('fecha_registro')
             ->orderBy('hora_registro')
             ->orderBy('id')
@@ -333,8 +673,14 @@ class EmpleadoHoraOrdinariaController extends Controller
             $porEmpleado = $registros->groupBy('empleado_codigo');
 
             foreach ($porEmpleado as $codigo => $registrosEmpleado) {
-                if ($grupo !== null && $gruposEmpleados->get((string) $codigo) !== $grupo) {
-                    continue;
+                if ($grupo !== null && $grupo !== 'todos') {
+                    if ($grupo === 'sin_documento') {
+                        $registrosEmpleado = $registrosEmpleado->filter(fn ($r) => empty($r->documento_numero));
+                    } elseif (! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+                        $registrosEmpleado = $registrosEmpleado->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
+                    } elseif ($gruposEmpleados->get((string) $codigo) !== $grupo) {
+                        continue;
+                    }
                 }
 
                 if ($registrosEmpleado->isEmpty()) {
@@ -415,14 +761,96 @@ class EmpleadoHoraOrdinariaController extends Controller
         ]);
     }
 
+    public function storeGlobal(Request $request): JsonResponse
+    {
+        if (! Schema::hasTable('empleado_horas_ordinarias')) {
+            return response()->json([
+                'message' => 'La tabla de horas ordinarias no existe. Ejecuta la migracion pendiente.',
+            ], 409);
+        }
+
+        $request->validate([
+            'grupo' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $data = $this->validatedHoraData($request);
+        $fecha = $data['fecha'];
+        $grupo = $request->input('grupo');
+        $sucursal = $request->input('sucursal') ? (int) $request->input('sucursal') : null;
+
+        $registros = VinetaRegistro::query()
+            ->whereDate('fecha_registro', $fecha)
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+            ->get();
+
+        if ($grupo === 'hora') {
+            $registros = $registros->filter(fn (VinetaRegistro $registro) => $registro->esPorHoraOrdinario());
+        } elseif ($grupo === 'sin_documento') {
+            $registros = $registros->filter(fn (VinetaRegistro $registro) => empty($registro->documento_numero));
+        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+            $registros = $registros->filter(fn (VinetaRegistro $registro) => (string) $registro->documento_numero === (string) $grupo);
+        }
+
+        $codigos = $registros->pluck('empleado_codigo')->filter()->unique()->values();
+        $empleados = Empleado::query()->whereIn('codigo', $codigos)->get()->keyBy(fn ($e) => trim((string) $e->codigo));
+
+        if ($grupo !== null && in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+            $gruposEmpleados = $this->gruposProduccionEmpleados($registros, $empleados);
+            $empleados = $empleados->filter(fn (Empleado $empleado) => $gruposEmpleados->get(trim((string) $empleado->codigo)) === $grupo);
+        }
+
+        if ($empleados->isEmpty()) {
+            throw ValidationException::withMessages([
+                'fecha' => 'No se encontraron empleados en el grupo y fecha seleccionados para agregar horas ordinarias.',
+            ]);
+        }
+
+        $userId = $request->user()?->id;
+        $userName = $request->user()?->name;
+        $docNumeroParaGuardar = ($grupo !== null && ! in_array($grupo, ['sin_documento', 'rezago', 'anillado', 'llenado', 'limpieza', 'hora', 'todos'], true)) ? (string) $grupo : null;
+        $creados = 0;
+
+        $hasDocCol = Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero');
+
+        DB::transaction(function () use ($empleados, $data, $userId, $userName, $docNumeroParaGuardar, $sucursal, $hasDocCol, &$creados) {
+            foreach ($empleados as $empleado) {
+                $createPayload = [
+                    'empleado_id' => $empleado->id,
+                    'registrado_por_user_id' => $userId,
+                    'empleado_codigo' => $empleado->codigo,
+                    'empleado_nombre' => $empleado->nombre,
+                    'fecha' => $data['fecha'],
+                    'minutos' => $data['minutos_total'],
+                    'observacion' => $data['observacion'],
+                    'sucursal' => $sucursal,
+                    'registrado_por_nombre' => $userName,
+                ];
+                if ($hasDocCol) {
+                    $createPayload['documento_numero'] = $docNumeroParaGuardar;
+                }
+                EmpleadoHoraOrdinaria::create($createPayload);
+                $creados++;
+            }
+        });
+
+        return response()->json([
+            'message' => "Hora ordinaria agregada a {$creados} empleado(s) correctamente.",
+            'empleados_actualizados' => $creados,
+            'minutos' => $data['minutos_total'],
+            'tiempo_texto' => VinetaRegistro::minutosATiempoTexto($data['minutos_total']),
+        ], 201);
+    }
+
 
     /** @return Collection<int, VinetaRegistro> */
-    private function registrosTareaEmpleado(Empleado $empleado, string $fecha): Collection
+    private function registrosTareaEmpleado(Empleado $empleado, string $fecha, ?int $sucursal = null): Collection
     {
         return VinetaRegistro::query()
             ->where('empleado_codigo', $empleado->codigo)
             ->whereDate('fecha_registro', $fecha)
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->when($sucursal !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
             ->orderBy('fecha_registro')
             ->orderBy('hora_registro')
             ->orderBy('id')
@@ -619,7 +1047,7 @@ class EmpleadoHoraOrdinariaController extends Controller
     {
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'grupo' => ['nullable', 'string', 'in:rezago,anillado,llenado,limpieza'],
+            'grupo' => ['nullable', 'string', 'max:50'],
             'horas' => ['nullable', 'integer', 'min:0', 'max:9'],
             'minutos' => ['nullable', 'integer', 'min:0', 'max:570'],
         ]);
@@ -658,6 +1086,8 @@ class EmpleadoHoraOrdinariaController extends Controller
             'vineta' => $registro->vineta_api_id ? 'ID '.$registro->vineta_api_id : $registro->codigo_vineta,
             'actividad' => $registro->actividad_nombre,
             'grupo' => $this->grupoActividadRegistro($registro),
+            'documento_numero' => $registro->documento_numero,
+            'documento_empaque_id' => $registro->documento_empaque_id,
             'producto' => $registro->producto_nombre,
             'cantidad_puros' => $registro->cantidad_puros,
             'cantidad_actividades' => $registro->cantidadActividadesValor(),
@@ -677,6 +1107,8 @@ class EmpleadoHoraOrdinariaController extends Controller
         return [
             'id' => $hora->id,
             'fecha' => $hora->fecha?->format('Y-m-d'),
+            'documento_numero' => $hora->documento_numero,
+            'documento_empaque_id' => $hora->documento_empaque_id,
             'minutos' => $minutos,
             'horas' => intdiv($minutos, 60),
             'minutos_resto' => $minutos % 60,

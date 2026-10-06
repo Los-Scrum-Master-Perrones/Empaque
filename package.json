@@ -1,6 +1,6 @@
 {
     "private": true,
-"type": "module",
+    "type": "module",
     "scripts": {
         "dev": "vite",
         "build": "vite build"
@@ -16,6 +16,7 @@
         "vite": "^4.0.0"
     },
     "dependencies": {
+        "qrcode": "^1.5.4",
         "sweetalert2": "^11.26.25"
     }
 }

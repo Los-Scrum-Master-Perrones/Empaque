@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Actividad;
 use App\Models\Empleado;
+use App\Models\EmpleadoHoraOrdinaria;
 use App\Models\Producto;
 use App\Models\TipoEmpaque;
 use App\Models\Vineta;
@@ -81,21 +82,129 @@ class VinetaRegistroController extends Controller
                 ->values();
         }
 
+        $items = $registros->map(fn (VinetaRegistro $registro) => [
+            'id_vineta' => (int) ($registro->vineta_api_id ?? $registro->vineta_id),
+            'item' => $registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : $registro->producto_item,
+            'codigo_producto' => $registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : $registro->producto_codigo,
+            'orden_del_sistema' => $registro->ordenDelSistemaReporte() !== 'N/A' ? $registro->ordenDelSistemaReporte() : $registro->orden_del_sistema,
+            'orden_del_cliente' => $registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : $registro->orden,
+            'codigo_actividad' => $registro->actividad_codigo,
+            'actividad' => $registro->actividad_nombre,
+            'grupo' => $this->grupoActividadRegistro($registro),
+            'empleado_codigo' => $registro->empleado_codigo,
+            'empleado_nombre' => $registro->empleado_nombre,
+            'cantidad_puros' => (int) $registro->cantidad_puros,
+            'minutos_por_vineta' => $registro->minutos_trabajados === null
+                ? null
+                : round((int) $registro->minutos_trabajados / 60, 2),
+            'fecha_ingreso' => $registro->fecha_registro?->format('Y-m-d'),
+            '_raw_minutos' => $registro->minutos_trabajados,
+        ]);
+
+        $items = $this->distributeMinutosPorVineta($items)->map(function ($item) {
+            unset($item['_raw_minutos']);
+
+            return $item;
+        })->values();
+
         return response()->json([
             'message' => 'Viñetas registradas encontradas.',
             'fecha_desde' => $data['fecha'],
             'todo' => $todo ? 1 : 0,
             'grupo' => $grupo,
-            'total' => $registros->count(),
-            'registros' => $registros->map(fn (VinetaRegistro $registro) => [
+            'total' => $items->count(),
+            'registros' => $items,
+        ])->header('Cache-Control', 'no-store');
+    }
+
+    public function feedErp(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->query(), [
+            'fecha' => ['required', 'date_format:Y-m-d'],
+            'todo' => ['nullable', 'in:0,1'],
+            'grupo' => ['nullable', 'string'],
+        ], [
+            'fecha.required' => 'La fecha es obligatoria y debe tener el formato AAAA-MM-DD.',
+            'fecha.date_format' => 'La fecha es obligatoria y debe tener el formato AAAA-MM-DD.',
+            'todo.in' => 'El campo todo debe ser 0 o 1.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'La fecha es obligatoria y debe tener el formato AAAA-MM-DD.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $grupoInput = $request->query('grupo');
+        $grupoNormalizado = $this->normalizarGrupoErp($grupoInput);
+
+        if ($grupoInput !== null && trim((string) $grupoInput) !== '' && $grupoNormalizado === 'invalido') {
+            return response()->json([
+                'message' => 'El grupo seleccionado no es válido.',
+                'errors' => [
+                    'grupo' => ['El grupo seleccionado no es válido.'],
+                ],
+            ], 422);
+        }
+
+        $data = $validator->validated();
+        $todo = ($data['todo'] ?? '1') === '1';
+
+        $empleadosPorCodigo = Empleado::all()->keyBy('codigo');
+
+        $registros = VinetaRegistro::query()
+            ->with(['vineta', 'empleado'])
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->when(
+                $todo,
+                fn ($query) => $query->where('fecha_registro', '>=', $data['fecha']),
+                fn ($query) => $query->whereDate('fecha_registro', $data['fecha'])
+            )
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get();
+
+        $items = collect();
+
+        foreach ($registros as $registro) {
+            $empleado = $registro->empleado ?? $empleadosPorCodigo->get($registro->empleado_codigo);
+            $empGrupo = EmployeeProductionGroup::fromCargo($empleado?->cargo, $registro->empleado_codigo);
+            $empPlural = match ($empGrupo) {
+                'rezago' => 'rezagadoras',
+                'anillado' => 'anilladoras',
+                'llenado' => 'llenadoras',
+                'limpieza' => 'limpiadoras',
+                default => 'indirectos',
+            };
+
+            $esPorHora = $registro->esPorHoraOrdinario();
+            $actGrupo = $esPorHora ? 'hora' : $this->grupoActividadRegistro($registro);
+
+            if ($empPlural === 'indirectos') {
+                $grupoErp = 'indirectos';
+            } elseif ($esPorHora) {
+                $grupoErp = $empPlural ? "{$empPlural}_hora" : 'por_hora';
+            } elseif ($empPlural && $actGrupo) {
+                $grupoErp = "{$empPlural}_{$actGrupo}";
+            } else {
+                $grupoErp = $actGrupo ?? 'sin_grupo';
+            }
+
+            if (! $this->registroCoincideGrupoErp($grupoErp, $empPlural, $actGrupo, $grupoNormalizado)) {
+                continue;
+            }
+
+            $items->push([
                 'id_vineta' => (int) ($registro->vineta_api_id ?? $registro->vineta_id),
-                'item' => $registro->producto_item,
-                'codigo_producto' => $registro->producto_codigo,
-                'orden_del_sistema' => $registro->orden_del_sistema,
-                'orden_del_cliente' => $registro->orden,
+                'item' => $registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : $registro->producto_item,
+                'codigo_producto' => $registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : $registro->producto_codigo,
+                'orden_del_sistema' => $registro->ordenDelSistemaReporte() !== 'N/A' ? $registro->ordenDelSistemaReporte() : $registro->orden_del_sistema,
+                'orden_del_cliente' => $registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : $registro->orden,
                 'codigo_actividad' => $registro->actividad_codigo,
                 'actividad' => $registro->actividad_nombre,
-                'grupo' => $this->grupoActividadRegistro($registro),
+                'grupo' => $grupoErp,
                 'empleado_codigo' => $registro->empleado_codigo,
                 'empleado_nombre' => $registro->empleado_nombre,
                 'cantidad_puros' => (int) $registro->cantidad_puros,
@@ -103,8 +212,232 @@ class VinetaRegistroController extends Controller
                     ? null
                     : round((int) $registro->minutos_trabajados / 60, 2),
                 'fecha_ingreso' => $registro->fecha_registro?->format('Y-m-d'),
-            ])->values(),
+                'created_sort' => ($registro->fecha_registro?->format('Y-m-d') ?? '').' '.($registro->hora_registro ?? '00:00:00'),
+                'sort_id' => $registro->id,
+                '_raw_minutos' => $registro->minutos_trabajados,
+            ]);
+        }
+
+        $items = $this->distributeMinutosPorVineta($items);
+
+        $items = $items->sort(function ($a, $b) {
+            $cmp = strcmp($a['created_sort'], $b['created_sort']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return $a['sort_id'] <=> $b['sort_id'];
+        })->values()->map(function ($item) {
+            unset($item['created_sort'], $item['sort_id'], $item['_raw_minutos']);
+
+            return $item;
+        });
+
+        return response()->json([
+            'message' => 'Viñetas registradas encontradas.',
+            'fecha_desde' => $data['fecha'],
+            'todo' => $todo ? 1 : 0,
+            'grupo' => $grupoInput,
+            'total' => $items->count(),
+            'registros' => $items,
         ])->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * Distribute minutos_por_vineta with exact 2 decimal places so that
+     * the sum per employee per date matches the total hours without rounding drift.
+     */
+    private function distributeMinutosPorVineta(Collection $items): Collection
+    {
+        $itemsArray = $items->all();
+
+        // Group indices by empleado_codigo + fecha_ingreso
+        $empDateGroups = [];
+        foreach ($itemsArray as $idx => $item) {
+            $empCode = $item['empleado_codigo'] ?? '';
+            $date = $item['fecha_ingreso'] ?? '';
+            $empDateGroups[$empCode . '|' . $date][] = $idx;
+        }
+
+        foreach ($empDateGroups as $groupKey => $indices) {
+            $taskIndices = [];
+            $taskMinutes = [];
+            $totalTaskMinutes = 0;
+            $horaOrdCents = 0;
+            $totalHoraMinutes = 0;
+
+            foreach ($indices as $idx) {
+                $it = $itemsArray[$idx];
+                if (($it['codigo_actividad'] ?? '') === 'HORA') {
+                    $hMin = (int) ($it['_raw_minutos'] ?? 0);
+                    $totalHoraMinutes += $hMin;
+                    $horaOrdCents += (int) round(($hMin / 60) * 100);
+                } else {
+                    $rawMin = $it['_raw_minutos'] ?? null;
+                    if ($rawMin !== null) {
+                        $min = (int) $rawMin;
+                        if ($min > 0) {
+                            $taskIndices[] = $idx;
+                            $taskMinutes[$idx] = $min;
+                            $totalTaskMinutes += $min;
+                        } else {
+                            $itemsArray[$idx]['minutos_por_vineta'] = 0.0;
+                        }
+                    }
+                }
+            }
+
+            if (empty($taskIndices) || $totalTaskMinutes <= 0) {
+                continue;
+            }
+
+            $totalDayMinutes = $totalTaskMinutes + $totalHoraMinutes;
+
+            if ($horaOrdCents > 0) {
+                $totalDayCents = (int) round(($totalDayMinutes / 60) * 100);
+                $taskTargetCents = max(0, $totalDayCents - $horaOrdCents);
+            } else {
+                $taskTargetCents = (int) round(($totalTaskMinutes / 60) * 100);
+            }
+
+            $baseCents = [];
+            $remainders = [];
+            $allocatedCents = 0;
+
+            foreach ($taskIndices as $idx) {
+                $exactCents = ($taskMinutes[$idx] / $totalTaskMinutes) * $taskTargetCents;
+                $floor = (int) floor($exactCents);
+                $baseCents[$idx] = $floor;
+                $remainders[$idx] = $exactCents - $floor;
+                $allocatedCents += $floor;
+            }
+
+            $leftoverCents = $taskTargetCents - $allocatedCents;
+
+            usort($taskIndices, function ($a, $b) use ($remainders) {
+                if ($remainders[$a] > $remainders[$b]) {
+                    return -1;
+                }
+                if ($remainders[$a] < $remainders[$b]) {
+                    return 1;
+                }
+
+                return $a <=> $b;
+            });
+
+            for ($i = 0; $i < $leftoverCents; $i++) {
+                $baseCents[$taskIndices[$i]]++;
+            }
+
+            foreach ($baseCents as $idx => $cents) {
+                $itemsArray[$idx]['minutos_por_vineta'] = round($cents / 100, 2);
+            }
+        }
+
+        return collect($itemsArray);
+    }
+
+    private function normalizarGrupoErp(?string $grupo): ?string
+    {
+        if ($grupo === null) {
+            return null;
+        }
+
+        $val = strtolower(trim($grupo));
+        if ($val === '' || $val === 'todos' || $val === 'todos los grupos' || $val === 'todos_los_grupos') {
+            return null;
+        }
+
+        $val = str_replace(['(', ')', '[', ']'], ['_', '', '_', ''], $val);
+        $val = preg_replace('/[\s\-\/]+/', '_', $val);
+        $val = trim($val, '_');
+
+        $aliasMap = [
+            'hora' => 'por_hora',
+            'horas' => 'por_hora',
+            'por_horas' => 'por_hora',
+            'rezagadora' => 'rezagadoras',
+            'anilladora' => 'anilladoras',
+            'llenadora' => 'llenadoras',
+            'limpiadora' => 'limpiadoras',
+            'indirecto' => 'indirectos',
+            'indirectos_general' => 'indirectos',
+            'indirectos_rezago' => 'indirectos',
+            'indirectos_anillado' => 'indirectos',
+            'indirectos_llenado' => 'indirectos',
+            'indirectos_limpieza' => 'indirectos',
+            'indirectos_hora' => 'indirectos',
+            'rezago_general' => 'rezago',
+            'anillado_general' => 'anillado',
+            'llenado_general' => 'llenado',
+            'limpieza_general' => 'limpieza',
+            'por_hora_general' => 'por_hora',
+        ];
+
+        if (isset($aliasMap[$val])) {
+            return $aliasMap[$val];
+        }
+
+        $validGroups = [
+            'rezagadoras_rezago',
+            'rezagadoras_anillado',
+            'rezagadoras_llenado',
+            'rezagadoras_hora',
+            'anilladoras_anillado',
+            'anilladoras_rezago',
+            'anilladoras_llenado',
+            'anilladoras_hora',
+            'llenadoras_llenado',
+            'llenadoras_rezago',
+            'llenadoras_anillado',
+            'llenadoras_hora',
+            'limpiadoras_limpieza',
+            'limpiadoras_rezago',
+            'limpiadoras_anillado',
+            'limpiadoras_llenado',
+            'limpiadoras_hora',
+            'indirectos',
+            'rezago',
+            'anillado',
+            'llenado',
+            'limpieza',
+            'por_hora',
+            'rezagadoras',
+            'anilladoras',
+            'llenadoras',
+            'limpiadoras',
+        ];
+
+        return in_array($val, $validGroups, true) ? $val : 'invalido';
+    }
+
+    private function registroCoincideGrupoErp(
+        string $registroGrupoErp,
+        ?string $empPlural,
+        ?string $actGrupo,
+        ?string $filtroGrupo
+    ): bool {
+        if ($filtroGrupo === null) {
+            return true;
+        }
+
+        if ($registroGrupoErp === $filtroGrupo) {
+            return true;
+        }
+
+        if (in_array($filtroGrupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+            return $actGrupo === $filtroGrupo;
+        }
+
+        if ($filtroGrupo === 'por_hora') {
+            return $actGrupo === 'hora' || str_ends_with($registroGrupoErp, '_hora');
+        }
+
+        if (in_array($filtroGrupo, ['rezagadoras', 'anilladoras', 'llenadoras', 'limpiadoras', 'indirectos'], true)) {
+            return $empPlural === $filtroGrupo;
+        }
+
+        return false;
     }
 
     public function index(Request $request): JsonResponse
@@ -112,12 +445,16 @@ class VinetaRegistroController extends Controller
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
             'estado' => ['nullable', 'in:activo,anulado,todos'],
+            'sucursal' => ['nullable', 'integer'],
         ]);
 
         $estado = $data['estado'] ?? 'activo';
+        $sucursal = isset($data['sucursal']) && (int) $data['sucursal'] > 0 ? (int) $data['sucursal'] : null;
+
         $query = VinetaRegistro::query()
             ->whereDate('fecha_registro', $data['fecha'])
             ->when($estado !== 'todos', fn ($query) => $query->where('estado', $estado))
+            ->when($sucursal !== null, fn ($query) => $query->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
             ->orderBy('fecha_registro')
             ->orderBy('hora_registro')
             ->orderBy('id');
@@ -128,10 +465,16 @@ class VinetaRegistroController extends Controller
         $minutosCajones = (int) $activos->sum(fn (VinetaRegistro $registro) => (int) ($registro->minutos_trabajados ?? 0));
         $incluyeOrdinarias = $estado !== 'anulado' && Schema::hasTable('empleado_horas_ordinarias');
         $minutosOrdinarios = $incluyeOrdinarias
-            ? (int) DB::table('empleado_horas_ordinarias')->whereDate('fecha', $data['fecha'])->sum('minutos')
+            ? (int) DB::table('empleado_horas_ordinarias')
+                ->whereDate('fecha', $data['fecha'])
+                ->when($sucursal !== null, fn ($query) => $query->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                ->sum('minutos')
             : 0;
         $horasOrdinariasCount = $incluyeOrdinarias
-            ? (int) DB::table('empleado_horas_ordinarias')->whereDate('fecha', $data['fecha'])->count()
+            ? (int) DB::table('empleado_horas_ordinarias')
+                ->whereDate('fecha', $data['fecha'])
+                ->when($sucursal !== null, fn ($query) => $query->where(fn ($sub) => $sub->where('sucursal', $sucursal)->orWhereNull('sucursal')))
+                ->count()
             : 0;
         $totalMinutos = $minutosCajones + $minutosOrdinarios;
 
@@ -293,10 +636,41 @@ class VinetaRegistroController extends Controller
         }
 
         $isVinetaPorOrden = $this->isVinetaPorOrden($vineta);
+        $grupoActividad = $this->grupoActividadProceso($actividadNombre, $actividadTipoEmpaque, $actividadCodigo);
+        $isLimpieza = (
+            $grupoActividad === 'limpieza'
+            || Str::contains(Str::lower(Str::ascii((string) $actividadNombre)), 'limpi')
+            || trim((string) $actividadCodigo) === '103'
+            || (isset($actividad) && (
+                Str::contains(Str::lower(Str::ascii((string) $actividad->nombre)), 'limpi')
+                || trim((string) $actividad->codigo_actividad) === '103'
+            ))
+        );
 
-        if (! $isVinetaPorOrden) {
-            $grupoActividad = $this->grupoActividadProceso($actividadNombre, $actividadTipoEmpaque, $actividadCodigo);
+        $nombreNormalizado = Str::lower(Str::ascii((string) $actividadNombre));
+        $codigoActividadStr = trim((string) $actividadCodigo);
 
+        $isPrensado = (
+            Str::contains($nombreNormalizado, 'prens')
+            || $codigoActividadStr === '1'
+            || (isset($actividad) && (
+                Str::contains(Str::lower(Str::ascii((string) $actividad->nombre)), 'prens')
+                || trim((string) $actividad->codigo_actividad) === '1'
+            ))
+        );
+
+        $isRolado = (
+            Str::contains($nombreNormalizado, 'rola')
+            || $codigoActividadStr === '171'
+            || (isset($actividad) && (
+                Str::contains(Str::lower(Str::ascii((string) $actividad->nombre)), 'rola')
+                || trim((string) $actividad->codigo_actividad) === '171'
+            ))
+        );
+
+        $isEspecial = $isLimpieza || $isPrensado || $isRolado;
+
+        if (! $isVinetaPorOrden && ! $isEspecial) {
             if ($grupoActividad && $grupoActividad !== 'llenado' && $this->vinetaTieneGrupoProceso($vineta, $grupoActividad)) {
                 throw ValidationException::withMessages([
                     'actividad_nombre' => 'Esta viñeta ya tiene '.$this->grupoActividadProcesoLabel($grupoActividad).' registrado.',
@@ -328,10 +702,27 @@ class VinetaRegistroController extends Controller
         }
 
         $cantidadActividades = $this->resolveCantidadActividades($data, $actividadNombre);
+        $documentoNumero = $this->inputString($data, 'documento_numero', 'documento');
+        $documentoEmpaqueId = $this->inputInt($data, 'documento_empaque_id');
+        $sucursal = $this->inputInt($data, 'sucursal') ?? (int) config('services.erp.default_sucursal', 2);
 
-        $codigoVinetaGenerado = $isVinetaPorOrden
-            ? $this->generarSiguienteIdOrden()
-            : $this->codigoVineta($vineta);
+        if (! $documentoEmpaqueId && $documentoNumero) {
+            $docModel = \App\Models\DocumentoEmpaque::where('numero', $documentoNumero)
+                ->where('fecha', $registradoEn->toDateString())
+                ->where('sucursal', $sucursal)
+                ->first();
+            $documentoEmpaqueId = $docModel?->id;
+        }
+
+        $codigoVinetaGenerado = $isLimpieza
+            ? $this->generarSiguienteIdLimpieza()
+            : ($isPrensado
+                ? $this->generarSiguienteIdPrensado()
+                : ($isRolado
+                    ? $this->generarSiguienteIdRolado()
+                    : ($isVinetaPorOrden
+                        ? $this->generarSiguienteIdOrden()
+                        : $this->codigoVineta($vineta))));
 
         $registro = DB::transaction(function () use (
             $request,
@@ -348,28 +739,37 @@ class VinetaRegistroController extends Controller
             $precioMo,
             $cantidadActividades,
             $isVinetaPorOrden,
-            $codigoVinetaGenerado
+            $isLimpieza,
+            $isPrensado,
+            $isRolado,
+            $codigoVinetaGenerado,
+            $documentoNumero,
+            $documentoEmpaqueId,
+            $sucursal
         ) {
             $payload = [
                 'vineta_id' => $vineta->id,
                 'producto_id' => $producto?->id,
                 'actividad_id' => $actividad?->id,
                 'empleado_id' => $empleado->id,
+                'documento_empaque_id' => $documentoEmpaqueId,
+                'documento_numero' => $documentoNumero,
+                'sucursal' => $sucursal,
                 'registrado_por_user_id' => $request->user()?->id,
                 'codigo_vineta' => $codigoVinetaGenerado,
-                'vineta_api_id' => $isVinetaPorOrden ? null : $vineta->api_id,
+                'vineta_api_id' => ($isVinetaPorOrden || $isLimpieza || $isPrensado || $isRolado) ? null : $vineta->api_id,
                 'id_pendiente_empaque' => $vineta->id_pendiente_empaque,
                 'id_detalle_programacion' => $vineta->id_detalle_programacion,
                 'vineta_fecha' => $vineta->fecha,
-                'producto_codigo' => $producto?->codigo_producto ?? $vineta->codigo_producto,
-                'producto_item' => $producto?->item ?? $vineta->item,
+                'producto_codigo' => $this->textoPreferidoVineta($vineta->codigo_producto, $producto?->codigo_producto),
+                'producto_item' => $this->textoPreferidoVineta($vineta->item, $producto?->item),
                 'producto_nombre' => $this->textoPreferidoVineta($vineta->nombre, $producto?->nombre),
-                'marca' => $vineta->marca,
-                'capa' => $vineta->capa,
-                'vitola' => $vineta->vitola,
-                'tipo_empaque' => $vineta->tipo_empaque,
-                'orden' => $vineta->orden,
-                'orden_del_sistema' => $vineta->orden_del_sistema,
+                'marca' => $this->textoPreferidoVineta($vineta->marca, $producto?->marca?->nombre ?? $producto?->marca),
+                'capa' => $this->textoPreferidoVineta($vineta->capa, $producto?->capa?->nombre ?? $producto?->capa),
+                'vitola' => $this->textoPreferidoVineta($vineta->vitola, $producto?->vitola?->nombre ?? $producto?->vitola),
+                'tipo_empaque' => $this->textoPreferidoVineta($vineta->tipo_empaque, $producto?->tipoEmpaque?->nombre ?? $producto?->tipo_empaque),
+                'orden' => $this->textoPreferidoVineta($vineta->orden, $producto?->orden),
+                'orden_del_sistema' => $this->textoPreferidoVineta($vineta->orden_del_sistema, $producto?->orden_del_sistema),
                 'actividad_api_id' => $actividadApiId,
                 'actividad_codigo' => $actividadCodigo,
                 'actividad_nombre' => $actividadNombre,
@@ -415,12 +815,21 @@ class VinetaRegistroController extends Controller
             return $registro;
         });
 
-        return response()->json([
+        $erpResultado = null;
+        if (! empty($documentoNumero)) {
+            try {
+                $erpResultado = app(\App\Services\ErpApiService::class)->enviarRegistroVineta($registro, $documentoNumero, $sucursal);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Error registrando vineta en ERP: '.$e->getMessage());
+            }
+        }
 
+        return response()->json([
             'message' => 'Registro de viñeta guardado correctamente.',
             'registro' => $this->registroPayload($registro),
             'resumen_diario' => $this->resumenDiarioPayload($registro),
             'proceso' => $this->procesoVinetaPayload($vineta),
+            'erp_resultado' => $erpResultado,
         ], 201);
     }
 
@@ -458,27 +867,204 @@ class VinetaRegistroController extends Controller
         $empleadoCodigo = $empleado?->codigo;
         $empleadoBusqueda = $empleadoCodigo ? null : $this->inputString($data, 'empleado_codigo');
 
-        $query = VinetaRegistro::query()
+        $activeEmployeeCodes = VinetaRegistro::query()
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
             ->whereDate('fecha_registro', '>=', $from->toDateString())
             ->whereDate('fecha_registro', '<=', $to->toDateString())
-            ->when($empleadoCodigo, fn ($query) => $query->where('empleado_codigo', $empleadoCodigo))
-            ->when($empleadoBusqueda, fn ($query) => $query->where('empleado_codigo', 'like', '%'.$empleadoBusqueda.'%'))
+            ->distinct()
+            ->pluck('empleado_codigo')
+            ->filter()
+            ->values();
+
+        $empleadosMap = Empleado::query()
+            ->whereIn('codigo', $activeEmployeeCodes)
+            ->get(['id', 'codigo', 'nombre', 'cargo', 'area', 'activo'])
+            ->keyBy('codigo');
+
+        $groupCounts = [
+            'global' => $activeEmployeeCodes->count(),
+            'anillado' => 0,
+            'rezago' => 0,
+            'llenado' => 0,
+        ];
+
+        $scopedEmployeeCodes = [];
+        foreach ($activeEmployeeCodes as $code) {
+            $emp = $empleadosMap->get((string) $code);
+            $grp = EmployeeProductionGroup::fromCargo($emp?->cargo, (string) $code);
+            if ($grp && isset($groupCounts[$grp])) {
+                $groupCounts[$grp]++;
+            }
+            if ($scope === 'global' || $grp === $scope) {
+                $scopedEmployeeCodes[] = (string) $code;
+            }
+        }
+
+        if ($empleadoCodigo) {
+            $scopedEmployeeCodes = array_values(array_filter($scopedEmployeeCodes, fn ($c) => $c === (string) $empleadoCodigo));
+        } elseif ($empleadoBusqueda) {
+            $scopedEmployeeCodes = array_values(array_filter($scopedEmployeeCodes, fn ($c) => str_contains(strtolower($c), strtolower($empleadoBusqueda))));
+        }
+
+        if (empty($scopedEmployeeCodes)) {
+            return response()->json([
+                'message' => 'Seguimiento de empleado encontrado.',
+                'scope' => $scope,
+                'period' => $period,
+                'date' => $date->toDateString(),
+                'range' => [
+                    'from' => $from->toDateString(),
+                    'to' => $to->toDateString(),
+                    'label' => $label,
+                ],
+                'employee' => $this->seguimientoEmpleadoPayload($empleado),
+                'summary' => [
+                    'registros' => 0,
+                    'empleados' => 0,
+                    'puros' => 0,
+                    'cajones' => 0,
+                    'actividades' => 0,
+                    'minutos' => 0,
+                    'tiempo' => '0 min',
+                    'monto' => 0.0,
+                ],
+                'group_counts' => $groupCounts,
+                'employee_summaries' => [],
+                'activity_summaries' => [],
+                'records' => [],
+            ]);
+        }
+
+        $recordsQuery = VinetaRegistro::query()
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->whereDate('fecha_registro', '>=', $from->toDateString())
+            ->whereDate('fecha_registro', '<=', $to->toDateString())
+            ->whereIn('empleado_codigo', $scopedEmployeeCodes)
+            ->select([
+                'id',
+                'actividad_id',
+                'actividad_nombre',
+                'actividad_codigo',
+                'actividad_tipo_empaque',
+                'precio_mo',
+                'empleado_id',
+                'empleado_codigo',
+                'empleado_nombre',
+                'cantidad_puros',
+                'cantidad_cajones',
+                'cantidad_actividades',
+                'minutos_trabajados',
+                'fecha_registro',
+                'hora_registro',
+                'registrado_en',
+                'estado',
+                'observacion',
+                'documento_empaque_id',
+                'documento_numero',
+                'sucursal',
+                'erp_enviado',
+            ])
             ->orderBy('fecha_registro')
             ->orderBy('hora_registro')
             ->orderBy('id');
-        $periodRecords = $query->with('empleado')->get();
-        $codigos = $periodRecords->pluck('empleado_codigo')->filter()->unique()->values();
-        $empleadosMap = Empleado::query()->whereIn('codigo', $codigos)->get()->keyBy('codigo');
 
-        $scopedRecords = $scope === 'global'
-            ? $periodRecords
-            : $periodRecords
-                ->filter(function (VinetaRegistro $registro) use ($empleadosMap, $scope) {
-                    $emp = $registro->empleado ?? $empleadosMap->get((string) $registro->empleado_codigo);
-                    return EmployeeProductionGroup::fromCargo($emp?->cargo, $registro->empleado_codigo) === $scope;
-                })
-                ->values();
+        $scopedRecords = $recordsQuery->get();
+
+        $totalRegistros = 0;
+        $totalPuros = 0;
+        $totalCajones = 0;
+        $totalActividades = 0;
+        $totalMinutos = 0;
+        $totalMonto = 0.0;
+        $distinctEmployees = [];
+        $empGroups = [];
+        $actGroups = [];
+
+        foreach ($scopedRecords as $r) {
+            $empCode = trim((string) $r->empleado_codigo);
+            $empName = trim((string) $r->empleado_nombre);
+            $empKey = $empCode.'|'.$empName;
+            $distinctEmployees[$empKey] = true;
+
+            $actNombre = trim((string) $r->actividad_nombre) ?: 'Actividad';
+
+            $puros = (int) $r->cantidad_puros;
+            $cajones = (int) $r->cantidad_cajones;
+            $actividades = (int) $r->total_actividades;
+            $minutos = $r->esPorHoraOrdinario() ? 0 : (int) ($r->minutos_trabajados ?? 0);
+            $monto = (float) $r->total_mo;
+
+            $totalRegistros++;
+            $totalPuros += $puros;
+            $totalCajones += $cajones;
+            $totalActividades += $actividades;
+            $totalMinutos += $minutos;
+            $totalMonto += $monto;
+
+            if (! isset($empGroups[$empKey])) {
+                $emp = $empleadosMap->get($empCode);
+                $empGroups[$empKey] = [
+                    'codigo' => $empCode,
+                    'nombre' => $empName,
+                    'cargo' => $emp?->cargo,
+                    'area' => $emp?->area,
+                    'registros' => 0,
+                    'puros' => 0,
+                    'cajones' => 0,
+                    'actividades' => 0,
+                    'minutos' => 0,
+                    'monto' => 0.0,
+                ];
+            }
+            $empGroups[$empKey]['registros']++;
+            $empGroups[$empKey]['puros'] += $puros;
+            $empGroups[$empKey]['cajones'] += $cajones;
+            $empGroups[$empKey]['actividades'] += $actividades;
+            $empGroups[$empKey]['minutos'] += $minutos;
+            $empGroups[$empKey]['monto'] += $monto;
+
+            if (! isset($actGroups[$actNombre])) {
+                $actGroups[$actNombre] = [
+                    'actividad' => $actNombre,
+                    'grupo' => $this->grupoActividadRegistro($r),
+                    'registros' => 0,
+                    'puros' => 0,
+                    'cajones' => 0,
+                    'actividades' => 0,
+                    'minutos' => 0,
+                    'monto' => 0.0,
+                ];
+            }
+            $actGroups[$actNombre]['registros']++;
+            $actGroups[$actNombre]['puros'] += $puros;
+            $actGroups[$actNombre]['cajones'] += $cajones;
+            $actGroups[$actNombre]['actividades'] += $actividades;
+            $actGroups[$actNombre]['minutos'] += $minutos;
+            $actGroups[$actNombre]['monto'] += $monto;
+        }
+
+        $summary = [
+            'registros' => $totalRegistros,
+            'empleados' => count($distinctEmployees),
+            'puros' => $totalPuros,
+            'cajones' => $totalCajones,
+            'actividades' => $totalActividades,
+            'minutos' => $totalMinutos,
+            'tiempo' => VinetaRegistro::minutosATiempoTexto($totalMinutos),
+            'monto' => $totalMonto,
+        ];
+
+        $empSummaries = array_values(array_map(function ($item) {
+            $item['tiempo'] = VinetaRegistro::minutosATiempoTexto($item['minutos']);
+            return $item;
+        }, $empGroups));
+        usort($empSummaries, fn ($a, $b) => $b['actividades'] <=> $a['actividades']);
+
+        $actSummaries = array_values(array_map(function ($item) {
+            $item['tiempo'] = VinetaRegistro::minutosATiempoTexto($item['minutos']);
+            return $item;
+        }, $actGroups));
+        usort($actSummaries, fn ($a, $b) => $b['actividades'] <=> $a['actividades']);
 
         return response()->json([
             'message' => 'Seguimiento de empleado encontrado.',
@@ -491,10 +1077,10 @@ class VinetaRegistroController extends Controller
                 'label' => $label,
             ],
             'employee' => $this->seguimientoEmpleadoPayload($empleado),
-            'summary' => $this->seguimientoResumenPayload($scopedRecords),
-            'group_counts' => $this->seguimientoGrupoCountsPayload($periodRecords, $empleadosMap),
-            'employee_summaries' => $this->seguimientoEmpleadoSummariesPayload($scopedRecords, $empleadosMap),
-            'activity_summaries' => $this->seguimientoActividadSummariesPayload($scopedRecords),
+            'summary' => $summary,
+            'group_counts' => $groupCounts,
+            'employee_summaries' => $empSummaries,
+            'activity_summaries' => $actSummaries,
             'records' => $empleado
                 ? $scopedRecords->map(fn (VinetaRegistro $registro) => $this->registroPayload($registro))->values()
                 : [],
@@ -587,8 +1173,14 @@ class VinetaRegistroController extends Controller
             $this->timezone
         );
         $isVinetaPorOrden = $vinetaRegistro->vineta ? $this->isVinetaPorOrden($vinetaRegistro->vineta) : false;
+        $nombreNormalizado = Str::lower(Str::ascii((string) $actividadNombre));
+        $codigoActividadStr = trim((string) $actividadCodigo);
+        $isLimpieza = Str::contains($nombreNormalizado, 'limpi') || $codigoActividadStr === '103';
+        $isPrensado = Str::contains($nombreNormalizado, 'prens') || $codigoActividadStr === '1';
+        $isRolado = Str::contains($nombreNormalizado, 'rola') || $codigoActividadStr === '171';
+        $isEspecial = $isLimpieza || $isPrensado || $isRolado;
 
-        if (! $isVinetaPorOrden) {
+        if (! $isVinetaPorOrden && ! $isEspecial) {
             $duplicado = $this->registroActivoExistente(
                 $vinetaRegistro->vineta,
                 $registradoEn,
@@ -650,14 +1242,27 @@ class VinetaRegistroController extends Controller
         ];
 
         if ($actualizaActividad) {
-            $payload = array_merge($payload, [
+            $updateFields = [
                 'actividad_id' => $actividad?->id,
                 'actividad_api_id' => $actividadApiId,
                 'actividad_codigo' => $actividadCodigo,
                 'actividad_nombre' => $actividadNombre,
                 'actividad_tipo_empaque' => $actividadTipoEmpaque,
                 'cantidad_actividades' => VinetaRegistro::cantidadActividadesDesdeNombre($actividadNombre),
-            ]);
+            ];
+
+            if ($isPrensado && ! str_starts_with(strtolower((string) $vinetaRegistro->codigo_vineta), 'p-')) {
+                $updateFields['codigo_vineta'] = $this->generarSiguienteIdPrensado();
+                $updateFields['vineta_api_id'] = null;
+            } elseif ($isRolado && ! str_starts_with(strtolower((string) $vinetaRegistro->codigo_vineta), 'r-')) {
+                $updateFields['codigo_vineta'] = $this->generarSiguienteIdRolado();
+                $updateFields['vineta_api_id'] = null;
+            } elseif ($isLimpieza && ! str_starts_with(strtolower((string) $vinetaRegistro->codigo_vineta), 'l-')) {
+                $updateFields['codigo_vineta'] = $this->generarSiguienteIdLimpieza();
+                $updateFields['vineta_api_id'] = null;
+            }
+
+            $payload = array_merge($payload, $updateFields);
         }
 
         $rawPayload = is_array($vinetaRegistro->raw_payload) ? $vinetaRegistro->raw_payload : [];
@@ -725,6 +1330,10 @@ class VinetaRegistroController extends Controller
             'hora_registro' => ['nullable', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/'],
             'registrado_en' => ['nullable', 'date'],
             'observacion' => ['nullable', 'string', 'max:1000'],
+            'documento_empaque_id' => ['nullable', 'integer'],
+            'documento_numero' => ['nullable', 'string', 'max:50'],
+            'documento' => ['nullable', 'string', 'max:50'],
+            'sucursal' => ['nullable', 'integer'],
         ];
     }
 
@@ -894,6 +1503,19 @@ class VinetaRegistroController extends Controller
             ->whereDate('fecha_registro', $registradoEn->toDateString())
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
             ->when($exceptRegistroId, fn ($query) => $query->whereKeyNot($exceptRegistroId))
+            ->where(function ($query) {
+                $query->whereNull('codigo_vineta')
+                    ->orWhere(function ($q) {
+                        $q->where('codigo_vineta', 'not like', 'l-%')
+                          ->where('codigo_vineta', 'not like', 'L-%')
+                          ->where('codigo_vineta', 'not like', 'o-%')
+                          ->where('codigo_vineta', 'not like', 'O-%')
+                          ->where('codigo_vineta', 'not like', 'p-%')
+                          ->where('codigo_vineta', 'not like', 'P-%')
+                          ->where('codigo_vineta', 'not like', 'r-%')
+                          ->where('codigo_vineta', 'not like', 'R-%');
+                    });
+            })
             ->where(function ($query) use ($actividad, $actividadApiId, $actividadCodigo, $actividadNombre) {
                 if ($actividad) {
                     $query->orWhere('actividad_id', $actividad->id);
@@ -1067,6 +1689,19 @@ class VinetaRegistroController extends Controller
                             ->whereDate('vineta_fecha', $vineta->fecha->format('Y-m-d'));
                     });
                 }
+            })
+            ->where(function ($query) {
+                $query->whereNull('codigo_vineta')
+                    ->orWhere(function ($q) {
+                        $q->where('codigo_vineta', 'not like', 'l-%')
+                          ->where('codigo_vineta', 'not like', 'L-%')
+                          ->where('codigo_vineta', 'not like', 'o-%')
+                          ->where('codigo_vineta', 'not like', 'O-%')
+                          ->where('codigo_vineta', 'not like', 'p-%')
+                          ->where('codigo_vineta', 'not like', 'P-%')
+                          ->where('codigo_vineta', 'not like', 'r-%')
+                          ->where('codigo_vineta', 'not like', 'R-%');
+                    });
             })
             ->orderBy('fecha_registro')
             ->orderBy('hora_registro')
@@ -1311,7 +1946,20 @@ class VinetaRegistroController extends Controller
             return 'anillado';
         }
 
-        // 3. Llenado: Llenado, petaca, sampler, display, bolsa, caja, paquete, sellado, jarra, tubo, costura
+        // 3. Limpieza: Limpieza de puros, limpiado de brocha
+        if (
+            str_contains($texto, 'limpieza')
+            || str_contains($texto, 'limpiad')
+            || str_contains($texto, 'limpia')
+            || str_contains($texto, '103')
+            || trim((string) $codigo) === '103'
+        ) {
+            if (! str_contains($texto, 'llenado de bolsa')) {
+                return 'limpieza';
+            }
+        }
+
+        // 4. Llenado: Llenado, petaca, sampler, display, bolsa, caja, paquete, sellado, jarra, tubo, costura
         if (
             str_contains($texto, 'llenad')
             || str_contains($texto, 'petaca')
@@ -1328,15 +1976,6 @@ class VinetaRegistroController extends Controller
             || str_contains($texto, 'swisher')
         ) {
             return 'llenado';
-        }
-
-        // 4. Limpieza: Limpieza de puros, limpiado de brocha
-        if (
-            str_contains($texto, 'limpieza')
-            || str_contains($texto, 'limpiad')
-            || str_contains($texto, 'limpia')
-        ) {
-            return 'limpieza';
         }
 
         return null;
@@ -1397,16 +2036,16 @@ class VinetaRegistroController extends Controller
             'id_pendiente_empaque' => $registro->id_pendiente_empaque,
             'id_detalle_programacion' => $registro->id_detalle_programacion,
             'vineta_fecha' => $registro->vineta_fecha?->format('Y-m-d'),
-            'orden' => $registro->orden,
-            'orden_del_sistema' => $registro->orden_del_sistema,
+            'orden' => $registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : $registro->orden,
+            'orden_del_sistema' => $registro->ordenDelSistemaReporte() !== 'N/A' ? $registro->ordenDelSistemaReporte() : $registro->orden_del_sistema,
             'producto' => [
                 'id' => $registro->producto_id,
-                'codigo_producto' => $registro->producto_codigo,
-                'item' => $registro->producto_item,
+                'codigo_producto' => $registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : $registro->producto_codigo,
+                'item' => $registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : $registro->producto_item,
                 'nombre' => $registro->productoNombreReporte(),
-                'marca' => $registro->marca,
-                'capa' => $registro->capa,
-                'vitola' => $registro->vitola,
+                'marca' => $registro->marcaReporte() !== 'N/A' ? $registro->marcaReporte() : $registro->marca,
+                'capa' => $registro->capaReporte() !== 'N/A' ? $registro->capaReporte() : $registro->capa,
+                'vitola' => $registro->vitolaReporte() !== 'N/A' ? $registro->vitolaReporte() : $registro->vitola,
                 'tipo_empaque' => $registro->tipoEmpaqueReporte(),
             ],
             'actividad' => [
@@ -1446,6 +2085,12 @@ class VinetaRegistroController extends Controller
             ],
             'estado' => $registro->estado,
             'observacion' => $registro->observacion,
+            'documento_empaque_id' => $registro->documento_empaque_id,
+            'documento_numero' => $registro->documento_numero,
+            'sucursal' => $registro->sucursal,
+            'erp_enviado' => (bool) $registro->erp_enviado,
+            'erp_enviado_en' => $registro->erp_enviado_en?->toIso8601String(),
+            'erp_respuesta' => $registro->erp_respuesta,
         ];
     }
 
@@ -1526,15 +2171,15 @@ class VinetaRegistroController extends Controller
             'id' => $vineta?->id ?? $registro?->vineta_id,
             'api_id' => $vineta?->api_id ?? $registro?->vineta_api_id ?? $apiId,
             'fecha' => $vineta?->fecha?->format('Y-m-d') ?? $registro?->vineta_fecha?->format('Y-m-d') ?? $fecha,
-            'marca' => $vineta?->marca ?? $registro?->marca,
-            'nombre' => $vineta?->nombre ?? $registro?->producto_nombre,
-            'capa' => $vineta?->capa ?? $registro?->capa,
-            'vitola' => $vineta?->vitola ?? $registro?->vitola,
-            'tipo_empaque' => $vineta?->tipo_empaque ?? $registro?->tipo_empaque,
-            'codigo_producto' => $vineta?->codigo_producto ?? $registro?->producto_codigo,
-            'item' => $vineta?->item ?? $registro?->producto_item,
-            'orden_del_sistema' => $vineta?->orden_del_sistema ?? $registro?->orden_del_sistema,
-            'orden' => $vineta?->orden ?? $registro?->orden,
+            'marca' => $this->textoPreferidoVineta($vineta?->marca, $registro?->marca),
+            'nombre' => $this->textoPreferidoVineta($vineta?->nombre, $registro?->producto_nombre),
+            'capa' => $this->textoPreferidoVineta($vineta?->capa, $registro?->capa),
+            'vitola' => $this->textoPreferidoVineta($vineta?->vitola, $registro?->vitola),
+            'tipo_empaque' => $this->textoPreferidoVineta($vineta?->tipo_empaque, $registro?->tipo_empaque),
+            'codigo_producto' => $this->textoPreferidoVineta($vineta?->codigo_producto, $registro?->producto_codigo),
+            'item' => $this->textoPreferidoVineta($vineta?->item, $registro?->producto_item),
+            'orden_del_sistema' => $this->textoPreferidoVineta($vineta?->orden_del_sistema, $registro?->orden_del_sistema),
+            'orden' => $this->textoPreferidoVineta($vineta?->orden, $registro?->orden),
             'cantidad_puros' => $vineta?->cantidad_puros ?? $registro?->cantidad_puros,
             'estado' => $vineta?->estado,
             'impreso' => $vineta ? (bool) $vineta->impreso : null,
@@ -1603,7 +2248,7 @@ class VinetaRegistroController extends Controller
     private function isVinetaPorOrden(Vineta $vineta): bool
     {
         $idPendiente = strtolower(trim((string) $vineta->id_pendiente_empaque));
-        if (str_starts_with($idPendiente, 'or-') || str_starts_with($idPendiente, 'o-')) {
+        if (str_starts_with($idPendiente, 'or-') || str_starts_with($idPendiente, 'o-') || str_starts_with($idPendiente, 'li-')) {
             return true;
         }
 
@@ -1634,6 +2279,232 @@ class VinetaRegistroController extends Controller
         }
 
         return 'o-' . ($maxNum + 1);
+    }
+
+    private function generarSiguienteIdLimpieza(): string
+    {
+        $this->asegurarSecuenciaLimpieza();
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'l-%')
+                  ->orWhere('codigo_vineta', 'like', 'L-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^l-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        return 'l-' . ($maxNum + 1);
+    }
+
+    private function asegurarSecuenciaLimpieza(): void
+    {
+        $pendientes = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('actividad_codigo', '103')
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%limpiez%'])
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%limpiad%']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('codigo_vineta')
+                  ->orWhere(function ($sub) {
+                      $sub->where('codigo_vineta', 'not like', 'l-%')
+                          ->where('codigo_vineta', 'not like', 'L-%');
+                  });
+            })
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($pendientes->isEmpty()) {
+            return;
+        }
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'l-%')
+                  ->orWhere('codigo_vineta', 'like', 'L-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^l-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        foreach ($pendientes as $reg) {
+            $maxNum++;
+            DB::table('vineta_registros')
+                ->where('id', $reg->id)
+                ->update([
+                    'codigo_vineta' => 'l-' . $maxNum,
+                    'vineta_api_id' => null,
+                ]);
+        }
+    }
+
+    private function generarSiguienteIdPrensado(): string
+    {
+        $this->asegurarSecuenciaPrensado();
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'p-%')
+                  ->orWhere('codigo_vineta', 'like', 'P-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^p-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        return 'p-' . ($maxNum + 1);
+    }
+
+    private function asegurarSecuenciaPrensado(): void
+    {
+        $pendientes = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('actividad_codigo', '1')
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%prens%']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('codigo_vineta')
+                  ->orWhere(function ($sub) {
+                      $sub->where('codigo_vineta', 'not like', 'p-%')
+                          ->where('codigo_vineta', 'not like', 'P-%');
+                  });
+            })
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($pendientes->isEmpty()) {
+            return;
+        }
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'p-%')
+                  ->orWhere('codigo_vineta', 'like', 'P-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^p-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        foreach ($pendientes as $reg) {
+            $maxNum++;
+            DB::table('vineta_registros')
+                ->where('id', $reg->id)
+                ->update([
+                    'codigo_vineta' => 'p-' . $maxNum,
+                    'vineta_api_id' => null,
+                ]);
+        }
+    }
+
+    private function generarSiguienteIdRolado(): string
+    {
+        $this->asegurarSecuenciaRolado();
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'r-%')
+                  ->orWhere('codigo_vineta', 'like', 'R-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^r-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        return 'r-' . ($maxNum + 1);
+    }
+
+    private function asegurarSecuenciaRolado(): void
+    {
+        $pendientes = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('actividad_codigo', '171')
+                  ->orWhereRaw('LOWER(actividad_nombre) LIKE ?', ['%rola%']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('codigo_vineta')
+                  ->orWhere(function ($sub) {
+                      $sub->where('codigo_vineta', 'not like', 'r-%')
+                          ->where('codigo_vineta', 'not like', 'R-%');
+                  });
+            })
+            ->orderBy('fecha_registro')
+            ->orderBy('hora_registro')
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($pendientes->isEmpty()) {
+            return;
+        }
+
+        $codigos = DB::table('vineta_registros')
+            ->where(function ($q) {
+                $q->where('codigo_vineta', 'like', 'r-%')
+                  ->orWhere('codigo_vineta', 'like', 'R-%');
+            })
+            ->pluck('codigo_vineta');
+
+        $maxNum = 0;
+        foreach ($codigos as $cod) {
+            if (preg_match('/^r-(\d+)$/i', trim((string) $cod), $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        foreach ($pendientes as $reg) {
+            $maxNum++;
+            DB::table('vineta_registros')
+                ->where('id', $reg->id)
+                ->update([
+                    'codigo_vineta' => 'r-' . $maxNum,
+                    'vineta_api_id' => null,
+                ]);
+        }
     }
 }
 

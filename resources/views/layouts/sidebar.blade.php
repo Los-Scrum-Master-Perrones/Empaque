@@ -1,8 +1,13 @@
 @php
     $catalogosActivo = request()->routeIs('catalogos.*');
+    $vinetasActivo = request()->routeIs('vinetas.*') || request()->routeIs('vinetas-por-orden.*') || request()->routeIs('vinetas-pendientes.*') || request()->routeIs('vineta-registros.*');
 @endphp
 
-<div x-data="{ mobileSidebarOpen: false }"
+<div x-data="{
+    mobileSidebarOpen: false,
+    catalogos: {{ $catalogosActivo ? 'true' : 'false' }},
+    vinetas: {{ $vinetasActivo ? 'true' : 'false' }}
+}"
      x-effect="document.body.classList.toggle('mobile-sidebar-lock', mobileSidebarOpen)"
      x-on:open-mobile-sidebar.window="mobileSidebarOpen = true"
      x-on:close-mobile-sidebar.window="mobileSidebarOpen = false"
@@ -178,7 +183,7 @@
                 </svg>
             </button>
 
-            <div :class="catalogos && sidebarOpen ? 'sidebar-submenu-open max-h-[26rem] opacity-100 mt-2' : 'sidebar-submenu-closed max-h-0 opacity-0 mt-0 pointer-events-none'"
+            <div :class="catalogos && (sidebarOpen || mobileSidebarOpen) ? 'sidebar-submenu-open max-h-[26rem] opacity-100 mt-2' : 'sidebar-submenu-closed max-h-0 opacity-0 mt-0 pointer-events-none'"
                  class="sidebar-submenu ml-8 mr-4 space-y-1 text-sm overflow-hidden max-h-0 opacity-0">
 
                 @can('productos.ver')
@@ -249,50 +254,79 @@
         </a>
 
         {{-- Viñetas --}}
-        <a href="{{ route('vinetas.index') }}"
-           data-sidebar-tooltip="Viñetas"
+        <button type="button"
+            data-sidebar-tooltip="Viñetas"
+            @click="
+                if (!sidebarOpen) {
+                    sidebarOpen = true;
+                    vinetas = true;
+                } else {
+                    vinetas = !vinetas;
+                }
+            "
+            class="sidebar-nav-item w-full flex items-center justify-between px-4 py-3 rounded-l-2xl transition
+            {{ $vinetasActivo ? 'sidebar-active' : 'sidebar-link' }}">
+
+            <div class="flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 min-w-5" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h2m4 0h-2m-4 4h6" />
+                </svg>
+
+                <span class="sidebar-label">Viñetas</span>
+            </div>
+
+            <svg :class="vinetas ? 'rotate-180' : ''"
+                 class="sidebar-disclosure-icon w-4 h-4 transition-transform"
+                 xmlns="http://www.w3.org/2000/svg" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+
+        <div :class="vinetas && (sidebarOpen || mobileSidebarOpen) ? 'sidebar-submenu-open max-h-[22rem] opacity-100 mt-2' : 'sidebar-submenu-closed max-h-0 opacity-0 mt-0 pointer-events-none'"
+             class="sidebar-submenu ml-8 mr-4 space-y-1 text-sm overflow-hidden max-h-0 opacity-0">
+
+            <a href="{{ route('vinetas.index') }}"
+               class="block px-4 py-2 rounded-xl transition {{ (request()->routeIs('vinetas.*') && !request()->routeIs('vinetas-por-orden.*') && !request()->routeIs('vinetas-pendientes.*')) ? 'sidebar-sub-active' : 'sidebar-sub-link' }}">
+                Viñetas
+            </a>
+
+            <a href="{{ route('vinetas-por-orden.index') }}"
+               class="block px-4 py-2 rounded-xl transition {{ request()->routeIs('vinetas-por-orden.*') ? 'sidebar-sub-active' : 'sidebar-sub-link' }}">
+                Viñetas por orden
+            </a>
+
+            <a href="{{ route('vinetas-pendientes.index') }}"
+               class="block px-4 py-2 rounded-xl transition {{ request()->routeIs('vinetas-pendientes.*') ? 'sidebar-sub-active' : 'sidebar-sub-link' }}">
+                Viñetas pendientes
+            </a>
+
+            <a href="{{ route('vineta-registros.index') }}"
+               class="block px-4 py-2 rounded-xl transition {{ request()->routeIs('vineta-registros.*') ? 'sidebar-sub-active' : 'sidebar-sub-link' }}">
+                Viñetas registradas
+            </a>
+        </div>
+
+        {{-- Estadístico --}}
+        <a href="{{ route('estadistico.index') }}"
+           data-sidebar-tooltip="Estadístico"
            class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-2xl transition
-           {{ request()->routeIs('vinetas.*') ? 'sidebar-active' : 'sidebar-link' }}">
+           {{ request()->routeIs('estadistico.*') ? 'sidebar-active' : 'sidebar-link' }}">
 
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 min-w-5" fill="none"
                  viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h2m4 0h-2m-4 4h6" />
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
 
-            <span class="sidebar-label">Viñetas</span>
-        </a>
-
-        {{-- Viñetas por orden --}}
-        <a href="{{ route('vinetas-por-orden.index') }}"
-           data-sidebar-tooltip="Viñetas por orden"
-           class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-2xl transition
-           {{ request()->routeIs('vinetas-por-orden.*') ? 'sidebar-active' : 'sidebar-link' }}">
-
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 min-w-5" fill="none"
-                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-            </svg>
-
-            <span class="sidebar-label">Viñetas por orden</span>
-        </a>
-
-        <a href="{{ route('vineta-registros.index') }}"
-           data-sidebar-tooltip="Viñetas registradas"
-           class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-2xl transition
-           {{ request()->routeIs('vineta-registros.*') ? 'sidebar-active' : 'sidebar-link' }}">
-
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 min-w-5" fill="none"
-                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M9 12h6m-6 4h6M7 4h10a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2V6a2 2 0 0 1 2-2Z" />
-            </svg>
-
-            <span class="sidebar-label">Viñetas registradas</span>
+            <span class="sidebar-label">Estadístico</span>
         </a>
 
         {{-- Costos empaque --}}
+        @if(!auth()->user()?->esSoloSupervisor())
         <a href="{{ route('costos-empaque.index') }}"
            data-sidebar-tooltip="Costos empaque"
            class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-2xl transition
@@ -306,6 +340,7 @@
 
             <span class="sidebar-label">Costos empaque</span>
         </a>
+        @endif
 
         {{-- Mi perfil --}}
         <a href="{{ route('profile.edit') }}"

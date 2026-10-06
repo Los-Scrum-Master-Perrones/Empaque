@@ -73,7 +73,7 @@ class AppUpdateController extends Controller
     {
         $default = [
             'version_name' => '2.0.0',
-            'version_code' => 23,
+            'version_code' => 24,
             'release_notes' => "Versión 2.0.0 (Build 23)\n• Ranking mensual de empleados por área (Anillado, Rezago y Llenado) con podio Top 3\n• Filtro estricto por puesto de trabajo (anilladoras/celofanadoras en Anillado, rezagadoras y 8219/8217 en Rezago, llenadoras de paquetes en Llenado)\n• Selector interactivo de mes",
             'apk_filename' => 'app-arm64-v8a-release.apk',
             'force_update' => false,

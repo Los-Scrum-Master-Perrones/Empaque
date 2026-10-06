@@ -68,6 +68,7 @@
                                     </div>
                                 </div>
 
+                                @if(!auth()->user()?->esSoloSupervisor())
                                 <form method="POST"
                                       action="{{ route('empleados.sincronizar') }}"
                                       class="form-sincronizar w-full sm:w-auto">
@@ -82,6 +83,7 @@
                                         </span>
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </div>
 

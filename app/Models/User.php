@@ -44,4 +44,21 @@ use HasRoles;
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public function esSoloSupervisor(): bool
+    {
+        if ($this->hasAnyRole(['SuperAdmin', 'Admin', 'Digitalizador', 'Operador'])) {
+            return false;
+        }
+
+        if ($this->hasRole('Supervisor')) {
+            return true;
+        }
+
+        $nombre = mb_strtolower(trim((string) $this->name));
+        $email = mb_strtolower(trim((string) $this->email));
+
+        return str_contains($nombre, 'supervisor')
+            || str_starts_with($email, 'supervisor');
+    }
 }

@@ -161,6 +161,21 @@ class VinetasPorOrdenSeeder extends Seeder
                 'tipo_empaque' => 'Display 5',
                 'estado' => 'activo',
             ],
+            [
+                'codigo_qr' => 'or-11',
+                'api_id' => 11,
+                'item' => '151997',
+                'codigo_producto' => 'P-01947',
+                'orden_del_sistema' => '3606',
+                'mes' => 'MAYO 2026',
+                'orden' => '111394',
+                'marca' => 'Cuban Rounds',
+                'vitola' => '6-1/8X50',
+                'nombre' => 'Toro',
+                'capa' => 'INDONESIA',
+                'tipo_empaque' => 'Display/24',
+                'estado' => 'activo',
+            ],
         ];
     }
 

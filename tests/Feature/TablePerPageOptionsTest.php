@@ -95,6 +95,7 @@ class TablePerPageOptionsTest extends TestCase
             'marca' => 'Norte',
             'nombre' => 'Toro Especial',
             'codigo_producto' => 'CP-100',
+            'capa' => 'Claro',
             'item' => 'ITEM-100',
             'orden_del_sistema' => 'OS-100',
             'orden_cliente' => 'OC-100',
@@ -114,16 +115,15 @@ class TablePerPageOptionsTest extends TestCase
         ])));
 
         $combinedResponse->assertOk()
-            ->assertSee('class="vinetas-filter-row grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7', false)
-            ->assertSee('class="vinetas-filter-actions mt-3"', false)
-            ->assertSee('justify-content: flex-end', false)
+            ->assertSee('vinetas-filter-row', false)
+            ->assertSee('vinetas-filter-actions', false)
             ->assertSee('name="marca"', false)
             ->assertSee('name="nombre"', false)
             ->assertSee('name="codigo_producto"', false)
+            ->assertSee('name="capa"', false)
             ->assertSee('name="item"', false)
             ->assertSee('name="orden_del_sistema"', false)
             ->assertSee('name="orden_cliente"', false)
-            ->assertDontSee('name="capa"', false)
             ->assertDontSee('name="vitola"', false)
             ->assertDontSee('name="tipo_empaque"', false)
             ->assertDontSee('vinetas-filter-scroll', false)

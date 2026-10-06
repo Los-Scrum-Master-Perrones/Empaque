@@ -15,7 +15,7 @@
                     </h1>
 
                     <p class="theme-text text-xs mt-0.5 truncate">
-                        Registros guardados desde el móvil y horas ordinarias para seguimiento y planilla.
+                        Registros móviles y horas ordinarias.
                     </p>
                 </div>
             </div>

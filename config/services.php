@@ -35,4 +35,12 @@ return [
         'base_url' => env('PRODUCT_IMAGES_BASE_URL', 'http://192.168.2.7:8099'),
     ],
 
+    'erp' => [
+        'base_url' => env('ERP_API_BASE_URL', 'http://192.168.2.7:8080/api'),
+        'api_key' => env('ERP_API_KEY', 'f745d8e577bbf01a7b0c0e6ea24e5e2ccb742a3a21953786a81a2a2f66fd850d'),
+        'default_sucursal' => (int) env('ERP_DEFAULT_SUCURSAL', 2),
+        'default_forma_pago' => (int) env('ERP_DEFAULT_FORMA_PAGO', 2),
+        'default_bodega_detalle' => (int) env('ERP_DEFAULT_BODEGA_DETALLE', 218),
+    ],
+
 ];

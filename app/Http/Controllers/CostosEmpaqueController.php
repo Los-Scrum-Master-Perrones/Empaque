@@ -11,9 +11,15 @@ use Illuminate\Support\Facades\Schema;
 
 class CostosEmpaqueController extends Controller
 {
+    private static ?bool $hasTableVinetaRegistros = null;
+    private static ?bool $hasCantidadActividadesCol = null;
+
     public function index(Request $request)
     {
-        $migrationPending = ! Schema::hasTable('vineta_registros');
+        if (self::$hasTableVinetaRegistros === null) {
+            self::$hasTableVinetaRegistros = Schema::hasTable('vineta_registros');
+        }
+        $migrationPending = ! self::$hasTableVinetaRegistros;
 
         if ($migrationPending) {
             $perPageOptions = PerPageOptions::forTotal(0);
@@ -53,7 +59,10 @@ class CostosEmpaqueController extends Controller
         $orden = $request->get('orden', 'fecha_registro');
         $direccion = strtolower((string) $request->get('direccion', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $hasCantidadActividades = Schema::hasColumn('vineta_registros', 'cantidad_actividades');
+        if (self::$hasCantidadActividadesCol === null) {
+            self::$hasCantidadActividadesCol = Schema::hasColumn('vineta_registros', 'cantidad_actividades');
+        }
+        $hasCantidadActividades = self::$hasCantidadActividadesCol;
         $activityMultiplier = $hasCantidadActividades
             ? 'CASE WHEN vineta_registros.cantidad_actividades IS NULL OR vineta_registros.cantidad_actividades < 1 THEN 1 ELSE vineta_registros.cantidad_actividades END'
             : '1';
@@ -62,23 +71,17 @@ class CostosEmpaqueController extends Controller
         $totalModExpr = "($activityExpr) * COALESCE(vineta_registros.precio_mo, 0)";
 
         $query = DB::table('vineta_registros')
-            ->leftJoin('productos', function ($join) {
-                $join->on('productos.id', '=', 'vineta_registros.producto_id')
-                    ->orWhere(function ($q) {
-                        $q->whereNull('vineta_registros.producto_id')
-                            ->whereColumn('productos.codigo_producto', '=', 'vineta_registros.producto_codigo');
-                    });
-            })
+            ->leftJoin('productos', 'productos.id', '=', 'vineta_registros.producto_id')
             ->leftJoin('presentaciones', 'presentaciones.id', '=', 'productos.presentacion_id')
             ->where('vineta_registros.estado', VinetaRegistro::ESTADO_ACTIVO)
             ->whereNull('vineta_registros.anulado_en');
 
         if ($fechaDesde !== '') {
-            $query->whereDate('vineta_registros.fecha_registro', '>=', $fechaDesde);
+            $query->where('vineta_registros.fecha_registro', '>=', $fechaDesde);
         }
 
         if ($fechaHasta !== '') {
-            $query->whereDate('vineta_registros.fecha_registro', '<=', $fechaHasta);
+            $query->where('vineta_registros.fecha_registro', '<=', $fechaHasta);
         }
 
         if ($empleado !== '') {

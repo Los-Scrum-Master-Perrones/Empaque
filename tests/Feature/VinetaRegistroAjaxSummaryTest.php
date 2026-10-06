@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Empleado;
 use App\Models\EmpleadoHoraOrdinaria;
 use App\Models\Presentacion;
 use App\Models\Producto;
@@ -173,10 +174,11 @@ class VinetaRegistroAjaxSummaryTest extends TestCase
             ->assertSee('name="orden_cliente"', false)
             ->assertSee('name="codigo_producto"', false)
             ->assertSee('name="empleado"', false)
+            ->assertSee('name="capa"', false)
             ->assertSee('name="actividad_grupo"', false)
             ->assertSee('name="fecha_desde"', false)
             ->assertSee('name="fecha_hasta"', false)
-            ->assertSee('xl:grid-cols-9', false)
+            ->assertSee('vineta-registros-filter-row', false)
             ->assertDontSee('name="buscar"', false)
             ->assertDontSee('name="estado"', false)
             ->assertDontSee('Ordinario Filtro');
@@ -284,6 +286,73 @@ class VinetaRegistroAjaxSummaryTest extends TestCase
         $this->assertStringNotContainsString('Ninguna', $body);
     }
 
+    public function test_registered_vinetas_table_prefers_vineta_data_over_catalog_data(): void
+    {
+        $user = User::factory()->create();
+        $producto = Producto::create([
+            'api_id_producto' => 9202,
+            'codigo_producto' => 'CAT-COD-001',
+            'item' => 'CAT-ITEM-001',
+            'nombre' => 'Producto Cat',
+            'marca' => 'Marca Cat',
+            'capa' => 'Capa Cat',
+            'vitola' => 'Vitola Cat',
+            'tipo_empaque' => 'Empaque Cat',
+        ]);
+        $vineta = Vineta::create([
+            'api_id' => 15409,
+            'codigo_producto' => 'VIN-COD-999',
+            'item' => 'VIN-ITEM-999',
+            'nombre' => 'Producto Viñeta',
+            'marca' => 'Marca Viñeta',
+            'capa' => 'Capa Viñeta',
+            'vitola' => 'Vitola Viñeta',
+            'tipo_empaque' => 'Empaque Viñeta',
+            'orden' => 'ORD-VIN-777',
+            'orden_del_sistema' => 'OS-VIN-888',
+            'impreso' => true,
+        ]);
+
+        // Even if the registro had historical catalog data, it should prioritize viñeta
+        $this->createRegistro($vineta, [
+            'producto_id' => $producto->id,
+            'producto_codigo' => 'CAT-COD-001',
+            'producto_item' => 'CAT-ITEM-001',
+            'producto_nombre' => 'Producto Cat',
+            'marca' => 'Marca Cat',
+            'capa' => 'Capa Cat',
+            'vitola' => 'Vitola Cat',
+            'tipo_empaque' => 'Empaque Cat',
+            'orden' => 'ORD-CAT-111',
+            'orden_del_sistema' => 'OS-CAT-222',
+            'empleado_codigo' => 'EMP-TEST',
+            'empleado_nombre' => 'Empleado Test',
+            'cantidad_puros' => 20,
+            'cantidad_cajones' => 1,
+            'cantidad_actividades' => 1,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('vineta-registros.index', [
+            'id_vineta' => '15409',
+        ]));
+
+        $response->assertOk();
+        $body = $this->tableBody($response->getContent());
+
+        $this->assertStringContainsString('VIN-COD-999', $body);
+        $this->assertStringContainsString('VIN-ITEM-999', $body);
+        $this->assertStringContainsString('Producto Viñeta', $body);
+        $this->assertStringContainsString('Marca Viñeta', $body);
+        $this->assertStringContainsString('Capa Viñeta', $body);
+        $this->assertStringContainsString('Vitola Viñeta', $body);
+        $this->assertStringContainsString('Empaque Viñeta', $body);
+        $this->assertStringContainsString('ORD-VIN-777', $body);
+        $this->assertStringContainsString('OS-VIN-888', $body);
+
+        $this->assertStringNotContainsString('CAT-COD-001', $body);
+        $this->assertStringNotContainsString('CAT-ITEM-001', $body);
+    }
+
     public function test_it_paginates_combined_records_in_the_database(): void
     {
         $user = User::factory()->create();
@@ -326,10 +395,9 @@ class VinetaRegistroAjaxSummaryTest extends TestCase
         );
         $this->assertTrue(
             collect(DB::getQueryLog())->contains(
-                fn (array $query) => str_contains(strtolower($query['query']), 'union all')
-                    && str_contains(strtolower($query['query']), 'limit 10')
+                fn (array $query) => str_contains(strtolower($query['query']), 'limit 10')
             ),
-            'La consulta combinada debe paginar en la base de datos con LIMIT 10.'
+            'La consulta debe paginar en la base de datos con LIMIT 10.'
         );
 
         $allResponse = $this->actingAs($user)->get('/vinetas-registradas?per_page=all');
@@ -337,8 +405,9 @@ class VinetaRegistroAjaxSummaryTest extends TestCase
         $allResponse->assertOk()
             ->assertSee('<option value="all" selected>Todos</option>', false)
             ->assertSee('"timelines":[],"summaries":[]', false);
+        // Debe mostrar exactamente las 12 viñetas excluyendo las horas ordinarias
         $this->assertSame(
-            14,
+            12,
             substr_count($allResponse->getContent(), 'class="vinetas-table-row')
         );
     }
@@ -477,6 +546,66 @@ class VinetaRegistroAjaxSummaryTest extends TestCase
         $this->assertNotFalse($posADesc);
         $this->assertNotFalse($posZDesc);
         $this->assertTrue($posZDesc < $posADesc);
+    }
+
+    public function test_it_filters_by_indirectos_group_and_subactivity_in_web_table(): void
+    {
+        $user = User::factory()->create();
+
+        $empIndirecto = Empleado::create([
+            'codigo' => 'EMP-CALIDAD',
+            'nombre' => 'Inspector Calidad',
+            'cargo' => 'Revisadora de Calidad',
+            'activo' => true,
+        ]);
+
+        $empDirecto = Empleado::create([
+            'codigo' => 'EMP-REZAGO',
+            'nombre' => 'Operador Rezago',
+            'cargo' => 'Rezagadora de puros',
+            'activo' => true,
+        ]);
+
+        $vinetaA = Vineta::create(['api_id' => 9101, 'impreso' => true]);
+        $vinetaB = Vineta::create(['api_id' => 9102, 'impreso' => true]);
+
+        $this->createRegistro($vinetaA, [
+            'empleado_id' => $empIndirecto->id,
+            'empleado_codigo' => $empIndirecto->codigo,
+            'empleado_nombre' => $empIndirecto->nombre,
+            'actividad_nombre' => 'Rezagado',
+            'fecha_registro' => '2026-08-12',
+            'cantidad_puros' => 20,
+            'cantidad_cajones' => 1,
+            'cantidad_actividades' => 1,
+        ]);
+
+        $this->createRegistro($vinetaB, [
+            'empleado_id' => $empDirecto->id,
+            'empleado_codigo' => $empDirecto->codigo,
+            'empleado_nombre' => $empDirecto->nombre,
+            'actividad_nombre' => 'Rezagado',
+            'fecha_registro' => '2026-08-12',
+            'cantidad_puros' => 20,
+            'cantidad_cajones' => 1,
+            'cantidad_actividades' => 1,
+        ]);
+
+        // Filtrar actividad_grupo = indirectos
+        $resIndirectos = $this->actingAs($user)->get(route('vineta-registros.index', [
+            'actividad_grupo' => 'indirectos',
+        ]));
+        $resIndirectos->assertOk()
+            ->assertSee('Inspector Calidad')
+            ->assertDontSee('Operador Rezago');
+
+        // Filtrar actividad_grupo = indirectos_rezago
+        $resIndirectosRezago = $this->actingAs($user)->get(route('vineta-registros.index', [
+            'actividad_grupo' => 'indirectos_rezago',
+        ]));
+        $resIndirectosRezago->assertOk()
+            ->assertSee('Inspector Calidad')
+            ->assertDontSee('Operador Rezago');
     }
 
     private function createRegistro(Vineta $vineta, array $attributes): VinetaRegistro

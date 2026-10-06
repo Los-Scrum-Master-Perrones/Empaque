@@ -156,6 +156,12 @@
                             <span class="text-xs">{{ $sortIcon('estado') }}</span>
                         </a>
                     </th>
+
+                    @if(!auth()->user()?->esSoloSupervisor())
+                    <th class="px-4 py-3 text-center font-bold whitespace-nowrap">
+                        Acción
+                    </th>
+                    @endif
                 </tr>
             </thead>
 
@@ -173,9 +179,22 @@
                         </td>
 
                         <td class="px-4 py-3 whitespace-nowrap">
-                            <span class="theme-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border text-[#2563eb] bg-[#eff6ff]">
-                                {{ $vineta->codigo_qr ?? 'N/A' }}
-                            </span>
+                            <div class="inline-flex items-center gap-1.5">
+                                <span class="theme-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border text-[#2563eb] bg-[#eff6ff]">
+                                    {{ $vineta->codigo_qr ?? 'N/A' }}
+                                </span>
+                                @if(!empty($vineta->codigo_qr))
+                                    <button type="button"
+                                            class="btn-ver-qr theme-button-secondary inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border theme-border transition cursor-pointer"
+                                            data-qr-code="{{ $vineta->codigo_qr }}"
+                                            title="Ver código QR">
+                                        <svg class="w-3.5 h-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                        </svg>
+                                        <span>Ver QR</span>
+                                    </button>
+                                @endif
+                            </div>
                         </td>
 
                         <td class="px-4 py-3 whitespace-nowrap theme-title font-semibold">
@@ -231,10 +250,39 @@
                                 {{ $vineta->estado ?? 'N/A' }}
                             </span>
                         </td>
+
+                        @if(!auth()->user()?->esSoloSupervisor())
+                        <td class="px-4 py-3 whitespace-nowrap text-center">
+                            <button type="button"
+                                    class="btn-crear-vineta-orden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-[#0f172a] text-white hover:bg-[#1e293b] shadow-sm transition cursor-pointer"
+                                    data-id="{{ $vineta->id }}"
+                                    data-codigo-qr="{{ $vineta->codigo_qr ?? '' }}"
+                                    data-fecha="{{ $vineta->fecha ? date('Y-m-d', strtotime((string) $vineta->fecha)) : '' }}"
+                                    data-item="{{ $vineta->item ?? '' }}"
+                                    data-presentacion="{{ $vineta->presentacion ?? '' }}"
+                                    data-codigo-producto="{{ $vineta->codigo_producto ?? '' }}"
+                                    data-marca="{{ $vineta->marca ?? '' }}"
+                                    data-nombre="{{ $vineta->nombre ?? '' }}"
+                                    data-vitola="{{ $vineta->vitola ?? '' }}"
+                                    data-capa="{{ $vineta->capa ?? '' }}"
+                                    data-orden-del-sistema="{{ $vineta->orden_del_sistema ?? '' }}"
+                                    data-orden="{{ $vineta->orden ?? '' }}"
+                                    data-tipo-empaque="{{ $vineta->tipo_empaque ?? '' }}"
+                                    data-mes="{{ $vineta->mes ?? '' }}"
+                                    data-cantidad-puros="{{ $vineta->cantidad_puros ?? 0 }}"
+                                    data-estado="{{ $vineta->estado ?? 'activo' }}"
+                                    title="Crear viñeta a partir de este registro">
+                                <svg class="w-3.5 h-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Crear</span>
+                            </button>
+                        </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="16" class="px-4 py-12 text-center">
+                        <td colspan="{{ !auth()->user()?->esSoloSupervisor() ? 17 : 16 }}" class="px-4 py-12 text-center">
                             <p class="theme-title font-bold">
                                 No hay viñetas por orden para mostrar
                             </p>

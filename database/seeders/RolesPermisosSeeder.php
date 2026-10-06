@@ -43,6 +43,7 @@ class RolesPermisosSeeder extends Seeder
             'cajones.ver',
             'cajones.registrar',
             'cajones.editar',
+            'cajones.eliminar',
 
             // Anillado
             'anillado.ver',
@@ -57,6 +58,9 @@ class RolesPermisosSeeder extends Seeder
             // Reportes
             'reportes.ver',
             'reportes.exportar',
+
+            // Costos empaque
+            'costos-empaque.ver',
 
             // Configuración
             'configuracion.ver',
@@ -98,6 +102,7 @@ class RolesPermisosSeeder extends Seeder
             'cajones.ver',
             'cajones.registrar',
             'cajones.editar',
+            'cajones.eliminar',
 
             'anillado.ver',
             'anillado.registrar',
@@ -109,6 +114,8 @@ class RolesPermisosSeeder extends Seeder
 
             'reportes.ver',
             'reportes.exportar',
+
+            'costos-empaque.ver',
         ]);
 
         // Supervisor: ver producción y reportes
@@ -131,7 +138,7 @@ class RolesPermisosSeeder extends Seeder
             'reportes.exportar',
         ]);
 
-        // Digitalizador: registrar información inicial y catálogos
+        // Digitalizador: puede editar, eliminar, sincronizar empleados y viñetas
         $digitalizador->syncPermissions([
             'dashboard.ver',
 
@@ -146,6 +153,20 @@ class RolesPermisosSeeder extends Seeder
             'cajones.ver',
             'cajones.registrar',
             'cajones.editar',
+            'cajones.eliminar',
+
+            'anillado.ver',
+            'anillado.registrar',
+            'anillado.editar',
+
+            'llenado.ver',
+            'llenado.registrar',
+            'llenado.editar',
+
+            'reportes.ver',
+            'reportes.exportar',
+
+            'costos-empaque.ver',
         ]);
 
         // Operador: registrar anillado y llenado

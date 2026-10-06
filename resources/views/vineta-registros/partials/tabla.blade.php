@@ -222,23 +222,41 @@
 
                     <td class="px-4 py-3 whitespace-nowrap">
                         @if ($isHoraOrdinaria)
-                            <span class="theme-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border">Ordinaria</span>
-                        @else
-                            <span class="theme-badge vinetas-id-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border">
-                                @if ($registro->codigo_vineta && (str_starts_with(strtolower($registro->codigo_vineta), 'o-') || str_starts_with(strtolower($registro->codigo_vineta), 'or-')))
-                                    ID {{ $registro->codigo_vineta }}
-                                @else
-                                    ID {{ $registro->vineta_api_id ?? $registro->vineta_id }}
+                            <div class="flex flex-col gap-1 items-start">
+                                <span class="vinetas-id-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border">Ordinaria</span>
+                                @if (!empty($registro->documento_numero))
+                                    <span class="vinetas-doc-badge inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border">Doc. #{{ $registro->documento_numero }}</span>
                                 @endif
-                            </span>
-                            @if ($isRegistroPorHora)
-                                <span class="theme-badge mt-1 inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black border">Por hora</span>
-                            @endif
+                            </div>
+                        @else
+                            <div class="flex flex-col gap-1 items-start">
+                                <span class="vinetas-id-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border">
+                                    @if ($registro->codigo_vineta && (str_starts_with(strtolower($registro->codigo_vineta), 'o-') || str_starts_with(strtolower($registro->codigo_vineta), 'or-') || str_starts_with(strtolower($registro->codigo_vineta), 'l-') || str_starts_with(strtolower($registro->codigo_vineta), 'p-') || str_starts_with(strtolower($registro->codigo_vineta), 'r-')))
+                                        ID {{ $registro->codigo_vineta }}
+                                    @elseif ((string)$registro->actividad_codigo === '103' || str_contains(strtolower($registro->actividad_nombre ?? ''), 'limpiez') || str_contains(strtolower($registro->actividad_nombre ?? ''), 'limpiad'))
+                                        ID {{ (str_starts_with(strtolower($registro->codigo_vineta ?? ''), 'l-')) ? $registro->codigo_vineta : 'l-1' }}
+                                    @elseif ((string)$registro->actividad_codigo === '1' || str_contains(strtolower($registro->actividad_nombre ?? ''), 'prens'))
+                                        ID {{ (str_starts_with(strtolower($registro->codigo_vineta ?? ''), 'p-')) ? $registro->codigo_vineta : 'p-1' }}
+                                    @elseif ((string)$registro->actividad_codigo === '171' || str_contains(strtolower($registro->actividad_nombre ?? ''), 'rola'))
+                                        ID {{ (str_starts_with(strtolower($registro->codigo_vineta ?? ''), 'r-')) ? $registro->codigo_vineta : 'r-1' }}
+                                    @else
+                                        ID {{ $registro->vineta_api_id ?? $registro->vineta_id }}
+                                    @endif
+                                </span>
+                                @if (!empty($registro->documento_numero))
+                                    <span class="vinetas-doc-badge inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border">Doc. #{{ $registro->documento_numero }}</span>
+                                @else
+                                    <span class="vinetas-no-doc-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border">Sin doc.</span>
+                                @endif
+                                @if ($isRegistroPorHora)
+                                    <span class="theme-badge inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black border">Por hora</span>
+                                @endif
+                            </div>
                         @endif
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-title font-semibold">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->producto_item ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->productoItemReporte() }}
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-text">
@@ -246,11 +264,11 @@
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-title font-semibold">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->producto_codigo ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->productoCodigoReporte() }}
                     </td>
 
                     <td class="px-4 py-3 theme-title font-semibold whitespace-nowrap">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->marca ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->marcaReporte() }}
                     </td>
 
                     <td class="px-4 py-3 min-w-[220px] theme-text">
@@ -263,11 +281,11 @@
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-text">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->vitola ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->vitolaReporte() }}
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-text">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->capa ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->capaReporte() }}
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-text">
@@ -275,11 +293,11 @@
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-title font-semibold">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->orden_del_sistema ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->ordenDelSistemaReporte() }}
                     </td>
 
                     <td class="px-4 py-3 whitespace-nowrap theme-title font-semibold">
-                        {{ $isHoraOrdinaria ? 'N/A' : ($registro->orden ?? 'N/A') }}
+                        {{ $isHoraOrdinaria ? 'N/A' : $registro->ordenReporte() }}
                     </td>
 
                     <td class="px-4 py-3 min-w-[180px]">
@@ -334,34 +352,37 @@
                     <td class="px-3 py-3 text-right whitespace-nowrap">
 
                         @if ($isHoraOrdinaria)
-                            <div class="vineta-actions inline-flex items-center justify-end overflow-hidden rounded-xl border theme-border">
-                                <button type="button"
-                                        title="Editar hora ordinaria"
-                                        aria-label="Editar hora ordinaria"
-                                        class="hora-ordinaria-edit vineta-action-btn vineta-action-btn-secondary"
-                                        data-action="{{ route('vineta-registros.horas-ordinarias.update', $registro) }}"
-                                        data-fecha="{{ optional($registro->fecha)->format('Y-m-d') }}"
-                                        data-horas="{{ $horaOrdinariaHoras }}"
-                                        data-minutos="{{ $horaOrdinariaResto }}"
-                                        data-empleado-codigo="{{ $registro->empleado_codigo }}"
-                                        data-empleado-nombre="{{ $registro->empleado_nombre }}"
-                                        data-observacion="{{ $registro->observacion }}">
-                                    Editar
-                                </button>
-                                <form method="POST"
-                                      action="{{ route('vineta-registros.horas-ordinarias.destroy', $registro) }}"
-                                      onsubmit="return confirm('Eliminar esta hora ordinaria?');"
-                                      class="inline-flex">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit"
-                                            title="Eliminar hora ordinaria"
-                                            aria-label="Eliminar hora ordinaria"
-                                            class="vineta-action-btn vineta-action-btn-danger">
-                                        Eliminar
+                            @if(!auth()->user()?->esSoloSupervisor())
+                                <div class="vineta-actions inline-flex items-center justify-end overflow-hidden rounded-xl border theme-border">
+                                    <button type="button"
+                                            title="Editar hora ordinaria"
+                                            aria-label="Editar hora ordinaria"
+                                            class="hora-ordinaria-edit vineta-action-btn vineta-action-btn-secondary"
+                                            data-action="{{ route('vineta-registros.horas-ordinarias.update', $registro) }}"
+                                            data-fecha="{{ optional($registro->fecha)->format('Y-m-d') }}"
+                                            data-horas="{{ $horaOrdinariaHoras }}"
+                                            data-minutos="{{ $horaOrdinariaResto }}"
+                                            data-empleado-codigo="{{ $registro->empleado_codigo }}"
+                                            data-empleado-nombre="{{ $registro->empleado_nombre }}"
+                                            data-observacion="{{ $registro->observacion }}">
+                                        Editar
                                     </button>
-                                </form>
-                            </div>
+                                    <form method="POST"
+                                          action="{{ route('vineta-registros.horas-ordinarias.destroy', $registro) }}"
+                                          class="form-eliminar-hora-ordinaria inline-flex">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit"
+                                                title="Eliminar hora ordinaria"
+                                                aria-label="Eliminar hora ordinaria"
+                                                class="vineta-action-btn vineta-action-btn-danger">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            @else
+                                <span class="theme-text text-xs opacity-40">-</span>
+                            @endif
                         @else
                             <div class="vineta-actions inline-flex items-center justify-end overflow-hidden rounded-xl border theme-border">
                                 <button type="button"
@@ -371,6 +392,7 @@
                                         data-vineta-id="{{ $registro->vineta_id }}">
                                     Seguimiento
                                 </button>
+                                @if(!auth()->user()?->esSoloSupervisor())
                                 <button type="button"
                                         title="Editar registro"
                                         aria-label="Editar registro"
@@ -383,14 +405,13 @@
                                         data-por-hora="{{ $isRegistroPorHora ? '1' : '0' }}"
                                         data-empleado-codigo="{{ $registro->empleado_codigo }}"
                                         data-empleado-nombre="{{ $registro->empleado_nombre }}"
-                                        data-vineta="ID {{ $registro->vineta_api_id ?? $registro->vineta_id }}"
+                                        data-vineta="ID {{ ($registro->codigo_vineta && (str_starts_with(strtolower($registro->codigo_vineta), 'o-') || str_starts_with(strtolower($registro->codigo_vineta), 'or-') || str_starts_with(strtolower($registro->codigo_vineta), 'l-') || str_starts_with(strtolower($registro->codigo_vineta), 'p-') || str_starts_with(strtolower($registro->codigo_vineta), 'r-'))) ? $registro->codigo_vineta : (((string)$registro->actividad_codigo === '103' || str_contains(strtolower($registro->actividad_nombre ?? ''), 'limpiez') || str_contains(strtolower($registro->actividad_nombre ?? ''), 'limpiad')) ? ((str_starts_with(strtolower($registro->codigo_vineta ?? ''), 'l-')) ? $registro->codigo_vineta : 'l-1') : (((string)$registro->actividad_codigo === '1' || str_contains(strtolower($registro->actividad_nombre ?? ''), 'prens')) ? ((str_starts_with(strtolower($registro->codigo_vineta ?? ''), 'p-')) ? $registro->codigo_vineta : 'p-1') : (((string)$registro->actividad_codigo === '171' || str_contains(strtolower($registro->actividad_nombre ?? ''), 'rola')) ? ((str_starts_with(strtolower($registro->codigo_vineta ?? ''), 'r-')) ? $registro->codigo_vineta : 'r-1') : ($registro->vineta_api_id ?? $registro->vineta_id)))) }}"
                                         data-actividad="{{ $registro->actividad_nombre }}">
                                     Editar
                                 </button>
                                 <form method="POST"
                                       action="{{ route('vineta-registros.destroy', $registro) }}"
-                                      onsubmit="return confirm('Eliminar este registro de prueba?');"
-                                      class="inline-flex">
+                                      class="form-eliminar-vineta-registro inline-flex">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit"
@@ -400,6 +421,7 @@
                                         Eliminar
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         @endif
                     </td>
