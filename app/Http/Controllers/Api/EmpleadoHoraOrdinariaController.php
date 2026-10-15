@@ -340,6 +340,8 @@ class EmpleadoHoraOrdinariaController extends Controller
                 'anillado' => $itemsRegulares->where('grupo', 'anillado')->count(),
                 'llenado' => $itemsRegulares->where('grupo', 'llenado')->count(),
                 'limpieza' => $itemsRegulares->where('grupo', 'limpieza')->count(),
+                'prensado' => $itemsRegulares->where('grupo', 'prensado')->count(),
+                'rolado' => $itemsRegulares->where('grupo', 'rolado')->count(),
                 'hora' => $itemsHora->count(),
             ];
 
@@ -1087,6 +1089,17 @@ class EmpleadoHoraOrdinariaController extends Controller
         ], fn ($valor) => trim((string) $valor) !== ''));
         $texto = Str::ascii(Str::lower(trim($texto)));
         $texto = preg_replace('/[^a-z0-9]+/', ' ', $texto) ?? $texto;
+
+        // Grupos por codigo EXACTO de actividad: 1 = Prensado, 171 = Rolado Empaque
+        $codigoExacto = trim((string) $registro->actividad_codigo);
+
+        if ($codigoExacto === '1') {
+            return 'prensado';
+        }
+
+        if ($codigoExacto === '171') {
+            return 'rolado';
+        }
 
         if (str_contains($texto, 'rezag') || str_contains($texto, 'rezad') || str_contains($texto, 'resag')) {
             return 'rezago';

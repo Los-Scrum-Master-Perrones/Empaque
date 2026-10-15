@@ -630,7 +630,7 @@ class DashboardController extends Controller
             ->where('vineta_registros.estado', VinetaRegistro::ESTADO_ACTIVO)
             ->when($from, fn ($query) => $query->whereDate('vineta_registros.fecha_registro', '>=', $from->toDateString()))
             ->when($to, fn ($query) => $query->whereDate('vineta_registros.fecha_registro', '<=', $to->toDateString()))
-            ->whereRaw("$activityGroup IN ('limpieza', 'rezago', 'anillado', 'llenado')");
+            ->whereRaw("$activityGroup IN ('limpieza', 'rezago', 'anillado', 'llenado', 'prensado', 'rolado')");
     }
 
     private function ordinaryMinutes(?Carbon $from, ?Carbon $to, bool $hasHorasOrdinarias): int
