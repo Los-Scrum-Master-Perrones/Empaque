@@ -14,6 +14,7 @@ class ErpApiService
     protected int $defaultSucursal;
     protected int $defaultFormaPago;
     protected int $defaultBodegaDetalle;
+    protected bool $dryRun;
 
     public function __construct()
     {
@@ -22,6 +23,12 @@ class ErpApiService
         $this->defaultSucursal = (int) config('services.erp.default_sucursal', 2);
         $this->defaultFormaPago = (int) config('services.erp.default_forma_pago', 2);
         $this->defaultBodegaDetalle = (int) config('services.erp.default_bodega_detalle', 218);
+        $this->dryRun = (bool) config('services.erp.dry_run', false);
+    }
+
+    public function esDryRun(): bool
+    {
+        return $this->dryRun;
     }
 
     /**
@@ -174,7 +181,7 @@ class ErpApiService
             : round((int) $registro->minutos_trabajados / 60, 2);
 
         $payload = [
-            'dry_run' => false,
+            'dry_run' => $this->dryRun,
             'fecha' => $registro->fecha_registro?->format('Y-m-d') ?? now()->format('Y-m-d'),
             'sucursal' => (int) $suc,
             'documento' => (string) $doc,
@@ -199,11 +206,15 @@ class ErpApiService
 
         $exito = !empty($resultado['success']) || !empty($resultado['ya_registrada']);
 
+        // En modo prueba (dry_run) el ERP valida pero no inserta: el registro local
+        // NO se marca como enviado, para poder reenviarlo cuando se apague el modo.
+        $enviadoReal = $exito && ! $this->dryRun;
+
         $registro->update([
             'documento_numero' => $doc,
             'sucursal' => $suc,
-            'erp_enviado' => $exito,
-            'erp_enviado_en' => now(),
+            'erp_enviado' => $enviadoReal,
+            'erp_enviado_en' => $enviadoReal ? now() : null,
             'erp_respuesta' => $resultado,
         ]);
 

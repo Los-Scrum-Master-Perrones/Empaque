@@ -41,6 +41,11 @@ return [
         'default_sucursal' => (int) env('ERP_DEFAULT_SUCURSAL', 2),
         'default_forma_pago' => (int) env('ERP_DEFAULT_FORMA_PAGO', 2),
         'default_bodega_detalle' => (int) env('ERP_DEFAULT_BODEGA_DETALLE', 218),
+
+        // Modo prueba: envia los registros al ERP marcados como dry_run,
+        // el ERP valida pero NO inserta nada. Para probar desde la app
+        // sin ensuciar la base del ERP.
+        'dry_run' => (bool) env('ERP_DRY_RUN', false),
     ],
 
 ];
