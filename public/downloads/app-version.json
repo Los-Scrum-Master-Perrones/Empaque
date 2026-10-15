@@ -1,10 +1,10 @@
 {
-    "version_name": "2.0.2",
-    "version_code": 45,
-    "release_notes": "• Jornada laboral: el tiempo se reparte proporcionalmente a los puros de cada viñeta, en cuartos de hora (0.25, 0.5, 0.75, 1, ...) y con un minimo de 0.25 h por viñeta.\n• Horas ordinarias: las horas agregadas quedan asociadas al documento de empaque del empleado y se muestran correctamente.\n• Ajustes: se muestra la versión de la aplicación instalada.\n• Mejoras y correcciones generales.",
-    "apk_filename": "app-empaque-2.0.2-45-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.0.2-45-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.0.2-45-universal.apk",
+    "version_name": "2.0.3",
+    "version_code": 46,
+    "release_notes": "• Nuevos grupos de actividad: Prensado y Rolado (antes se contaban como Anillado).\n• Filtros de grupo actualizados en los registros del día y en horas ordinarias.\n• Estadísticas con color propio para Prensado y Rolado.\n• Mejoras y correcciones generales.",
+    "apk_filename": "app-empaque-2.0.3-46-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.0.3-46-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.0.3-46-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-13 11:00:00"
+    "published_at": "2026-10-15 16:35:00"
 }
