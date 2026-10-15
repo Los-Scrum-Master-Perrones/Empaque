@@ -586,6 +586,8 @@ class VinetaRegistroController extends Controller
             'rezago' => ['empleados' => []],
             'llenado' => ['empleados' => []],
             'limpieza' => ['empleados' => []],
+            'prensado' => ['empleados' => []],
+            'rolado' => ['empleados' => []],
         ];
 
         $empleadosMap = Empleado::query()
@@ -612,13 +614,25 @@ class VinetaRegistroController extends Controller
             $cargo = $empleadoObj?->cargo;
 
             $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
-            $grupoArea = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
-                ? $grupoPuesto
-                : ($this->grupoActividadProceso(
-                    $registro->actividad_nombre,
-                    $registro->actividad_tipo_empaque,
-                    $registro->actividad_codigo
-                ) ?? 'anillado');
+            $grupoActividad = $this->grupoActividadProceso(
+                $registro->actividad_nombre,
+                $registro->actividad_tipo_empaque,
+                $registro->actividad_codigo
+            );
+
+            // Prensado y Rolado son grupos propios: la actividad manda sobre el cargo del empleado
+            if (in_array($grupoActividad, ['prensado', 'rolado'], true)) {
+                $grupoArea = $grupoActividad;
+            } else {
+                $grupoArea = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
+                    ? $grupoPuesto
+                    : ($grupoActividad ?? 'anillado');
+            }
+
+            // Blindaje: si aparece un grupo sin area propia, va a anillado (nunca null)
+            if (! isset($areaData[$grupoArea]['empleados'])) {
+                $grupoArea = 'anillado';
+            }
 
             $this->acumularAreaExport(
                 $areaData[$grupoArea]['empleados'],
@@ -734,6 +748,16 @@ class VinetaRegistroController extends Controller
                 'rows' => $this->resumenLimpiezaExportRows($areaData['limpieza']['empleados'], $fechaTexto),
                 'format' => 'pivot_limpieza',
             ],
+            [
+                'name' => 'Resumen Prensado',
+                'rows' => $this->resumenGrupoSimpleExportRows($areaData['prensado']['empleados'], $fechaTexto, 'PRENSADO'),
+                'format' => 'pivot_prensado',
+            ],
+            [
+                'name' => 'Resumen Rolado',
+                'rows' => $this->resumenGrupoSimpleExportRows($areaData['rolado']['empleados'], $fechaTexto, 'ROLADO'),
+                'format' => 'pivot_rolado',
+            ],
         ];
 
         $path = $this->buildXlsx($sheets);
@@ -794,7 +818,7 @@ class VinetaRegistroController extends Controller
     ): void {
         $key = $codigo.'|'.$nombre;
 
-        foreach (['llenado', 'rezago', 'anillado', 'limpieza'] as $grupo) {
+        foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupo) {
             if (isset($areaData[$grupo]['empleados'][$key])) {
                 $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
 
@@ -1032,6 +1056,79 @@ class VinetaRegistroController extends Controller
 
         $rows = [
             ['REPORTE DE LIMPIEZA '.$fechaTexto.'.'],
+            [],
+            [
+                'Etiquetas de fila',
+                'Suma de Cantidad Procesada',
+                'Suma de Horas Trabajadas',
+                'Suma de Horas Ordinarias',
+            ],
+        ];
+
+        $totalEstadisticoGeneral = 0;
+        $totalMinutosGeneral = 0;
+        $totalMinutosOrdinariosGeneral = 0;
+
+        foreach ($empleados as $emp) {
+            $totalEstadistico = (int) ($emp['estadistico'] ?? 0);
+            $totalHoras = round($emp['minutos'] / 60, 2);
+            $totalOrdinarias = round(($emp['minutos_ordinarios'] ?? 0) / 60, 2);
+
+            $totalEstadisticoGeneral += $totalEstadistico;
+            $totalMinutosGeneral += (int) $emp['minutos'];
+            $totalMinutosOrdinariosGeneral += (int) ($emp['minutos_ordinarios'] ?? 0);
+
+            $rows[] = [
+                $emp['empleado'],
+                $totalEstadistico,
+                $totalHoras,
+                $totalOrdinarias,
+            ];
+
+            $rows[] = [
+                '   '.$emp['codigo_empleado'],
+                $totalEstadistico,
+                $totalHoras,
+                $totalOrdinarias,
+            ];
+
+            $actividades = $emp['actividades'];
+            uksort($actividades, 'strnatcasecmp');
+            $first = true;
+
+            foreach ($actividades as $act) {
+                $rows[] = [
+                    '      '.$act['nombre'],
+                    (int) ($act['estadistico'] ?? 0),
+                    round($act['minutos'] / 60, 2),
+                    $first ? $totalOrdinarias : 0,
+                ];
+                $first = false;
+            }
+        }
+
+        $rows[] = [
+            'Total general',
+            $totalEstadisticoGeneral,
+            round($totalMinutosGeneral / 60, 2),
+            round($totalMinutosOrdinariosGeneral / 60, 2),
+        ];
+
+        return $rows;
+    }
+
+    /**
+     * Reporte simple por grupo (Prensado / Rolado): mismo formato que Limpieza.
+     */
+    private function resumenGrupoSimpleExportRows(array $empleados, string $fechaTexto, string $titulo): array
+    {
+        uasort($empleados, function (array $a, array $b) {
+            return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
+                <=> [$this->normalizarTextoReporte($b['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])];
+        });
+
+        $rows = [
+            ['REPORTE DE '.$titulo.' '.$fechaTexto.'.'],
             [],
             [
                 'Etiquetas de fila',
@@ -2776,7 +2873,7 @@ class VinetaRegistroController extends Controller
                     $styleId = $paperSize === 'legal' ? 10 : 7;
                 }
 
-                if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza'], true)) {
+                if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
                     if ($rowIndex === 2) {
                         $styleId = $columnIndex === 0 ? 11 : 12;
                     } elseif ($rowIndex >= 3) {
@@ -2853,7 +2950,7 @@ class VinetaRegistroController extends Controller
             $mergeXml .= '</mergeCells>';
         }
 
-        $autoFilter = in_array($format, ['weekly_report', 'pivot_rezago', 'pivot_llenado', 'pivot_limpieza'], true) ? '' : '<autoFilter ref="A1:'.$lastCell.'"/>';
+        $autoFilter = in_array($format, ['weekly_report', 'pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true) ? '' : '<autoFilter ref="A1:'.$lastCell.'"/>';
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
@@ -2937,7 +3034,7 @@ class VinetaRegistroController extends Controller
             return null;
         }
 
-        if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza'], true)) {
+        if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
             if ($rowIndex === 0) {
                 return 1;
             }
@@ -3001,7 +3098,7 @@ class VinetaRegistroController extends Controller
             return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
         }
 
-        if ($format === 'pivot_rezago' || $format === 'pivot_limpieza') {
+        if ($format === 'pivot_rezago' || $format === 'pivot_limpieza' || $format === 'pivot_prensado' || $format === 'pivot_rolado') {
             return [45, 28, 26, 26];
         }
 
@@ -3556,6 +3653,8 @@ class VinetaRegistroController extends Controller
             'rezago',
             'llenado',
             'limpieza',
+            'prensado',
+            'rolado',
             'por_hora',
             'hora',
             'anilladoras_anillado',
@@ -3676,8 +3775,15 @@ class VinetaRegistroController extends Controller
                         ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%tapon%'])
                         ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%tapón%'])
                         ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%banda%'])
-                        ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%cinta%'])
-                        ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%rolado%']);
+                        ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%cinta%']);
+                }),
+                'prensado' => $query->where(function ($query) {
+                    $query->where('vineta_registros.actividad_codigo', '1')
+                        ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%prens%']);
+                }),
+                'rolado' => $query->where(function ($query) {
+                    $query->where('vineta_registros.actividad_codigo', '171')
+                        ->orWhereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%rolad%']);
                 }),
                 'rezago' => $query->where(function ($query) {
                     $query->whereRaw('LOWER(vineta_registros.actividad_nombre) LIKE ?', ['%rezag%'])
