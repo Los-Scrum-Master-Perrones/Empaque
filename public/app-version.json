@@ -1,8 +1,0 @@
-{
-    "version_name": "2.0.0",
-    "version_code": 40,
-    "release_notes": "• Escaneo múltiple: Diferenciación de documentos de empaque ERP mediante puntos de color por categoría (anilladoras, rezagadoras, llenadoras, limpiadoras, prensadoras, rolado, indirectos) y visualización completa y clara de la descripción del documento.",
-    "apk_filename": "app-arm64-v8a-release.apk",
-    "force_update": false,
-    "published_at": "2026-10-02 07:44:00"
-}

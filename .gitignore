@@ -16,3 +16,12 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Binarios pesados: los APK se suben por FTP al servidor, no a git
+*.apk
+*.aab
+*.ipa
+*.zip
+/public/apks
+/public/downloads/*.apk
+/public/downloads/*.aab

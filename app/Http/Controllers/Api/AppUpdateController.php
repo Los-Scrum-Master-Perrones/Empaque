@@ -115,10 +115,14 @@ class AppUpdateController extends Controller
             $default['download_url'] = $baseUrl . '/api/app/download/' . ($default['apk_filename'] ?? 'app-release.apk');
         }
 
+        $arm64File = $default['apk_filename'] ?? 'app-arm64-v8a-release.apk';
+        $armFile = $default['apk_filename_armeabi_v7a'] ?? 'app-armeabi-v7a-release.apk';
+        $universalFile = $default['apk_filename_universal'] ?? 'app-release.apk';
+
         $default['split_apks'] = [
-            'arm64-v8a' => $baseUrl . '/api/app/download/app-arm64-v8a-release.apk',
-            'armeabi-v7a' => $baseUrl . '/api/app/download/app-armeabi-v7a-release.apk',
-            'universal' => $baseUrl . '/api/app/download/app-release.apk',
+            'arm64-v8a' => $baseUrl . '/api/app/download/' . $arm64File,
+            'armeabi-v7a' => $baseUrl . '/api/app/download/' . $armFile,
+            'universal' => $baseUrl . '/api/app/download/' . $universalFile,
         ];
 
         return $default;

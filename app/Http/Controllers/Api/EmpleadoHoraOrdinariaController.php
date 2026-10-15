@@ -443,14 +443,8 @@ class EmpleadoHoraOrdinariaController extends Controller
             }
         }
 
-        if ($tablaDisponible && $grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'hora'], true)) {
-            if ($grupo === 'sin_documento') {
-                $ordinarias = $ordinarias->filter(fn ($o) => empty($o->documento_numero))->values();
-            } else {
-                $ordinarias = $ordinarias->filter(fn ($o) => (string) $o->documento_numero === (string) $grupo)->values();
-            }
-        }
-
+        // Las horas ordinarias SIEMPRE se muestran: se toman por empleado + fecha,
+        // sin filtrar por documento (asi aparecen aunque tengan documento o no).
         $minutosOrdinarios = (int) $ordinarias->sum('minutos');
 
         return response()->json([
@@ -490,6 +484,34 @@ class EmpleadoHoraOrdinariaController extends Controller
         $data = $this->validatedHoraData($request);
         $sucursal = $request->input('sucursal') ? (int) $request->input('sucursal') : null;
         $documentoNumero = $request->input('documento_numero');
+        $documentoEmpaqueId = $request->input('documento_empaque_id');
+
+        // Si no viene el documento, inferirlo de las viñetas del empleado para esa
+        // fecha. Solo cuando hay un unico documento (si hay varios, se deja NULL).
+        if ((! $documentoNumero || trim((string) $documentoNumero) === '')
+            && Schema::hasTable('vineta_registros')
+            && Schema::hasColumn('vineta_registros', 'documento_numero')) {
+            $docs = VinetaRegistro::query()
+                ->where('empleado_codigo', $empleado->codigo)
+                ->whereDate('fecha_registro', $data['fecha'])
+                ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                ->whereNotNull('documento_numero')
+                ->where('documento_numero', '<>', '')
+                ->distinct()
+                ->pluck('documento_numero');
+
+            if ($docs->count() === 1) {
+                $documentoNumero = $docs->first();
+            }
+        }
+
+        if ((! $documentoEmpaqueId || (int) $documentoEmpaqueId <= 0)
+            && $documentoNumero
+            && Schema::hasTable('documento_empaques')) {
+            $documentoEmpaqueId = \App\Models\DocumentoEmpaque::query()
+                ->where('numero', $documentoNumero)
+                ->value('id');
+        }
 
         $payload = [
             'empleado_id' => $empleado->id,
@@ -504,6 +526,9 @@ class EmpleadoHoraOrdinariaController extends Controller
         ];
         if (Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero')) {
             $payload['documento_numero'] = $documentoNumero;
+        }
+        if (Schema::hasColumn('empleado_horas_ordinarias', 'documento_empaque_id')) {
+            $payload['documento_empaque_id'] = $documentoEmpaqueId ?: null;
         }
 
         $hora = EmpleadoHoraOrdinaria::create($payload);
@@ -580,13 +605,12 @@ class EmpleadoHoraOrdinariaController extends Controller
             ]);
         }
 
-        $baseMinutes = intdiv($totalMinutes, $registros->count());
-        $extraMinutes = $totalMinutes % $registros->count();
+        $reparto = $this->repartirMinutosPorPuros($registros->values(), $totalMinutes);
 
-        DB::transaction(function () use ($registros, $baseMinutes, $extraMinutes) {
-            foreach ($registros as $index => $registro) {
+        DB::transaction(function () use ($registros, $reparto) {
+            foreach ($registros->values() as $index => $registro) {
                 $registro->update([
-                    'minutos_trabajados' => $baseMinutes + ($index < $extraMinutes ? 1 : 0),
+                    'minutos_trabajados' => $reparto[$index] ?? 0,
                 ]);
             }
         });
@@ -687,13 +711,11 @@ class EmpleadoHoraOrdinariaController extends Controller
                     continue;
                 }
 
-                $count = $registrosEmpleado->count();
-                $baseMinutes = intdiv($totalMinutes, $count);
-                $extraMinutes = $totalMinutes % $count;
+                $reparto = $this->repartirMinutosPorPuros($registrosEmpleado->values(), $totalMinutes);
 
                 foreach ($registrosEmpleado->values() as $index => $registro) {
                     $registro->update([
-                        'minutos_trabajados' => $baseMinutes + ($index < $extraMinutes ? 1 : 0),
+                        'minutos_trabajados' => $reparto[$index] ?? 0,
                     ]);
                     $registrosActualizados++;
                 }
@@ -842,6 +864,99 @@ class EmpleadoHoraOrdinariaController extends Controller
         ], 201);
     }
 
+
+    /**
+     * Reparte $totalMinutes entre los registros proporcionalmente a sus puros.
+     *
+     * Trabaja en cuartos de hora (15 min): todos los valores quedan en
+     * multiplos de 0.25 h (0.25, 0.5, 0.75, 1, 1.25, 1.5, ...). El minimo es
+     * 1 cuarto (0.25 h); la diferencia se resta a la viñeta con mas cuartos,
+     * de modo que la suma total no cambie.
+     *
+     * @param  iterable<VinetaRegistro>  $registros
+     * @return array<int, int> minutos por indice (mismo orden que $registros)
+     */
+    private function repartirMinutosPorPuros(iterable $registros, int $totalMinutes): array
+    {
+        $registros = collect($registros)->values();
+        $count = $registros->count();
+
+        if ($count === 0) {
+            return [];
+        }
+
+        // Total en cuartos de hora (redondeado al cuarto mas cercano).
+        $totalQ = (int) round($totalMinutes / 15);
+        $minimo = 1; // 0.25 h
+
+        // Cada viñeta debe tener al menos 1 cuarto (0.25 h): si el total no
+        // alcanza, se sube el total a la cantidad de viñetas.
+        if ($totalQ < $count) {
+            $totalQ = $count;
+        }
+
+        $puros = $registros
+            ->map(fn (VinetaRegistro $r) => max(0, (int) ($r->cantidad_puros ?? 0)))
+            ->all();
+        $totalPuros = array_sum($puros);
+
+        $floors = [];
+        $rems = [];
+        $asignado = 0;
+
+        for ($i = 0; $i < $count; $i++) {
+            $exact = $totalPuros > 0
+                ? ($puros[$i] / $totalPuros) * $totalQ
+                : $totalQ / $count;
+            $floor = (int) floor($exact);
+            $floors[$i] = $floor;
+            $rems[$i] = $exact - $floor;
+            $asignado += $floor;
+        }
+
+        $sobra = $totalQ - $asignado;
+        $orden = range(0, $count - 1);
+        usort($orden, function ($a, $b) use ($rems) {
+            if ($rems[$a] == $rems[$b]) {
+                return $a <=> $b;
+            }
+
+            return $rems[$b] <=> $rems[$a];
+        });
+        foreach ($orden as $i) {
+            if ($sobra <= 0) {
+                break;
+            }
+            $floors[$i]++;
+            $sobra--;
+        }
+
+        // Minimo de 1 cuarto (0.25 h) por viñeta.
+        $ajuste = 0;
+        foreach ($floors as $i => $q) {
+            if ($q < $minimo) {
+                $ajuste += $minimo - $q;
+                $floors[$i] = $minimo;
+            }
+        }
+
+        if ($ajuste > 0) {
+            $maxIdx = null;
+            $maxVal = -1;
+            foreach ($floors as $i => $q) {
+                if ($q > $maxVal) {
+                    $maxVal = $q;
+                    $maxIdx = $i;
+                }
+            }
+            if ($maxIdx !== null && ($maxVal - $ajuste) >= $minimo) {
+                $floors[$maxIdx] -= $ajuste;
+            }
+        }
+
+        // Cuartos -> minutos
+        return array_map(fn ($q) => $q * 15, $floors);
+    }
 
     /** @return Collection<int, VinetaRegistro> */
     private function registrosTareaEmpleado(Empleado $empleado, string $fecha, ?int $sucursal = null): Collection
