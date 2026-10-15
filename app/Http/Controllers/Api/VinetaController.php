@@ -561,6 +561,17 @@ class VinetaController extends Controller
             return null;
         }
 
+        // Grupos por codigo EXACTO de actividad: 1 = Prensado, 171 = Rolado Empaque
+        $codigoExacto = trim((string) $codigo);
+
+        if ($codigoExacto === '1') {
+            return 'prensado';
+        }
+
+        if ($codigoExacto === '171') {
+            return 'rolado';
+        }
+
         if (str_contains($nombreNorm, 'rezag') || str_contains($nombreNorm, 'rezad') || str_contains($nombreNorm, 'resag')) {
             return 'rezago';
         }

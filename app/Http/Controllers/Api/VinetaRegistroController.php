@@ -33,7 +33,7 @@ class VinetaRegistroController extends Controller
         $validator = Validator::make($request->query(), [
             'fecha' => ['required', 'date_format:Y-m-d'],
             'todo' => ['nullable', 'in:0,1'],
-            'grupo' => ['nullable', 'in:rezago,anillado,llenado,limpieza'],
+            'grupo' => ['nullable', 'in:rezago,anillado,llenado,limpieza,prensado,rolado'],
         ]);
 
         if ($validator->fails()) {
@@ -360,17 +360,23 @@ class VinetaRegistroController extends Controller
             'anilladora' => 'anilladoras',
             'llenadora' => 'llenadoras',
             'limpiadora' => 'limpiadoras',
+            'prensadora' => 'prensadoras',
+            'roladora' => 'roladoras',
             'indirecto' => 'indirectos',
             'indirectos_general' => 'indirectos',
             'indirectos_rezago' => 'indirectos',
             'indirectos_anillado' => 'indirectos',
             'indirectos_llenado' => 'indirectos',
             'indirectos_limpieza' => 'indirectos',
+            'indirectos_prensado' => 'indirectos',
+            'indirectos_rolado' => 'indirectos',
             'indirectos_hora' => 'indirectos',
             'rezago_general' => 'rezago',
             'anillado_general' => 'anillado',
             'llenado_general' => 'llenado',
             'limpieza_general' => 'limpieza',
+            'prensado_general' => 'prensado',
+            'rolado_general' => 'rolado',
             'por_hora_general' => 'por_hora',
         ];
 
@@ -382,30 +388,42 @@ class VinetaRegistroController extends Controller
             'rezagadoras_rezago',
             'rezagadoras_anillado',
             'rezagadoras_llenado',
+            'rezagadoras_prensado',
+            'rezagadoras_rolado',
             'rezagadoras_hora',
             'anilladoras_anillado',
             'anilladoras_rezago',
             'anilladoras_llenado',
+            'anilladoras_prensado',
+            'anilladoras_rolado',
             'anilladoras_hora',
             'llenadoras_llenado',
             'llenadoras_rezago',
             'llenadoras_anillado',
+            'llenadoras_prensado',
+            'llenadoras_rolado',
             'llenadoras_hora',
             'limpiadoras_limpieza',
             'limpiadoras_rezago',
             'limpiadoras_anillado',
             'limpiadoras_llenado',
+            'limpiadoras_prensado',
+            'limpiadoras_rolado',
             'limpiadoras_hora',
             'indirectos',
             'rezago',
             'anillado',
             'llenado',
             'limpieza',
+            'prensado',
+            'rolado',
             'por_hora',
             'rezagadoras',
             'anilladoras',
             'llenadoras',
             'limpiadoras',
+            'prensadoras',
+            'roladoras',
         ];
 
         return in_array($val, $validGroups, true) ? $val : 'invalido';
@@ -425,7 +443,7 @@ class VinetaRegistroController extends Controller
             return true;
         }
 
-        if (in_array($filtroGrupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+        if (in_array($filtroGrupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
             return $actGrupo === $filtroGrupo;
         }
 
@@ -1671,6 +1689,9 @@ class VinetaRegistroController extends Controller
             'rezago' => 'rezago',
             'anillado' => 'anillado',
             'llenado' => 'llenado',
+            'limpieza' => 'limpieza',
+            'prensado' => 'prensado',
+            'rolado' => 'rolado',
             default => 'este proceso',
         };
     }
@@ -1918,6 +1939,18 @@ class VinetaRegistroController extends Controller
             return null;
         }
 
+        // 0. Grupos especiales por codigo EXACTO de actividad (nunca por LIKE)
+        //    1 = Prensado, 171 = Rolado Empaque, 103 = Limpieza de Puros
+        $codigoExacto = trim((string) $codigo);
+
+        if ($codigoExacto === '1') {
+            return 'prensado';
+        }
+
+        if ($codigoExacto === '171') {
+            return 'rolado';
+        }
+
         // 1. Rezago
         if (
             str_contains($texto, 'rezag')
@@ -1929,7 +1962,7 @@ class VinetaRegistroController extends Controller
             return 'rezago';
         }
 
-        // 2. Anillado: Anillo, celofan, cello, sello, lamina, esponja, tapon, banda, cinta, rolado
+        // 2. Anillado: Anillo, celofan, cello, sello, lamina, esponja, tapon, banda, cinta
         if (
             str_contains($texto, 'anill')
             || str_contains($texto, 'anil')
@@ -1941,7 +1974,6 @@ class VinetaRegistroController extends Controller
             || str_contains($texto, 'tapon')
             || str_contains($texto, 'banda')
             || str_contains($texto, 'cinta')
-            || str_contains($texto, 'rolado')
         ) {
             return 'anillado';
         }

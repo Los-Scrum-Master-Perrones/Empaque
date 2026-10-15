@@ -234,6 +234,18 @@
             --area-border: rgba(139, 92, 246, .38);
         }
 
+        .area-card-prensado {
+            --area-color: #ef4444;
+            --area-soft: rgba(239, 68, 68, .12);
+            --area-border: rgba(239, 68, 68, .38);
+        }
+
+        .area-card-rolado {
+            --area-color: #0d9488;
+            --area-soft: rgba(13, 148, 136, .12);
+            --area-border: rgba(13, 148, 136, .38);
+        }
+
         html.dark-navy .area-card-rezago {
             --area-color: #38bdf8;
             --area-soft: rgba(56, 189, 248, .13);
@@ -256,6 +268,18 @@
             --area-color: #a78bfa;
             --area-soft: rgba(167, 139, 250, .14);
             --area-border: rgba(167, 139, 250, .38);
+        }
+
+        html.dark-navy .area-card-prensado {
+            --area-color: #f87171;
+            --area-soft: rgba(248, 113, 113, .13);
+            --area-border: rgba(248, 113, 113, .38);
+        }
+
+        html.dark-navy .area-card-rolado {
+            --area-color: #2dd4bf;
+            --area-soft: rgba(45, 212, 191, .13);
+            --area-border: rgba(45, 212, 191, .38);
         }
 
         .area-card {

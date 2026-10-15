@@ -1095,6 +1095,17 @@ class VinetaRegistroController extends Controller
 
     private function grupoActividadProceso(?string $nombre, ?string $tipoEmpaque = null, ?string $codigo = null): ?string
     {
+        // Grupos por codigo EXACTO de actividad: 1 = Prensado, 171 = Rolado Empaque, 103 = Limpieza de Puros
+        $codigoExacto = trim((string) $codigo);
+
+        if ($codigoExacto === '1') {
+            return 'prensado';
+        }
+
+        if ($codigoExacto === '171') {
+            return 'rolado';
+        }
+
         $nombreNorm = $this->normalizarTextoProceso((string) $nombre);
 
         if ($nombreNorm !== '') {

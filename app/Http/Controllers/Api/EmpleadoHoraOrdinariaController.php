@@ -116,7 +116,7 @@ class EmpleadoHoraOrdinariaController extends Controller
                 }
             }
 
-            $itemsRegulares = collect(['rezago', 'anillado', 'llenado', 'limpieza'])
+            $itemsRegulares = collect(['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'])
                 ->flatMap(function (string $grupo) use ($registros, $empleados, $gruposEmpleados, $minutosOrdinarios) {
                     return $registros
                         ->filter(
@@ -187,7 +187,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
                 if (! $alreadyInRegulares && ! $alreadyInHora) {
                     $grupoPuesto = EmployeeProductionGroup::fromCargo($empleado->cargo, $empleado->codigo);
-                    $grupoDestino = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
+                    $grupoDestino = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)
                         ? $grupoPuesto
                         : 'hora';
 
@@ -419,7 +419,7 @@ class EmpleadoHoraOrdinariaController extends Controller
                     ->orderBy('hora_registro')
                     ->orderBy('id')
                     ->get();
-            } else if ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+            } else if ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
                 if (Schema::hasColumn('vineta_registros', 'documento_numero')) {
                     $cajones = VinetaRegistro::query()
                         ->where('empleado_codigo', $empleado->codigo)
@@ -588,7 +588,7 @@ class EmpleadoHoraOrdinariaController extends Controller
         $registros = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
         if ($grupo === 'sin_documento') {
             $registros = $registros->filter(fn ($r) => empty($r->documento_numero));
-        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
             $registros = $registros->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
         } elseif ($grupo !== null && $grupo !== 'todos') {
             $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $registros);
@@ -633,7 +633,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'grupo' => ['nullable', 'string', 'in:rezago,anillado,llenado,limpieza'],
+            'grupo' => ['nullable', 'string', 'in:rezago,anillado,llenado,limpieza,prensado,rolado'],
         ]);
         $registros = $this->registrosTareaEmpleado($empleado, $data['fecha']);
         $grupo = $data['grupo'] ?? null;
@@ -700,7 +700,7 @@ class EmpleadoHoraOrdinariaController extends Controller
                 if ($grupo !== null && $grupo !== 'todos') {
                     if ($grupo === 'sin_documento') {
                         $registrosEmpleado = $registrosEmpleado->filter(fn ($r) => empty($r->documento_numero));
-                    } elseif (! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+                    } elseif (! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
                         $registrosEmpleado = $registrosEmpleado->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
                     } elseif ($gruposEmpleados->get((string) $codigo) !== $grupo) {
                         continue;
@@ -749,7 +749,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'grupo' => ['nullable', 'string', 'in:rezago,anillado,llenado,limpieza'],
+            'grupo' => ['nullable', 'string', 'in:rezago,anillado,llenado,limpieza,prensado,rolado'],
         ]);
         $fecha = $data['fecha'];
         $grupo = $data['grupo'] ?? null;
@@ -810,14 +810,14 @@ class EmpleadoHoraOrdinariaController extends Controller
             $registros = $registros->filter(fn (VinetaRegistro $registro) => $registro->esPorHoraOrdinario());
         } elseif ($grupo === 'sin_documento') {
             $registros = $registros->filter(fn (VinetaRegistro $registro) => empty($registro->documento_numero));
-        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
             $registros = $registros->filter(fn (VinetaRegistro $registro) => (string) $registro->documento_numero === (string) $grupo);
         }
 
         $codigos = $registros->pluck('empleado_codigo')->filter()->unique()->values();
         $empleados = Empleado::query()->whereIn('codigo', $codigos)->get()->keyBy(fn ($e) => trim((string) $e->codigo));
 
-        if ($grupo !== null && in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+        if ($grupo !== null && in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
             $gruposEmpleados = $this->gruposProduccionEmpleados($registros, $empleados);
             $empleados = $empleados->filter(fn (Empleado $empleado) => $gruposEmpleados->get(trim((string) $empleado->codigo)) === $grupo);
         }
@@ -830,7 +830,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         $userId = $request->user()?->id;
         $userName = $request->user()?->name;
-        $docNumeroParaGuardar = ($grupo !== null && ! in_array($grupo, ['sin_documento', 'rezago', 'anillado', 'llenado', 'limpieza', 'hora', 'todos'], true)) ? (string) $grupo : null;
+        $docNumeroParaGuardar = ($grupo !== null && ! in_array($grupo, ['sin_documento', 'rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado', 'hora', 'todos'], true)) ? (string) $grupo : null;
         $creados = 0;
 
         $hasDocCol = Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero');
@@ -982,13 +982,13 @@ class EmpleadoHoraOrdinariaController extends Controller
         }
 
         $grupoPuesto = EmployeeProductionGroup::fromCargo($empleado->cargo, $codigoTrim);
-        if ($grupoPuesto !== null && in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+        if ($grupoPuesto !== null && in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
             return $grupoPuesto;
         }
 
         return $registros
             ->map(fn (VinetaRegistro $registro) => $this->grupoActividadRegistro($registro))
-            ->first(fn (?string $grupo) => $grupo !== null && in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza'], true));
+            ->first(fn (?string $grupo) => $grupo !== null && in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true));
     }
 
     /**
