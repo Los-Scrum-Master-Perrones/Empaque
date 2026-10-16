@@ -8,6 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ReporteOrdenController extends Controller
 {
@@ -27,10 +29,17 @@ class ReporteOrdenController extends Controller
             'mes' => ['nullable', 'integer', 'min:1', 'max:12'],
         ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => $this->armarReporte($data),
-        ])->header('Cache-Control', 'no-store');
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->armarReporte($data),
+            ])->header('Cache-Control', 'no-store');
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 503);
+        }
     }
 
     /**
@@ -192,47 +201,66 @@ class ReporteOrdenController extends Controller
     }
 
     /**
-     * Lo programado en facturacion_plasencia (base_2).
+     * Lo programado: se consulta la API de facturacion_plasencia.
+     * Si no esta configurada o falla, se lanza un error claro (no se inventan datos).
      */
     private function consultaProgramado(Carbon $desde)
     {
-        return DB::connection('programaciones')
-            ->table('detalle_programacion as dp')
-            ->join('pendiente as p', 'p.id_pendiente', '=', 'dp.id_pendiente')
-            ->leftJoin('marca_productos as m', 'm.id_marca', '=', 'p.marca')
-            ->leftJoin('nombre_productos as n', 'n.id_nombre', '=', 'p.nombre')
-            ->leftJoin('vitola_productos as v', 'v.id_vitola', '=', 'p.vitola')
-            ->leftJoin('capa_productos as c', 'c.id_capa', '=', 'p.capa')
-            ->leftJoin('tipo_empaques as te', 'te.id_tipo_empaque', '=', 'p.tipo_empaque')
-            ->whereNotNull('dp.numero_orden')
-            ->where('dp.numero_orden', '<>', '')
-            ->where('dp.created_at', '>=', $desde->toDateTimeString())
-            ->groupBy(
-                'dp.numero_orden',
-                'dp.orden',
-                'p.item',
-                'p.codigo_productos',
-                'm.marca',
-                'n.nombre',
-                'v.vitola',
-                'c.capa',
-                'te.tipo_empaque'
-            )
-            ->selectRaw('dp.numero_orden as orden_sistema')
-            ->selectRaw('dp.orden as orden_cliente')
-            ->selectRaw('p.item as item')
-            ->selectRaw('p.codigo_productos as codigo_producto')
-            ->selectRaw('m.marca as marca')
-            ->selectRaw('n.nombre as nombre')
-            ->selectRaw('v.vitola as vitola')
-            ->selectRaw('c.capa as capa')
-            ->selectRaw('te.tipo_empaque as tipo_empaque')
-            ->selectRaw('COUNT(*) as programaciones')
-            ->selectRaw('COALESCE(SUM(dp.cant_cajas), 0) as cajas')
-            ->selectRaw('COALESCE(SUM(dp.saldo), 0) as puros_programados')
-            ->orderBy('dp.numero_orden')
-            ->orderBy('p.item')
-            ->get();
+        $apiUrl = trim((string) config('services.programaciones.api_url', ''));
+
+        if ($apiUrl === '') {
+            throw new \RuntimeException('La API de programaciones no esta configurada (PROGRAMACIONES_API_URL).');
+        }
+
+        try {
+            $response = Http::timeout(30)
+                ->connectTimeout(10)
+                ->withHeaders([
+                    'X-Api-Key' => (string) config('services.programaciones.api_key', ''),
+                    'Accept' => 'application/json',
+                ])
+                ->get(rtrim($apiUrl, '/').'/programacion-orden', [
+                    'anio' => $desde->year,
+                    'mes' => $desde->month,
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('API programacion-orden excepcion: '.$e->getMessage());
+
+            throw new \RuntimeException('No se pudo conectar con la API de programaciones ('.$apiUrl.').');
+        }
+
+        if (! $response->successful()) {
+            Log::warning('API programacion-orden fallo', [
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
+
+            throw new \RuntimeException('La API de programaciones respondio HTTP '.$response->status().'.');
+        }
+
+        $data = $response->json();
+        $registros = $data['registros'] ?? null;
+
+        if (! is_array($registros)) {
+            throw new \RuntimeException('La API de programaciones devolvio una respuesta no valida.');
+        }
+
+        return collect($registros)->map(function ($r) {
+            return (object) [
+                'orden_sistema' => trim((string) ($r['orden_sistema'] ?? '')),
+                'orden_cliente' => trim((string) ($r['orden_cliente'] ?? '')),
+                'item' => trim((string) ($r['item'] ?? '')),
+                'codigo_producto' => trim((string) ($r['codigo_producto'] ?? '')),
+                'marca' => trim((string) ($r['marca'] ?? '')),
+                'nombre' => trim((string) ($r['nombre'] ?? '')),
+                'vitola' => trim((string) ($r['vitola'] ?? '')),
+                'capa' => trim((string) ($r['capa'] ?? '')),
+                'tipo_empaque' => trim((string) ($r['tipo_empaque'] ?? '')),
+                'programaciones' => (int) ($r['programaciones'] ?? 0),
+                'cajas' => (int) ($r['cajas'] ?? 0),
+                'puros_programados' => (int) ($r['puros_programados'] ?? 0),
+            ];
+        })->values();
     }
 
     /**

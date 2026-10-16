@@ -64,23 +64,8 @@ return [
         ],
 
         // Base de facturacion_plasencia (base_2): programaciones de produccion
-        'programaciones' => [
-            'driver' => 'mysql',
-            'host' => env('PROGRAMACIONES_DB_HOST', '127.0.0.1'),
-            'port' => env('PROGRAMACIONES_DB_PORT', '3308'),
-            'database' => env('PROGRAMACIONES_DB_DATABASE', 'base_2'),
-            'username' => env('PROGRAMACIONES_DB_USERNAME', 'root'),
-            'password' => env('PROGRAMACIONES_DB_PASSWORD', ''),
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
-        ],
+        // Se consulta por la API de facturacion_plasencia (PROGRAMACIONES_API_URL),
+        // no por conexion directa.
 
         'external_empaque' => [
             'driver' => 'mysql',

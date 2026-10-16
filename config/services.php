@@ -48,4 +48,11 @@ return [
         'dry_run' => (bool) env('ERP_DRY_RUN', false),
     ],
 
+    // API del sistema de facturacion_plasencia, que expone las programaciones.
+    // Si 'api_url' esta vacio se consulta la base directo (connection 'programaciones').
+    'programaciones' => [
+        'api_url' => env('PROGRAMACIONES_API_URL', ''),
+        'api_key' => env('PROGRAMACIONES_API_KEY', env('ERP_API_KEY', 'f745d8e577bbf01a7b0c0e6ea24e5e2ccb742a3a21953786a81a2a2f66fd850d')),
+    ],
+
 ];
