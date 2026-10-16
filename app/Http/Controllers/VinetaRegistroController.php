@@ -2878,7 +2878,7 @@ class VinetaRegistroController extends Controller
                 //   15 = borde + negrita izq    16 = borde + negrita der
                 if ($format === 'detail') {
                     if ($rowIndex === 0) {
-                        $styleId = 11;
+                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
                     } elseif (in_array($columnIndex, [11, 12, 13], true)) {
                         // Cantidad procesada, Estadistico, Minutos -> a la derecha
                         $styleId = 14;
@@ -2888,8 +2888,9 @@ class VinetaRegistroController extends Controller
                 }
 
                 if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
-                    if ($rowIndex === 2) {
-                        $styleId = $columnIndex === 0 ? 11 : 12;
+                    if ($rowIndex === 0 || $rowIndex === 2) {
+                        // titulo y encabezado con el color de la pestaña
+                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
                     } elseif ($rowIndex >= 3) {
                         $val = (string) ($row[0] ?? '');
 
@@ -2905,7 +2906,7 @@ class VinetaRegistroController extends Controller
 
                 if ($format === 'anillado_summary') {
                     if ($rowIndex === 0) {
-                        $styleId = $columnIndex === 0 ? 11 : 12;
+                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
                     } elseif (str_starts_with((string) ($row[0] ?? ''), 'Total')) {
                         $styleId = $columnIndex <= 1 ? 15 : 16;
                     } else {
@@ -3036,6 +3037,24 @@ class VinetaRegistroController extends Controller
         }
 
         return '<rowBreaks count="'.count($breaks).'" manualBreakCount="'.count($breaks).'">'.$breaksXml.'</rowBreaks>';
+    }
+
+    /**
+     * Color del encabezado de cada hoja (los mismos colores de la app).
+     * Se aplica a la fila de encabezado y a la fila de titulo.
+     */
+    private function xlsxHeaderStyle(?string $format): ?int
+    {
+        return match ($format) {
+            'detail' => 17,
+            'anillado_summary' => 18,
+            'pivot_rezago' => 19,
+            'pivot_llenado' => 20,
+            'pivot_limpieza' => 21,
+            'pivot_prensado' => 22,
+            'pivot_rolado' => 23,
+            default => null,
+        };
     }
 
     private function xlsxRowStyle(array $row, int $rowIndex, ?string $format, ?string $paperSize = null): ?int
@@ -3257,7 +3276,7 @@ class VinetaRegistroController extends Controller
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            .'<fonts count="7">'
+            .'<fonts count="8">'
             .'<font><sz val="11"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="11"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="16"/><name val="Georgia"/></font>'
@@ -3265,19 +3284,28 @@ class VinetaRegistroController extends Controller
             .'<font><sz val="9"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="9"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>'
+            .'<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>'
             .'</fonts>'
-            .'<fills count="4">'
+            .'<fills count="11">'
             .'<fill><patternFill patternType="none"/></fill>'
             .'<fill><patternFill patternType="gray125"/></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFF59D"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>'
+            // Colores por pestaña (los mismos de la app)
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF4F46E5"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFF59E0B"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF10B981"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF8B5CF6"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFEF4444"/><bgColor indexed="64"/></patternFill></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FF0D9488"/><bgColor indexed="64"/></patternFill></fill>'
             .'</fills>'
             .'<borders count="2">'
             .'<border><left/><right/><top/><bottom/><diagonal/></border>'
             .'<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>'
             .'</borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            .'<cellXfs count="17">'
+            .'<cellXfs count="24">'
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
             .'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
             .'<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
@@ -3295,6 +3323,14 @@ class VinetaRegistroController extends Controller
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
             .'<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
             .'<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+            // Encabezados con color por pestaña (texto blanco negrita)
+            .'<xf numFmtId="0" fontId="7" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="8" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="9" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            .'<xf numFmtId="0" fontId="7" fillId="10" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
             .'</cellXfs>'
             .'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             .'</styleSheet>';
