@@ -350,68 +350,77 @@ class VinetaController extends Controller
 
     public function resolveUltimaCantidadPuros(Vineta $vineta): ?int
     {
-        // 1. Buscar en registros activos de esta viñeta específica (por vineta_id o api_id)
-        $ultimoRegistroVineta = VinetaRegistro::query()
+        $query = VinetaRegistro::query()
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
-            ->where('cantidad_puros', '>', 0)
-            ->where(function ($query) use ($vineta) {
-                $query->where('vineta_id', $vineta->id);
+            ->where('cantidad_puros', '>', 0);
+
+        // 1. Registros de ESA misma viñeta: asi anillado y llenado heredan lo de rezago
+        $mismaVineta = (clone $query)
+            ->where(function ($q) use ($vineta) {
+                $q->where('vineta_id', $vineta->id);
+
                 if ($vineta->api_id) {
-                    $query->orWhere('vineta_api_id', $vineta->api_id);
+                    $q->orWhere('vineta_api_id', $vineta->api_id);
                 }
             })
             ->latest('id')
             ->value('cantidad_puros');
 
-        if ($ultimoRegistroVineta !== null && $ultimoRegistroVineta > 0) {
-            return (int) $ultimoRegistroVineta;
+        if ($mismaVineta !== null && $mismaVineta > 0) {
+            return (int) $mismaVineta;
         }
 
-        // 2. Coincidencia estricta: producto_item, orden_del_sistema, orden y producto_codigo
-        $query = VinetaRegistro::query()
-            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
-            ->where('cantidad_puros', '>', 0);
-
-        if (!empty($vineta->item) && !empty($vineta->orden_del_sistema) && !empty($vineta->orden) && !empty($vineta->codigo_producto)) {
-            $strict = (clone $query)
+        // 2. Mismo item + orden del cliente (el ultimo registrado)
+        if (! empty($vineta->item) && ! empty($vineta->orden)) {
+            $porItemOrdenCliente = (clone $query)
                 ->where('producto_item', $vineta->item)
-                ->where('orden_del_sistema', $vineta->orden_del_sistema)
                 ->where('orden', $vineta->orden)
-                ->where('producto_codigo', $vineta->codigo_producto)
                 ->latest('id')
                 ->value('cantidad_puros');
 
-            if ($strict !== null && $strict > 0) {
-                return (int) $strict;
+            if ($porItemOrdenCliente !== null && $porItemOrdenCliente > 0) {
+                return (int) $porItemOrdenCliente;
             }
         }
 
-        // 3. Coincidencia secundaria: item y orden del sistema
-        if (!empty($vineta->item) && !empty($vineta->orden_del_sistema)) {
-            $secundario = (clone $query)
+        // 3. Mismo item (cualquier orden)
+        if (! empty($vineta->item)) {
+            $porItem = (clone $query)
                 ->where('producto_item', $vineta->item)
-                ->where('orden_del_sistema', $vineta->orden_del_sistema)
                 ->latest('id')
                 ->value('cantidad_puros');
 
-            if ($secundario !== null && $secundario > 0) {
-                return (int) $secundario;
+            if ($porItem !== null && $porItem > 0) {
+                return (int) $porItem;
             }
         }
 
-        // 4. Coincidencia por código de producto y orden del sistema
-        if (!empty($vineta->codigo_producto) && !empty($vineta->orden_del_sistema)) {
-            $terciario = (clone $query)
-                ->where('producto_codigo', $vineta->codigo_producto)
-                ->where('orden_del_sistema', $vineta->orden_del_sistema)
+        // 4. Mismo tipo de empaque + marca (ej: CAJAS 1/20 de Romeo y Julieta)
+        if (! empty($vineta->tipo_empaque) && ! empty($vineta->marca)) {
+            $porEmpaqueMarca = (clone $query)
+                ->where('tipo_empaque', $vineta->tipo_empaque)
+                ->where('marca', $vineta->marca)
                 ->latest('id')
                 ->value('cantidad_puros');
 
-            if ($terciario !== null && $terciario > 0) {
-                return (int) $terciario;
+            if ($porEmpaqueMarca !== null && $porEmpaqueMarca > 0) {
+                return (int) $porEmpaqueMarca;
             }
         }
 
+        // 5. Mismo tipo de empaque (ej: si se rezaga una caja de 20, los puros que tiene una caja de 20)
+        if (! empty($vineta->tipo_empaque)) {
+            $porEmpaque = (clone $query)
+                ->where('tipo_empaque', $vineta->tipo_empaque)
+                ->latest('id')
+                ->value('cantidad_puros');
+
+            if ($porEmpaque !== null && $porEmpaque > 0) {
+                return (int) $porEmpaque;
+            }
+        }
+
+        // 6. Solo si nada de lo anterior aplica: el valor que trae la viñeta (ERP)
         return $vineta->cantidad_puros;
     }
 
