@@ -730,7 +730,7 @@ class VinetaRegistroController extends Controller
             ['name' => 'Detalle', 'rows' => $detalle, 'format' => 'detail'],
             [
                 'name' => 'Resumen Anillado',
-                'rows' => $this->resumenAnilladoExportRows($areaData['anillado']['empleados'], $hasHorasOrdinarias),
+                'rows' => $this->resumenAnilladoExportRows($areaData['anillado']['empleados'], $hasHorasOrdinarias, $fechaTexto),
                 'format' => 'anillado_summary',
             ],
             [
@@ -847,7 +847,7 @@ class VinetaRegistroController extends Controller
         $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
     }
 
-    private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias): array
+    private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias, string $fechaTexto = ''): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
@@ -865,7 +865,12 @@ class VinetaRegistroController extends Controller
             $headers[] = 'Horas ordinarias';
         }
 
-        $rows = [$headers];
+        // Mismo encabezado que los demas resumenes: titulo, renglon en blanco, columnas
+        $rows = [
+            ['REPORTE DE ANILLADO '.$fechaTexto.'.'],
+            [],
+            $headers,
+        ];
 
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
@@ -2905,12 +2910,15 @@ class VinetaRegistroController extends Controller
                 }
 
                 if ($format === 'anillado_summary') {
-                    if ($rowIndex === 0) {
+                    if ($rowIndex === 0 || $rowIndex === 2) {
+                        // titulo y encabezado con el color de la pestaña
                         $styleId = $this->xlsxHeaderStyle($format) ?? 11;
-                    } elseif (str_starts_with((string) ($row[0] ?? ''), 'Total')) {
-                        $styleId = $columnIndex <= 1 ? 15 : 16;
-                    } else {
-                        $styleId = $columnIndex === 0 ? 13 : 14;
+                    } elseif ($rowIndex >= 3) {
+                        if (str_starts_with((string) ($row[0] ?? ''), 'Total')) {
+                            $styleId = $columnIndex <= 1 ? 15 : 16;
+                        } else {
+                            $styleId = $columnIndex === 0 ? 13 : 14;
+                        }
                     }
                 }
 
@@ -3073,8 +3081,12 @@ class VinetaRegistroController extends Controller
         }
 
         if ($format === 'anillado_summary') {
-            if ($rowIndex === 0) {
+            if ($rowIndex === 0 || $rowIndex === 2) {
                 return 11;
+            }
+
+            if ($rowIndex === 1) {
+                return null;
             }
 
             return str_starts_with((string) ($row[0] ?? ''), 'Total') ? 4 : 13;
