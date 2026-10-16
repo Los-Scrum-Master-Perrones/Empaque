@@ -20,7 +20,6 @@ use ZipArchive;
 class VinetaRegistroController extends Controller
 {
     private int $metaDiariaMinutos = 570;
-
     public function index(Request $request)
     {
         $perPageInput = $request->get('per_page', 25);

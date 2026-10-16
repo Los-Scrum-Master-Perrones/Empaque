@@ -1,10 +1,10 @@
 {
-    "version_name": "2.0.4",
-    "version_code": 47,
-    "release_notes": "• CORRECCIÓN IMPORTANTE: la app ahora descarga el APK de la arquitectura del teléfono (arm64-v8a, armeabi-v7a o universal). Antes bajaba siempre el arm64 y en equipos de 32 bits la instalación fallaba con \"App not installed\".\n• El APK descargado conserva su nombre real (ya no se renombra a app_update_arm64.apk).\n• Nuevos grupos de actividad: Prensado y Rolado (antes se contaban como Anillado).\n• Rolado y Prensado ya no se confunden con Anillado al escanear.\n• Estadísticas con color propio para Prensado y Rolado.",
-    "apk_filename": "app-empaque-2.0.4-47-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.0.4-47-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.0.4-47-universal.apk",
+    "version_name": "2.0.5",
+    "version_code": 48,
+    "release_notes": "• Campo \"Hora total\" del escaneo múltiple: ahora sí acepta el punto decimal (1.5) y también el formato 2:30.\n• La app descarga el APK de la arquitectura del teléfono (arm64-v8a, armeabi-v7a o universal).\n• Rolado y Prensado ya no se confunden con Anillado al escanear.\n• Grupos de actividad: Prensado y Rolado con su propio filtro y color.\n• Jornada laboral repartida proporcional a los puros, en cuartos de hora.",
+    "apk_filename": "app-empaque-2.0.5-48-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.0.5-48-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.0.5-48-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-15 17:05:00"
+    "published_at": "2026-10-16 11:15:00"
 }
