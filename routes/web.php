@@ -199,6 +199,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/vinetas-registradas/reporte-semanal', [VinetaRegistroController::class, 'exportReporteSemanal'])
         ->name('vineta-registros.reporte-semanal');
 
+    Route::get('/vinetas-registradas/reporte-orden', [VinetaRegistroController::class, 'reporteOrden'])
+        ->name('vineta-registros.reporte-orden');
+
+    Route::get('/vinetas-registradas/reporte-orden/exportar', [VinetaRegistroController::class, 'exportReporteOrden'])
+        ->name('vineta-registros.reporte-orden.export');
+
     Route::get('/vinetas-registradas/documentos', [VinetaRegistroController::class, 'documentosPorFecha'])
         ->name('vineta-registros.documentos');
 

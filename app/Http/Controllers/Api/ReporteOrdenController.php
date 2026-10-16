@@ -43,9 +43,11 @@ class ReporteOrdenController extends Controller
     }
 
     /**
+     * Arma el reporte. Publico para que el reporte web reutilice la misma logica.
+     *
      * @param  array{anio?:int,mes?:int}  $filtros
      */
-    private function armarReporte(array $filtros): array
+    public function armarReporte(array $filtros): array
     {
         $hoy = now('America/Tegucigalpa');
         $anio = (int) ($filtros['anio'] ?? $hoy->year);

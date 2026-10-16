@@ -174,6 +174,12 @@
                                             class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#0f766e] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#ecfdf5] transition whitespace-nowrap">
                                         Reporte semanal
                                     </button>
+
+                                    <button type="button"
+                                            id="vinetaRegistrosOrdenReportOpen"
+                                            class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#4f46e5] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#eef2ff] transition whitespace-nowrap">
+                                        Reporte por orden
+                                    </button>
                                 </div>
                             </form>
                         </div>
@@ -291,6 +297,64 @@
                             class="theme-button-secondary inline-flex items-center justify-center rounded-2xl border theme-border bg-white px-4 py-3 text-sm font-bold transition hover:bg-[#f3efe7]">Cancelar</button>
                     <button type="submit"
                             class="inline-flex items-center justify-center rounded-2xl bg-[#5b3a1e] px-5 py-3 text-sm font-black text-white transition hover:bg-[#3b2818]">Generar reporte</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="vinetaRegistrosOrdenReportModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm">
+        <div class="theme-card w-full max-w-lg overflow-hidden rounded-3xl border theme-border bg-white shadow-2xl">
+            <div class="flex items-start justify-between gap-4 border-b theme-border px-5 py-4">
+                <div>
+                    <p class="theme-text text-xs font-black uppercase tracking-wide">Reporte por orden</p>
+                    <h2 class="theme-title mt-1 text-xl font-black">Programado vs hecho</h2>
+                    <p class="theme-text mt-1 text-sm">
+                        Compara lo programado (por orden del sistema, orden del cliente e item) contra lo
+                        trabajado en Rezago, Anillado y Llenado. El periodo va desde ese mes en adelante.
+                    </p>
+                </div>
+                <button type="button"
+                        data-vineta-registros-modal-close="vinetaRegistrosOrdenReportModal"
+                        class="theme-button-secondary inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border theme-border text-xl font-black transition hover:bg-[#f3efe7]"
+                        aria-label="Cerrar reporte por orden">×</button>
+            </div>
+
+            <form method="GET" action="{{ route('vineta-registros.reporte-orden') }}" target="_blank" class="px-5 py-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="orden_reporte_anio" class="theme-text mb-1 block text-xs font-bold">Año</label>
+                        <select id="orden_reporte_anio"
+                                name="anio"
+                                class="w-full rounded-2xl border theme-border bg-white px-4 py-3 text-sm theme-title outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20">
+                            @foreach(range(now('America/Tegucigalpa')->year, max(2020, now('America/Tegucigalpa')->year - 5)) as $anioOpcion)
+                                <option value="{{ $anioOpcion }}" @selected($anioOpcion === now('America/Tegucigalpa')->year)>{{ $anioOpcion }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="orden_reporte_mes" class="theme-text mb-1 block text-xs font-bold">Mes (desde ese mes en adelante)</label>
+                        <select id="orden_reporte_mes"
+                                name="mes"
+                                class="w-full rounded-2xl border theme-border bg-white px-4 py-3 text-sm theme-title outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20">
+                            <option value="">Todo el año</option>
+                            @foreach(['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] as $indiceMes => $nombreMes)
+                                <option value="{{ $indiceMes + 1 }}">{{ $nombreMes }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button type="button"
+                            data-vineta-registros-modal-close="vinetaRegistrosOrdenReportModal"
+                            class="theme-button-secondary inline-flex items-center justify-center rounded-2xl border theme-border bg-white px-4 py-3 text-sm font-bold transition hover:bg-[#f3efe7]">Cancelar</button>
+                    <button type="submit"
+                            formaction="{{ route('vineta-registros.reporte-orden.export') }}"
+                            class="inline-flex items-center justify-center rounded-2xl bg-[#4f46e5] px-5 py-3 text-sm font-black text-white transition hover:bg-[#4338ca]">Descargar Excel</button>
+                    <button type="submit"
+                            class="inline-flex items-center justify-center rounded-2xl bg-[#5b3a1e] px-5 py-3 text-sm font-black text-white transition hover:bg-[#3b2818]">Ver reporte</button>
                 </div>
             </form>
         </div>
@@ -636,6 +700,7 @@
             const modals = {
                 export: document.getElementById('vinetaRegistrosExportModal'),
                 weekly: document.getElementById('vinetaRegistrosWeeklyReportModal'),
+                orden: document.getElementById('vinetaRegistrosOrdenReportModal'),
             };
 
             const openModal = (modal) => {
@@ -650,6 +715,7 @@
 
             document.getElementById('vinetaRegistrosExportOpen')?.addEventListener('click', () => openModal(modals.export));
             document.getElementById('vinetaRegistrosWeeklyReportOpen')?.addEventListener('click', () => openModal(modals.weekly));
+            document.getElementById('vinetaRegistrosOrdenReportOpen')?.addEventListener('click', () => openModal(modals.orden));
 
             document.querySelectorAll('[data-vineta-registros-modal-close]').forEach((button) => {
                 button.addEventListener('click', () => {

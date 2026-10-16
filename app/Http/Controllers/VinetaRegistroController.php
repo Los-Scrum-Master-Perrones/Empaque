@@ -1612,6 +1612,202 @@ class VinetaRegistroController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
+    /**
+     * Reporte por orden: lo programado (API de facturacion_plasencia) contra
+     * lo hecho en empaque. Filtro por año / mes (desde ese mes en adelante).
+     */
+    public function reporteOrden(Request $request)
+    {
+        $datos = $this->reporteOrdenDatos($request);
+
+        if ($datos['error'] !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => $datos['error'],
+            ], 503);
+        }
+
+        return view('vineta-registros.reporte-orden', $datos);
+    }
+
+    public function exportReporteOrden(Request $request): BinaryFileResponse
+    {
+        $datos = $this->reporteOrdenDatos($request);
+
+        $encabezado = [
+            'Orden sistema',
+            'Orden cliente',
+            'Item',
+            'Cod. producto',
+            'Marca',
+            'Nombre',
+            'Vitola',
+            'Capa',
+            'Tipo empaque',
+            'Prog.',
+            'Cajas',
+            'Puros prog.',
+            'Rezagado',
+            'Anillado',
+            'Llenado',
+            'Avance %',
+        ];
+
+        $rows = [
+            ['PROGRAMADO VS HECHO '.$datos['periodoLabel'].'.'],
+            [],
+            $encabezado,
+        ];
+
+        if ($datos['error'] !== null) {
+            $rows[] = ['No se pudo consultar la API de programaciones: '.$datos['error']];
+        } else {
+            foreach ($datos['grupos'] as $grupo) {
+                foreach ($grupo['clientes'] as $cliente) {
+                    foreach ($cliente['items'] as $item) {
+                        $rows[] = [
+                            $grupo['orden_sistema'],
+                            $cliente['orden_cliente'],
+                            $item['item'],
+                            $item['codigo_producto'],
+                            $item['marca'],
+                            $item['nombre'],
+                            $item['vitola'],
+                            $item['capa'],
+                            $item['tipo_empaque'],
+                            $item['programaciones'],
+                            $item['cajas'],
+                            $item['puros_programados'],
+                            $item['rezago'],
+                            $item['anillado'],
+                            $item['llenado'],
+                            $item['avance'],
+                        ];
+                    }
+
+                    $rows[] = [
+                        'TOTAL '.$grupo['orden_sistema'].' / '.$cliente['orden_cliente'],
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        $cliente['totales']['programaciones'],
+                        $cliente['totales']['cajas'],
+                        $cliente['totales']['puros_programados'],
+                        $cliente['totales']['rezago'],
+                        $cliente['totales']['anillado'],
+                        $cliente['totales']['llenado'],
+                        $cliente['totales']['avance'],
+                    ];
+                }
+
+                $rows[] = [
+                    'TOTAL ORDEN '.$grupo['orden_sistema'],
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    $grupo['totales']['programaciones'],
+                    $grupo['totales']['cajas'],
+                    $grupo['totales']['puros_programados'],
+                    $grupo['totales']['rezago'],
+                    $grupo['totales']['anillado'],
+                    $grupo['totales']['llenado'],
+                    $grupo['totales']['avance'],
+                ];
+            }
+
+            $rows[] = [
+                'TOTAL GENERAL',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                $datos['totales']['programaciones'],
+                $datos['totales']['cajas'],
+                $datos['totales']['puros_programados'],
+                $datos['totales']['rezago'],
+                $datos['totales']['anillado'],
+                $datos['totales']['llenado'],
+                $datos['totales']['avance'],
+            ];
+        }
+
+        $path = $this->buildXlsx([[
+            'name' => 'Programado vs Hecho',
+            'rows' => $rows,
+            'format' => 'reporte_orden',
+        ]]);
+
+        $fileName = 'reporte_por_orden_'.now('America/Tegucigalpa')->format('Ymd_His').'.xlsx';
+
+        return response()->download($path, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Datos del reporte por orden (o el error si la API no responde).
+     */
+    private function reporteOrdenDatos(Request $request): array
+    {
+        $hoy = now('America/Tegucigalpa');
+        $anio = (int) $request->get('anio', $hoy->year);
+        $mes = (int) $request->get('mes', 0);
+
+        if ($anio < 2020 || $anio > 2100) {
+            $anio = (int) $hoy->year;
+        }
+
+        if ($mes < 1 || $mes > 12) {
+            $mes = 0;
+        }
+
+        $error = null;
+
+        try {
+            $reporte = app(\App\Http\Controllers\Api\ReporteOrdenController::class)
+                ->armarReporte(['anio' => $anio, 'mes' => $mes]);
+        } catch (\Throwable $e) {
+            $reporte = ['grupos' => [], 'totales' => [], 'ordenes' => 0, 'items' => 0, 'filtro' => []];
+            $error = $e->getMessage();
+        }
+
+        $desde = $mes > 0
+            ? Carbon::create($anio, $mes, 1, 0, 0, 0, 'America/Tegucigalpa')
+            : Carbon::create($anio, 1, 1, 0, 0, 0, 'America/Tegucigalpa');
+
+        $periodoLabel = $mes > 0
+            ? 'DESDE '.$desde->locale('es')->translatedFormat('F Y').' EN ADELANTE'
+            : 'DESDE '.$anio.' EN ADELANTE';
+
+        $anios = range($hoy->year, max(2020, $hoy->year - 4));
+
+        return [
+            'anio' => $anio,
+            'mes' => $mes,
+            'anios' => $anios,
+            'periodoLabel' => $periodoLabel,
+            'grupos' => $reporte['grupos'] ?? [],
+            'totales' => $reporte['totales'] ?? [],
+            'ordenes' => $reporte['ordenes'] ?? 0,
+            'items' => $reporte['items'] ?? 0,
+            'error' => $error,
+        ];
+    }
+
     private function reporteSemanalAreas(): array
     {
         return [
@@ -2891,6 +3087,25 @@ class VinetaRegistroController extends Controller
                     }
                 }
 
+                if ($format === 'reporte_orden') {
+                    if ($rowIndex === 0) {
+                        // solo la celda A1 lleva el color del titulo
+                        $styleId = $columnIndex === 0 ? ($this->xlsxHeaderStyle($format) ?? 11) : null;
+                    } elseif ($rowIndex === 2) {
+                        // encabezado de columnas: todas pintadas
+                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
+                    } elseif ($rowIndex >= 3) {
+                        $esTotal = str_starts_with((string) ($row[0] ?? ''), 'TOTAL');
+                        $esNumero = $columnIndex >= 9;
+
+                        if ($esTotal) {
+                            $styleId = $esNumero ? 16 : 15;
+                        } else {
+                            $styleId = $esNumero ? 14 : 13;
+                        }
+                    }
+                }
+
                 if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
                     if ($rowIndex === 0) {
                         // solo la celda A1 lleva el color del titulo
@@ -3060,6 +3275,7 @@ class VinetaRegistroController extends Controller
     {
         return match ($format) {
             'detail' => 17,
+            'reporte_orden' => 17,
             'anillado_summary' => 18,
             'pivot_rezago' => 19,
             'pivot_llenado' => 20,
@@ -3167,6 +3383,15 @@ class VinetaRegistroController extends Controller
             // Orden sistema, Orden cliente, Actividad, Cantidad, Estadistico,
             // Minutos, Tiempo, Observacion
             $base = [12, 30, 13, 11, 12, 17, 22, 15, 14, 14, 30, 13, 12, 11, 11, 26];
+
+            return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
+        }
+
+        if ($format === 'reporte_orden') {
+            // Orden sist, Orden clie, Item, Cod. producto, Marca, Nombre, Vitola,
+            // Capa, Tipo empaque, Prog, Cajas, Puros prog, Rezagado, Anillado,
+            // Llenado, Avance
+            $base = [11, 14, 13, 14, 26, 18, 11, 13, 15, 9, 11, 13, 12, 12, 12, 10];
 
             return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
         }
