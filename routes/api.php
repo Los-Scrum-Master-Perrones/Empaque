@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DocumentoEmpaqueController;
 use App\Http\Controllers\Api\EmpleadoController as ApiEmpleadoController;
 use App\Http\Controllers\Api\EmpleadoHoraOrdinariaController as ApiEmpleadoHoraOrdinariaController;
+use App\Http\Controllers\Api\ReporteOrdenController as ApiReporteOrdenController;
 use App\Http\Controllers\Api\VinetaController as ApiVinetaController;
 use App\Http\Controllers\Api\VinetaRegistroController as ApiVinetaRegistroController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,8 @@ Route::get('/vinetas-registradas', [ApiVinetaRegistroController::class, 'feed'])
     ->name('api.vinetas-registradas');
 Route::get('/registros-erp', [ApiVinetaRegistroController::class, 'feedErp'])
     ->name('api.registros-erp');
+Route::get('/reporte-orden', [ApiReporteOrdenController::class, 'index'])
+    ->name('api.reporte-orden');
 Route::get('/documentos-empaques', [DocumentoEmpaqueController::class, 'index'])
     ->name('api.documentos-empaques');
 Route::post('/registrar-vineta-erp', [DocumentoEmpaqueController::class, 'registrarVinetaErp'])
