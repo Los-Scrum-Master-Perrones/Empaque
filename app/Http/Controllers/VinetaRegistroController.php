@@ -2893,8 +2893,11 @@ class VinetaRegistroController extends Controller
                 }
 
                 if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
-                    if ($rowIndex === 0 || $rowIndex === 2) {
-                        // titulo y encabezado con el color de la pestaña
+                    if ($rowIndex === 0) {
+                        // solo la celda A1 lleva el color del titulo
+                        $styleId = $columnIndex === 0 ? ($this->xlsxHeaderStyle($format) ?? 11) : null;
+                    } elseif ($rowIndex === 2) {
+                        // encabezado de columnas: todas pintadas
                         $styleId = $this->xlsxHeaderStyle($format) ?? 11;
                     } elseif ($rowIndex >= 3) {
                         $val = (string) ($row[0] ?? '');
@@ -2910,8 +2913,11 @@ class VinetaRegistroController extends Controller
                 }
 
                 if ($format === 'anillado_summary') {
-                    if ($rowIndex === 0 || $rowIndex === 2) {
-                        // titulo y encabezado con el color de la pestaña
+                    if ($rowIndex === 0) {
+                        // solo la celda A1 lleva el color del titulo
+                        $styleId = $columnIndex === 0 ? ($this->xlsxHeaderStyle($format) ?? 11) : null;
+                    } elseif ($rowIndex === 2) {
+                        // encabezado de columnas: todas pintadas
                         $styleId = $this->xlsxHeaderStyle($format) ?? 11;
                     } elseif ($rowIndex >= 3) {
                         if (str_starts_with((string) ($row[0] ?? ''), 'Total')) {
