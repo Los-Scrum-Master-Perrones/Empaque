@@ -727,7 +727,7 @@ class VinetaRegistroController extends Controller
                 'rows' => $this->resumenAgrupadoExportRows($gruposExport, $totalesEmpleadoExport),
                 'format' => 'grouped_report',
             ],
-            ['name' => 'Detalle', 'rows' => $detalle],
+            ['name' => 'Detalle', 'rows' => $detalle, 'format' => 'detail'],
             [
                 'name' => 'Resumen Anillado',
                 'rows' => $this->resumenAnilladoExportRows($areaData['anillado']['empleados'], $hasHorasOrdinarias),
@@ -2873,22 +2873,44 @@ class VinetaRegistroController extends Controller
                     $styleId = $paperSize === 'legal' ? 10 : 7;
                 }
 
+                // Formato parejo en hojas de datos:
+                //   13 = borde + izquierda      14 = borde + derecha
+                //   15 = borde + negrita izq    16 = borde + negrita der
+                if ($format === 'detail') {
+                    if ($rowIndex === 0) {
+                        $styleId = 11;
+                    } elseif (in_array($columnIndex, [11, 12, 13], true)) {
+                        // Cantidad procesada, Estadistico, Minutos -> a la derecha
+                        $styleId = 14;
+                    } else {
+                        $styleId = 13;
+                    }
+                }
+
                 if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
                     if ($rowIndex === 2) {
                         $styleId = $columnIndex === 0 ? 11 : 12;
                     } elseif ($rowIndex >= 3) {
                         $val = (string) ($row[0] ?? '');
-                        $isHeaderRow = ! str_starts_with($val, '      ');
-                        if ($isHeaderRow) {
-                            $styleId = $columnIndex === 0 ? 1 : 5;
+
+                        if (str_starts_with($val, '      ')) {
+                            // fila de actividad (indentada, sin negrita)
+                            $styleId = $columnIndex === 0 ? 13 : 14;
                         } else {
-                            $styleId = $columnIndex === 0 ? null : null;
+                            // fila de empleado o total (negrita con borde)
+                            $styleId = $columnIndex === 0 ? 15 : 16;
                         }
                     }
                 }
 
-                if ($format === 'anillado_summary' && str_starts_with((string) ($row[0] ?? ''), 'Total')) {
-                    $styleId = $columnIndex <= 1 ? 1 : 5;
+                if ($format === 'anillado_summary') {
+                    if ($rowIndex === 0) {
+                        $styleId = $columnIndex === 0 ? 11 : 12;
+                    } elseif (str_starts_with((string) ($row[0] ?? ''), 'Total')) {
+                        $styleId = $columnIndex <= 1 ? 15 : 16;
+                    } else {
+                        $styleId = $columnIndex === 0 ? 13 : 14;
+                    }
                 }
 
                 $style = $styleId === null ? '' : ' s="'.$styleId.'"';
@@ -3026,12 +3048,17 @@ class VinetaRegistroController extends Controller
             return (string) ($row[3] ?? '') === 'Subtotal producto' ? 4 : null;
         }
 
+        // Detalle: encabezado azul con borde (igual que los demas) y filas con borde
+        if ($format === 'detail') {
+            return $rowIndex === 0 ? 11 : 13;
+        }
+
         if ($format === 'anillado_summary') {
-            if ($rowIndex === 0 || str_starts_with((string) ($row[0] ?? ''), 'Total')) {
-                return 1;
+            if ($rowIndex === 0) {
+                return 11;
             }
 
-            return null;
+            return str_starts_with((string) ($row[0] ?? ''), 'Total') ? 4 : 13;
         }
 
         if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
@@ -3045,10 +3072,11 @@ class VinetaRegistroController extends Controller
                 return 11;
             }
             $val = (string) ($row[0] ?? '');
-            if (! str_starts_with($val, '      ')) {
-                return 1;
+            if (str_starts_with($val, '      ')) {
+                return null;
             }
-            return null;
+
+            return str_starts_with($val, 'Total') ? 4 : 13;
         }
 
         if ($format !== 'weekly_report') {
@@ -3094,6 +3122,15 @@ class VinetaRegistroController extends Controller
     {
         if ($format === 'grouped_report') {
             $base = [13, 32, 16, 20, 11, 18, 25, 17, 18, 18, 48, 20, 16, 12, 16, 30];
+
+            return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
+        }
+
+        if ($format === 'detail') {
+            // Fecha, Empleado, Codigo, Tipo, Viñeta, Codigo producto, Marca, Item,
+            // Orden sistema, Orden cliente, Actividad, Cantidad, Estadistico,
+            // Minutos, Tiempo, Observacion
+            $base = [12, 30, 13, 11, 12, 17, 22, 15, 14, 14, 30, 13, 12, 11, 11, 26];
 
             return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
         }
@@ -3240,7 +3277,7 @@ class VinetaRegistroController extends Controller
             .'<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>'
             .'</borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            .'<cellXfs count="13">'
+            .'<cellXfs count="17">'
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
             .'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
             .'<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
@@ -3254,6 +3291,10 @@ class VinetaRegistroController extends Controller
             .'<xf numFmtId="0" fontId="5" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
             .'<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
             .'<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+            .'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            .'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+            .'<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            .'<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
             .'</cellXfs>'
             .'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             .'</styleSheet>';
