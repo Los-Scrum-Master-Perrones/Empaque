@@ -650,9 +650,11 @@ class VinetaController extends Controller
         $item = trim((string) $vineta->item);
         $codigo = trim((string) $vineta->codigo_producto);
 
-        // 1) Lo mas exacto: item + codigo de producto.
-        // Varios productos comparten el mismo item (samplers / presentaciones),
-        // asi que el codigo de producto es el que define cual es.
+        $conActividades = fn ($productos) => $productos
+            ->filter(fn (Producto $producto) => $producto->actividades->isNotEmpty())
+            ->values();
+
+        // 1) Item + codigo de producto (lo mas exacto)
         if ($item !== '' && $codigo !== '') {
             $exactos = Producto::query()
                 ->with(['actividades', 'tipoEmpaque', 'capa', 'vitola', 'presentacion'])
@@ -660,13 +662,14 @@ class VinetaController extends Controller
                 ->where('codigo_producto', $codigo)
                 ->get();
 
-            if ($exactos->isNotEmpty()) {
-                return $exactos->first(fn (Producto $producto) => $this->productoCoincideCaracteristicas($producto, $vineta))
-                    ?? $exactos->first();
+            $conAct = $conActividades($exactos);
+            if ($conAct->isNotEmpty()) {
+                return $conAct->first(fn (Producto $producto) => $this->productoCoincideCaracteristicas($producto, $vineta))
+                    ?? $conAct->first();
             }
         }
 
-        // 2) Respaldo: solo item o solo codigo de producto
+        // 2) Por item o por codigo, pero solo los que SI tienen actividades en su ficha
         foreach (['item' => $item, 'codigo_producto' => $codigo] as $column => $value) {
             if ($value === '') {
                 continue;
@@ -677,9 +680,38 @@ class VinetaController extends Controller
                 ->where($column, $value)
                 ->get();
 
-            if ($productos->isNotEmpty()) {
-                return $productos->first(fn (Producto $producto) => $this->productoCoincideCaracteristicas($producto, $vineta))
-                    ?? $productos->first();
+            $conAct = $conActividades($productos);
+            if ($conAct->isNotEmpty()) {
+                return $conAct->first(fn (Producto $producto) => $this->productoCoincideCaracteristicas($producto, $vineta))
+                    ?? $conAct->first();
+            }
+        }
+
+        // 3) Respaldo: cualquier producto que coincida (aunque no tenga actividades)
+        if ($item !== '' && $codigo !== '') {
+            $exacto = Producto::query()
+                ->with(['actividades', 'tipoEmpaque', 'capa', 'vitola', 'presentacion'])
+                ->where('item', $item)
+                ->where('codigo_producto', $codigo)
+                ->first();
+
+            if ($exacto) {
+                return $exacto;
+            }
+        }
+
+        foreach (['item' => $item, 'codigo_producto' => $codigo] as $column => $value) {
+            if ($value === '') {
+                continue;
+            }
+
+            $producto = Producto::query()
+                ->with(['actividades', 'tipoEmpaque', 'capa', 'vitola', 'presentacion'])
+                ->where($column, $value)
+                ->first();
+
+            if ($producto) {
+                return $producto;
             }
         }
 
