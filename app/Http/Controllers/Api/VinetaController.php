@@ -354,8 +354,11 @@ class VinetaController extends Controller
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
             ->where('cantidad_puros', '>', 0);
 
-        // 1. Registros de ESA misma viñeta: asi anillado y llenado heredan lo de rezago
-        $mismaVineta = (clone $query)
+        // 1. Registros de ESA misma viñeta: anillado y llenado heredan los puros
+        //    del paso anterior del proceso (rezago -> anillado -> llenado), tal
+        //    como quedaron registrados. Las actividades especiales (limpieza,
+        //    prensado, rolado) no cambian la cantidad del proceso.
+        $registrosVineta = (clone $query)
             ->where(function ($q) use ($vineta) {
                 $q->where('vineta_id', $vineta->id);
 
@@ -363,11 +366,36 @@ class VinetaController extends Controller
                     $q->orWhere('vineta_api_id', $vineta->api_id);
                 }
             })
-            ->latest('id')
-            ->value('cantidad_puros');
+            ->orderByDesc('id')
+            ->get(['id', 'cantidad_puros', 'actividad_nombre', 'actividad_tipo_empaque', 'actividad_codigo']);
 
-        if ($mismaVineta !== null && $mismaVineta > 0) {
-            return (int) $mismaVineta;
+        $purosPorGrupo = [];
+
+        foreach ($registrosVineta as $registro) {
+            $grupo = $this->grupoActividadProceso(
+                $registro->actividad_nombre,
+                $registro->actividad_tipo_empaque,
+                $registro->actividad_codigo
+            );
+
+            if ($grupo && ! array_key_exists($grupo, $purosPorGrupo) && $registro->cantidad_puros > 0) {
+                // El mas reciente de ese grupo (viene ordenado por id desc)
+                $purosPorGrupo[$grupo] = (int) $registro->cantidad_puros;
+            }
+        }
+
+        // Se hereda el paso mas avanzado del proceso
+        foreach (['llenado', 'anillado', 'rezago'] as $grupoProceso) {
+            if (! empty($purosPorGrupo[$grupoProceso])) {
+                return $purosPorGrupo[$grupoProceso];
+            }
+        }
+
+        // Sin proceso registrado: cualquier otro registro de la viñeta (especiales)
+        foreach ($registrosVineta as $registro) {
+            if ($registro->cantidad_puros > 0) {
+                return (int) $registro->cantidad_puros;
+            }
         }
 
         // 2. Mismo item + orden del cliente (el ultimo registrado)
