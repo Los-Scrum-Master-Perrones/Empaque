@@ -437,10 +437,13 @@ class EmpleadoHoraOrdinariaController extends Controller
                 }
             } else if (Schema::hasColumn('vineta_registros', 'minutos_trabajados')) {
                 $cajones = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
-                $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $cajones);
 
-                if ($grupo !== null && $grupo !== 'todos' && $grupoEmpleado !== $grupo) {
-                    $cajones = collect();
+                // Grupo de ACTIVIDAD: se filtra por la actividad de cada vineta
+                // (no por el cargo del empleado, que puede tener varios grupos el mismo dia).
+                if ($grupo !== null && $grupo !== 'todos' && in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
+                    $cajones = $cajones
+                        ->filter(fn (VinetaRegistro $registro) => $this->grupoActividadRegistro($registro) === $grupo)
+                        ->values();
                 }
             }
         }
@@ -593,10 +596,12 @@ class EmpleadoHoraOrdinariaController extends Controller
         } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
             $registros = $registros->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
         } elseif ($grupo !== null && $grupo !== 'todos') {
-            $grupoEmpleado = $this->grupoProduccionEmpleado($empleado, $registros);
-            if ($grupoEmpleado !== $grupo) {
-                $registros = collect();
-            }
+            // Grupo de ACTIVIDAD (rezago/anillado/llenado/...): se filtra por la
+            // actividad de cada vineta, no por el cargo del empleado. Un empleado
+            // puede tener vinetas de varios grupos el mismo dia.
+            $registros = $registros
+                ->filter(fn (VinetaRegistro $r) => $this->grupoActividadRegistro($r) === $grupo)
+                ->values();
         }
 
         if ($registros->isEmpty()) {
@@ -704,8 +709,11 @@ class EmpleadoHoraOrdinariaController extends Controller
                         $registrosEmpleado = $registrosEmpleado->filter(fn ($r) => empty($r->documento_numero));
                     } elseif (! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
                         $registrosEmpleado = $registrosEmpleado->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
-                    } elseif ($gruposEmpleados->get((string) $codigo) !== $grupo) {
-                        continue;
+                    } else {
+                        // Grupo de ACTIVIDAD: se filtra por la actividad de cada vineta
+                        $registrosEmpleado = $registrosEmpleado
+                            ->filter(fn (VinetaRegistro $r) => $this->grupoActividadRegistro($r) === $grupo)
+                            ->values();
                     }
                 }
 
