@@ -1,10 +1,10 @@
 {
-    "version_name": "2.0.5",
-    "version_code": 48,
-    "release_notes": "• Campo \"Hora total\" del escaneo múltiple: ahora sí acepta el punto decimal (1.5) y también el formato 2:30.\n• La app descarga el APK de la arquitectura del teléfono (arm64-v8a, armeabi-v7a o universal).\n• Rolado y Prensado ya no se confunden con Anillado al escanear.\n• Grupos de actividad: Prensado y Rolado con su propio filtro y color.\n• Jornada laboral repartida proporcional a los puros, en cuartos de hora.",
-    "apk_filename": "app-empaque-2.0.5-48-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.0.5-48-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.0.5-48-universal.apk",
+    "version_name": "2.0.6",
+    "version_code": 49,
+    "release_notes": "• Jornada laboral: se reparte exactamente el tiempo que se ingresa (ej. 7 h = 7 h), sin inflarlo al mínimo por viñeta.\n• La jornada se sigue aplicando por documento/lote y los lotes se acumulan; el total del empleado cuadra con el ERP.\n• Editar la jornada ya actualiza las horas de la lista (antes no cambiaba).\n• El mínimo de 0.25 h se aplica solo en el envío al ERP.\n• Escaneo: el campo \"Hora total\" acepta punto decimal (1.5) y formato 2:30.",
+    "apk_filename": "app-empaque-2.0.6-49-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.0.6-49-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.0.6-49-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-16 11:15:00"
+    "published_at": "2026-10-19 10:30:00"
 }
