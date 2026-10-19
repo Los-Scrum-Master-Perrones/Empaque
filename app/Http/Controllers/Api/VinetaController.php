@@ -647,9 +647,27 @@ class VinetaController extends Controller
 
     private function findProducto(Vineta $vineta): ?Producto
     {
-        foreach (['item' => $vineta->item, 'codigo_producto' => $vineta->codigo_producto] as $column => $value) {
-            $value = trim((string) $value);
+        $item = trim((string) $vineta->item);
+        $codigo = trim((string) $vineta->codigo_producto);
 
+        // 1) Lo mas exacto: item + codigo de producto.
+        // Varios productos comparten el mismo item (samplers / presentaciones),
+        // asi que el codigo de producto es el que define cual es.
+        if ($item !== '' && $codigo !== '') {
+            $exactos = Producto::query()
+                ->with(['actividades', 'tipoEmpaque', 'capa', 'vitola', 'presentacion'])
+                ->where('item', $item)
+                ->where('codigo_producto', $codigo)
+                ->get();
+
+            if ($exactos->isNotEmpty()) {
+                return $exactos->first(fn (Producto $producto) => $this->productoCoincideCaracteristicas($producto, $vineta))
+                    ?? $exactos->first();
+            }
+        }
+
+        // 2) Respaldo: solo item o solo codigo de producto
+        foreach (['item' => $item, 'codigo_producto' => $codigo] as $column => $value) {
             if ($value === '') {
                 continue;
             }
