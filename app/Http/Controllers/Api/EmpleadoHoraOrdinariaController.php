@@ -896,14 +896,9 @@ class EmpleadoHoraOrdinariaController extends Controller
         }
 
         // Total en cuartos de hora (redondeado al cuarto mas cercano).
+        // Se reparte EXACTAMENTE lo pedido: sin minimo por viñeta.
+        // (El minimo de 0.25 h se aplica solo al enviar al ERP.)
         $totalQ = (int) round($totalMinutes / 15);
-        $minimo = 1; // 0.25 h
-
-        // Cada viñeta debe tener al menos 1 cuarto (0.25 h): si el total no
-        // alcanza, se sube el total a la cantidad de viñetas.
-        if ($totalQ < $count) {
-            $totalQ = $count;
-        }
 
         $puros = $registros
             ->map(fn (VinetaRegistro $r) => max(0, (int) ($r->cantidad_puros ?? 0)))
@@ -939,29 +934,6 @@ class EmpleadoHoraOrdinariaController extends Controller
             }
             $floors[$i]++;
             $sobra--;
-        }
-
-        // Minimo de 1 cuarto (0.25 h) por viñeta.
-        $ajuste = 0;
-        foreach ($floors as $i => $q) {
-            if ($q < $minimo) {
-                $ajuste += $minimo - $q;
-                $floors[$i] = $minimo;
-            }
-        }
-
-        if ($ajuste > 0) {
-            $maxIdx = null;
-            $maxVal = -1;
-            foreach ($floors as $i => $q) {
-                if ($q > $maxVal) {
-                    $maxVal = $q;
-                    $maxIdx = $i;
-                }
-            }
-            if ($maxIdx !== null && ($maxVal - $ajuste) >= $minimo) {
-                $floors[$maxIdx] -= $ajuste;
-            }
         }
 
         // Cuartos -> minutos
