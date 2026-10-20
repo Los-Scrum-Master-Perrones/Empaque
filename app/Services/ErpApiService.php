@@ -282,6 +282,69 @@ class ErpApiService
         }
     }
 
+    /**
+     * Mueve los puros/horas de UNA viñeta de una actividad a otra en el ERP.
+     * Solo esa viñeta (por diferencia); no toca otras filas.
+     */
+    public function moverActividadVineta(VinetaRegistro $registro, int $actividadOrigen, int $actividadDestino, ?int $sucursal = null): array
+    {
+        $doc = trim((string) $registro->documento_numero);
+
+        if ($doc === '') {
+            return ['success' => false, 'message' => 'El registro no tiene documento.'];
+        }
+
+        $payload = [
+            'dry_run' => $this->dryRun,
+            'sucursal' => (int) ($sucursal ?? $registro->sucursal ?? $this->defaultSucursal),
+            'documento' => $doc,
+            'empleado_codigo' => (string) $registro->empleado_codigo,
+            'numero_de_orden' => (string) $registro->orden_del_sistema,
+            'actividad_origen' => $actividadOrigen,
+            'actividad_destino' => $actividadDestino,
+            'cantidad_puros' => (int) $registro->cantidad_puros,
+            'horas' => round(((int) ($registro->minutos_trabajados ?? 0)) / 60, 2),
+            'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
+            'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
+            'orden_del_cliente' => (string) ($registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : ($registro->orden ?? '')),
+        ];
+
+        try {
+            $response = Http::timeout(20)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/mover-actividad-vineta", $payload);
+
+            $data = $response->json();
+
+            if (! is_array($data)) {
+                return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
+            }
+
+            $previo = is_array($registro->erp_respuesta) ? $registro->erp_respuesta : [];
+            $previo['movimientos_actividad'] = array_slice(
+                array_merge($previo['movimientos_actividad'] ?? [], [[
+                    'origen' => $actividadOrigen,
+                    'destino' => $actividadDestino,
+                    'en' => now()->toIso8601String(),
+                    'resultado' => $data,
+                ]]),
+                -5
+            );
+            $registro->update(['erp_respuesta' => $previo]);
+
+            return $data;
+        } catch (\Throwable $e) {
+            Log::error('ERP mover-actividad-vineta exception: '.$e->getMessage());
+
+            return ['success' => false, 'message' => 'Error al comunicar con ERP: '.$e->getMessage()];
+        }
+    }
+
     public function ajustarHorasVineta(VinetaRegistro $registro, float $deltaHoras, ?int $sucursal = null, ?int $deltaPuros = null): array
     {
         $doc = trim((string) $registro->documento_numero);

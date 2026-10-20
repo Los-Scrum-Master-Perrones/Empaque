@@ -1251,23 +1251,37 @@ class VinetaRegistroController extends Controller
             }
 
             if ($actualizaActividad) {
-                // El ERP identifica la fila por la ACTIVIDAD. Si el registro ya
-                // se envió, cambiarla dejaría la fila vieja (y los ajustes de
-                // horas/puros se irían a otra fila). Por eso se bloquea.
+                // Si el registro ya esta en el ERP, se MUEVE solo esta viñeta de
+                // la actividad vieja a la nueva (puros y horas). Si el ERP no
+                // puede moverla (documento aplicado, fila ambigua...), no se
+                // cambia nada en el sistema.
                 $codigoAnterior = trim((string) $vinetaRegistro->actividad_codigo);
                 $nombreAnterior = trim((string) $vinetaRegistro->actividad_nombre);
-
-                if (
-                    $vinetaRegistro->erp_enviado
-                    && $codigoAnterior !== ''
+                $cambiaActividad = $codigoAnterior !== ''
                     && (
                         $codigoAnterior !== trim((string) $actividadCodigo)
                         || $nombreAnterior !== trim((string) $actividadNombre)
-                    )
-                ) {
-                    throw ValidationException::withMessages([
-                        'actividad_nombre' => 'No se puede cambiar la actividad: este registro ya está en el ERP con la actividad "'.$nombreAnterior.'". Anula el registro y créalo con la actividad correcta.',
-                    ]);
+                    );
+
+                if ($cambiaActividad) {
+                    if (
+                        $vinetaRegistro->erp_enviado
+                        && trim((string) $vinetaRegistro->documento_numero) !== ''
+                    ) {
+                        $movimiento = app(\App\Services\ErpApiService::class)->moverActividadVineta(
+                            $vinetaRegistro,
+                            (int) $codigoAnterior,
+                            (int) $actividadCodigo,
+                            $vinetaRegistro->sucursal
+                        );
+
+                        if (empty($movimiento['success'])) {
+                            throw ValidationException::withMessages([
+                                'actividad_nombre' => $movimiento['message']
+                                    ?? 'No se pudo mover la actividad en el ERP; no se cambió nada.',
+                            ]);
+                        }
+                    }
                 }
 
                 $grupoActividad = $this->grupoActividadProceso(
