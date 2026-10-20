@@ -1251,6 +1251,25 @@ class VinetaRegistroController extends Controller
             }
 
             if ($actualizaActividad) {
+                // El ERP identifica la fila por la ACTIVIDAD. Si el registro ya
+                // se envió, cambiarla dejaría la fila vieja (y los ajustes de
+                // horas/puros se irían a otra fila). Por eso se bloquea.
+                $codigoAnterior = trim((string) $vinetaRegistro->actividad_codigo);
+                $nombreAnterior = trim((string) $vinetaRegistro->actividad_nombre);
+
+                if (
+                    $vinetaRegistro->erp_enviado
+                    && $codigoAnterior !== ''
+                    && (
+                        $codigoAnterior !== trim((string) $actividadCodigo)
+                        || $nombreAnterior !== trim((string) $actividadNombre)
+                    )
+                ) {
+                    throw ValidationException::withMessages([
+                        'actividad_nombre' => 'No se puede cambiar la actividad: este registro ya está en el ERP con la actividad "'.$nombreAnterior.'". Anula el registro y créalo con la actividad correcta.',
+                    ]);
+                }
+
                 $grupoActividad = $this->grupoActividadProceso(
                     $actividadNombre,
                     $actividadTipoEmpaque,
