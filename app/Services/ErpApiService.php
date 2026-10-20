@@ -227,4 +227,75 @@ class ErpApiService
 
         return $resultado;
     }
+
+    /**
+     * Ajusta SOLO las horas de una fila ya registrada en el ERP.
+     *
+     * Se usa cuando desde la app se edita la hora de un registro que ya
+     * estaba enviado: se manda la DIFERENCIA (delta) para no duplicar.
+     * Las cantidades (puros) no se tocan.
+     */
+    public function ajustarHorasVineta(VinetaRegistro $registro, float $deltaHoras, ?int $sucursal = null): array
+    {
+        $doc = trim((string) $registro->documento_numero);
+
+        if ($doc === '') {
+            return ['success' => false, 'message' => 'El registro no tiene documento: no hay nada que ajustar en el ERP.'];
+        }
+
+        if (abs($deltaHoras) < 0.005) {
+            return ['success' => true, 'cambiado' => false, 'message' => 'Sin diferencia de horas.'];
+        }
+
+        $payload = [
+            'dry_run' => $this->dryRun,
+            'sucursal' => (int) ($sucursal ?? $registro->sucursal ?? $this->defaultSucursal),
+            'documento' => $doc,
+            'codigo_actividad' => (int) $registro->actividad_codigo,
+            'numero_de_orden' => (string) $registro->orden_del_sistema,
+            'empleado_codigo' => (string) $registro->empleado_codigo,
+            'delta_horas' => round($deltaHoras, 2),
+            'motivo' => 'Edicion de hora desde app_empaque',
+        ];
+
+        try {
+            $response = Http::timeout(15)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/ajustar-horas-vineta", $payload);
+
+            $data = $response->json();
+
+            if (! is_array($data)) {
+                return [
+                    'success' => false,
+                    'message' => 'Respuesta no válida del ERP: '.$response->body(),
+                ];
+            }
+
+            $previo = is_array($registro->erp_respuesta) ? $registro->erp_respuesta : [];
+            $previo['ajustes_horas'] = array_slice(
+                array_merge($previo['ajustes_horas'] ?? [], [[
+                    'delta_horas' => $payload['delta_horas'],
+                    'en' => now()->toIso8601String(),
+                    'resultado' => $data,
+                ]]),
+                -5
+            );
+            $registro->update(['erp_respuesta' => $previo]);
+
+            return $data;
+        } catch (\Throwable $e) {
+            Log::error('ERP ajustar-horas-vineta exception: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Error al comunicar con ERP: '.$e->getMessage(),
+            ];
+        }
+    }
 }

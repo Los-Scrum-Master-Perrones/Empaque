@@ -1312,12 +1312,38 @@ class VinetaRegistroController extends Controller
                 : ($this->inputInt($data, 'minutos_trabajados') ?? 0);
         }
 
+        // Datos previos para saber si hay que ajustar las horas en el ERP.
+        // Solo si el registro YA se envió y sigue siendo "por tarea".
+        $minutosPrevios = $vinetaRegistro->minutos_trabajados !== null
+            ? (int) $vinetaRegistro->minutos_trabajados
+            : null;
+        $estabaEnviadoAlErp = (bool) $vinetaRegistro->erp_enviado
+            && trim((string) $vinetaRegistro->documento_numero) !== '';
+
         $vinetaRegistro->update($payload);
+
+        // Ajuste en el ERP: SOLO horas (delta), sin tocar cantidades.
+        // Si el documento ya está aplicado/contabilizado, el ERP lo rechaza
+        // y se devuelve el motivo en 'erp_ajuste_horas'.
+        $ajusteErp = null;
+
+        if ($estabaEnviadoAlErp && ! $porHora && $minutosPrevios !== null) {
+            $minutosNuevos = $vinetaRegistro->minutos_trabajados !== null
+                ? (int) $vinetaRegistro->minutos_trabajados
+                : 0;
+            $deltaHoras = ($minutosNuevos - $minutosPrevios) / 60;
+
+            if (abs($deltaHoras) >= 0.005) {
+                $ajusteErp = app(\App\Services\ErpApiService::class)
+                    ->ajustarHorasVineta($vinetaRegistro->refresh(), $deltaHoras, $vinetaRegistro->sucursal);
+            }
+        }
 
         return response()->json([
             'message' => 'Registro actualizado correctamente.',
             'registro' => $this->registroPayload($vinetaRegistro),
             'resumen_diario' => $this->resumenDiarioPayload($vinetaRegistro),
+            'erp_ajuste_horas' => $ajusteErp,
         ]);
     }
 
