@@ -391,14 +391,23 @@ class VinetaController extends Controller
             }
         }
 
-        // Sin proceso registrado: cualquier otro registro de la viñeta (especiales)
+        // 2. La cantidad propia de la viñeta (ERP): si la viñeta ya dice cuantos
+        //    puros tiene, esa manda. Es el caso del anillado sin rezago previo:
+        //    antes se heredaba de registros de otras viñetas y salian cantidades
+        //    infladas (ej. 1325 en una viñeta de 250).
+        if ((int) $vineta->cantidad_puros > 0) {
+            return (int) $vineta->cantidad_puros;
+        }
+
+        // 2b. Solo si la viñeta no trae cantidad: un registro especial de esa
+        //     misma viñeta (limpieza, prensado, rolado)
         foreach ($registrosVineta as $registro) {
             if ($registro->cantidad_puros > 0) {
                 return (int) $registro->cantidad_puros;
             }
         }
 
-        // 2. Mismo item + orden del cliente (el ultimo registrado)
+        // 3. Mismo item + orden del cliente (el ultimo registrado)
         if (! empty($vineta->item) && ! empty($vineta->orden)) {
             $porItemOrdenCliente = (clone $query)
                 ->where('producto_item', $vineta->item)
@@ -411,7 +420,7 @@ class VinetaController extends Controller
             }
         }
 
-        // 3. Mismo item (cualquier orden)
+        // 4. Mismo item (cualquier orden)
         if (! empty($vineta->item)) {
             $porItem = (clone $query)
                 ->where('producto_item', $vineta->item)
@@ -423,7 +432,7 @@ class VinetaController extends Controller
             }
         }
 
-        // 4. Mismo tipo de empaque + marca (ej: CAJAS 1/20 de Romeo y Julieta)
+        // 5. Mismo tipo de empaque + marca (ej: CAJAS 1/20 de Romeo y Julieta)
         if (! empty($vineta->tipo_empaque) && ! empty($vineta->marca)) {
             $porEmpaqueMarca = (clone $query)
                 ->where('tipo_empaque', $vineta->tipo_empaque)
@@ -436,7 +445,7 @@ class VinetaController extends Controller
             }
         }
 
-        // 5. Mismo tipo de empaque (ej: si se rezaga una caja de 20, los puros que tiene una caja de 20)
+        // 6. Mismo tipo de empaque (ej: si se rezaga una caja de 20, los puros que tiene una caja de 20)
         if (! empty($vineta->tipo_empaque)) {
             $porEmpaque = (clone $query)
                 ->where('tipo_empaque', $vineta->tipo_empaque)
@@ -448,8 +457,8 @@ class VinetaController extends Controller
             }
         }
 
-        // 6. Solo si nada de lo anterior aplica: el valor que trae la viñeta (ERP)
-        return $vineta->cantidad_puros;
+        // 7. Sin cantidad propia ni historial: el llamador usa la viñeta
+        return null;
     }
 
     private function vinetaPayload(Vineta $vineta, $scannedAt = null): array
