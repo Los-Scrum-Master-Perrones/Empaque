@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.2",
-    "version_code": 55,
-    "release_notes": "• Viñetas del empleado: la tarjeta del producto ahora muestra la capa (Código · Item · Capa · ODS · Orden cliente).\n• Los samplers siguen separados por marca + item + código de producto + orden.",
-    "apk_filename": "app-empaque-2.1.2-55-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.2-55-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.1.2-55-universal.apk",
+    "version_name": "2.1.3",
+    "version_code": 56,
+    "release_notes": "• Editar viñeta: el selector de documento muestra Doc. #numero + la descripción/observación del documento y el color por categoría (igual que en el escaneo).",
+    "apk_filename": "app-empaque-2.1.3-56-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.3-56-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.1.3-56-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-20 16:20:00"
+    "published_at": "2026-10-20 17:00:00"
 }
