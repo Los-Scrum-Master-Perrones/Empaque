@@ -1,10 +1,10 @@
 {
-    "version_name": "2.0.7",
-    "version_code": 50,
-    "release_notes": "• Editar viñeta: si no tiene documento, se le puede asignar uno desde la pantalla de edición (viñeta por viñeta).\n• Al asignar documento, esa viñeta se registra en el ERP (solo esa, del día que se edita).\n• Documentos aplicados/contabilizados o anulados: no se tocan, se avisa en pantalla.\n• Botón \"Aplicar horas y puros al ERP\" en Horas del empleado (agrupa por documento + actividad + orden + empleado).\n• Al editar la hora de un registro ya enviado, el ajuste va por diferencia (solo horas).",
-    "apk_filename": "app-empaque-2.0.7-50-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.0.7-50-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.0.7-50-universal.apk",
+    "version_name": "2.0.8",
+    "version_code": 51,
+    "release_notes": "• Horas ordinarias: botón general \"Aplicar horas y puros al ERP\" para todos los empleados del grupo o para TODAS las viñetas del documento seleccionado.\n• Al editar una viñeta sin documento, se le puede asignar uno (viñeta por viñeta).\n• El ajuste al ERP se hace por documento + actividad + orden (sistema y cliente) + empleado; solo horas y puros.\n• Documentos aplicados/contabilizados o anulados: no se tocan, la app avisa.",
+    "apk_filename": "app-empaque-2.0.8-51-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.0.8-51-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.0.8-51-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-20 12:00:00"
+    "published_at": "2026-10-20 14:00:00"
 }

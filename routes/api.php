@@ -31,6 +31,7 @@ Route::get('/reporte-orden', [ApiReporteOrdenController::class, 'index'])
     ->name('api.reporte-orden');
 Route::get('/documentos-empaques', [DocumentoEmpaqueController::class, 'index'])
     ->name('api.documentos-empaques');
+Route::post('/documentos-empaques/{documento}/aplicar-horas-erp', [DocumentoEmpaqueController::class, 'aplicarHorasErp']);
 Route::post('/registrar-vineta-erp', [DocumentoEmpaqueController::class, 'registrarVinetaErp'])
     ->name('api.registrar-vineta-erp');
 
