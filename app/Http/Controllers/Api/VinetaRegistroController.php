@@ -984,6 +984,7 @@ class VinetaRegistroController extends Controller
                 'producto_item',
                 'producto_codigo',
                 'producto_nombre',
+                'marca',
                 'orden',
                 'orden_del_sistema',
                 'tipo_empaque',
@@ -1049,14 +1050,15 @@ class VinetaRegistroController extends Controller
             $empGroups[$empKey]['minutos'] += $minutos;
             $empGroups[$empKey]['monto'] += $monto;
 
-            // Los samplers comparten item: se separan por item + orden + codigo
-            // de producto para no mezclar varios samplers en una sola linea.
+            // Los samplers comparten item: se separan por item + marca + orden +
+            // codigo de producto para no mezclar varios samplers en una linea.
             $actKey = $actNombre;
             $esSampler = stripos($actNombre, 'sampler') !== false;
             if ($esSampler) {
                 $actKey = implode('|', [
                     $actNombre,
                     trim((string) $r->producto_item),
+                    trim((string) $r->marca),
                     trim((string) $r->orden),
                     trim((string) $r->producto_codigo),
                 ]);
@@ -1067,6 +1069,7 @@ class VinetaRegistroController extends Controller
                     'actividad' => $actNombre,
                     'grupo' => $this->grupoActividadRegistro($r),
                     'item' => $r->producto_item,
+                    'marca' => $r->marca,
                     'codigo_producto' => $r->producto_codigo,
                     'producto' => $r->producto_nombre,
                     'orden' => $r->orden,
