@@ -249,6 +249,8 @@ class ErpApiService
             'empleado_codigo' => (string) $registro->empleado_codigo,
             'horas' => round($horas, 2),
             'motivo' => 'Aplicar ajuste de horas desde app_empaque',
+            'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
+            'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
         ];
 
         if ($puros !== null) {
@@ -300,6 +302,8 @@ class ErpApiService
             'empleado_codigo' => (string) $registro->empleado_codigo,
             'delta_horas' => round($deltaHoras, 2),
             'motivo' => 'Edicion de hora desde app_empaque',
+            'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
+            'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
         ];
 
         try {
