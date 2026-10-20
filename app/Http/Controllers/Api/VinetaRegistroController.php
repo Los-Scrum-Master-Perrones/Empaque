@@ -1276,10 +1276,13 @@ class VinetaRegistroController extends Controller
                         );
 
                         if (empty($movimiento['success'])) {
-                            throw ValidationException::withMessages([
-                                'actividad_nombre' => $movimiento['message']
-                                    ?? 'No se pudo mover la actividad en el ERP; no se cambió nada.',
-                            ]);
+                            $mensajeMovimiento = $movimiento['message']
+                                ?? 'No se pudo mover la actividad en el ERP; no se cambió nada.';
+
+                            return response()->json([
+                                'message' => $mensajeMovimiento,
+                                'errors' => ['actividad_nombre' => [$mensajeMovimiento]],
+                            ], 422);
                         }
                     }
                 }
