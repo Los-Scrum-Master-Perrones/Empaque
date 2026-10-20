@@ -251,6 +251,7 @@ class ErpApiService
             'motivo' => 'Aplicar ajuste de horas desde app_empaque',
             'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
             'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
+            'orden_del_cliente' => (string) ($registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : ($registro->orden ?? '')),
         ];
 
         if ($puros !== null) {
@@ -304,6 +305,7 @@ class ErpApiService
             'motivo' => 'Edicion de hora desde app_empaque',
             'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
             'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
+            'orden_del_cliente' => (string) ($registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : ($registro->orden ?? '')),
         ];
 
         try {
