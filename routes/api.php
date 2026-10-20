@@ -60,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/empleados/{empleado}/horas-ordinarias/{horaOrdinaria}', [ApiEmpleadoHoraOrdinariaController::class, 'destroy']);
     Route::post('/empleados/{empleado}/jornada-laboral', [ApiEmpleadoHoraOrdinariaController::class, 'distributeJornada']);
     Route::delete('/empleados/{empleado}/jornada-laboral', [ApiEmpleadoHoraOrdinariaController::class, 'destroyJornada']);
+    Route::post('/empleados/{empleado}/horas-ordinarias/aplicar-erp', [ApiEmpleadoHoraOrdinariaController::class, 'aplicarHorasErp']);
     Route::post('/empleados/jornada-laboral/global', [ApiEmpleadoHoraOrdinariaController::class, 'distributeGlobal']);
     Route::delete('/empleados/jornada-laboral/global', [ApiEmpleadoHoraOrdinariaController::class, 'destroyGlobal']);
     Route::post('/empleados/horas-ordinarias/global', [ApiEmpleadoHoraOrdinariaController::class, 'storeGlobal']);

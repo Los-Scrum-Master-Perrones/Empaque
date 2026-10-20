@@ -793,6 +793,116 @@ class EmpleadoHoraOrdinariaController extends Controller
         ]);
     }
 
+    /**
+     * Boton "Aplicar ajuste de horas": deja el ERP con las horas que tiene el
+     * sistema para ese empleado en la fecha (y grupo/documento si se indica).
+     *
+     * Solo toca HorasTrabajadas. Solo registros ya enviados al ERP, con
+     * documento, y con el documento todavia abierto.
+     *
+     * POST /api/empleados/{empleado}/horas-ordinarias/aplicar-erp
+     */
+    public function aplicarHorasErp(Request $request, Empleado $empleado): JsonResponse
+    {
+        $data = $request->validate([
+            'fecha' => ['required', 'date_format:Y-m-d'],
+            'grupo' => ['nullable', 'string', 'max:50'],
+            'sucursal' => ['nullable', 'integer'],
+            'dry_run' => ['nullable', 'boolean'],
+        ]);
+
+        $fecha = $data['fecha'];
+        $grupo = $data['grupo'] ?? null;
+        $sucursal = ! empty($data['sucursal']) ? (int) $data['sucursal'] : null;
+        $dryRun = (bool) ($data['dry_run'] ?? false);
+
+        $registros = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
+
+        if ($grupo === 'sin_documento') {
+            $registros = $registros->filter(fn ($r) => empty($r->documento_numero));
+        } elseif ($grupo !== null && $grupo !== 'todos' && ! in_array($grupo, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
+            $registros = $registros->filter(fn ($r) => (string) $r->documento_numero === (string) $grupo);
+        } elseif ($grupo !== null && $grupo !== 'todos') {
+            $registros = $registros
+                ->filter(fn (VinetaRegistro $r) => $this->grupoActividadRegistro($r) === $grupo)
+                ->values();
+        }
+
+        $conDocumento = $registros->filter(fn (VinetaRegistro $r) => trim((string) $r->documento_numero) !== '');
+        $enviados = $conDocumento->filter(fn (VinetaRegistro $r) => (bool) $r->erp_enviado);
+
+        if ($enviados->isEmpty()) {
+            return response()->json([
+                'message' => $conDocumento->isEmpty()
+                    ? 'No hay registros con documento para aplicar al ERP.'
+                    : 'Ninguno de esos registros se ha enviado al ERP todavía.',
+                'total' => 0,
+                'aplicados' => 0,
+                'ya_iguales' => 0,
+                'rechazados' => 0,
+                'errores' => 0,
+                'detalle' => [],
+            ], 200);
+        }
+
+        $servicio = app(\App\Services\ErpApiService::class);
+        $aplicados = 0;
+        $yaIguales = 0;
+        $rechazados = 0;
+        $errores = 0;
+        $detalle = [];
+
+        foreach ($enviados as $registro) {
+            $minutos = (int) ($registro->minutos_trabajados ?? 0);
+            $horas = round($minutos / 60, 2);
+
+            $resultado = $servicio->fijarHorasVineta($registro, $horas, $sucursal);
+
+            $estado = 'error';
+            if (! empty($resultado['success'])) {
+                if (! empty($resultado['cambiado'])) {
+                    $estado = 'aplicado';
+                    $aplicados++;
+                } else {
+                    $estado = 'ya_igual';
+                    $yaIguales++;
+                }
+            } elseif (! empty($resultado['error'])) {
+                $estado = in_array($resultado['error'], ['documento_aplicado', 'documento_anulado', 'fila_ambigua'], true)
+                    ? 'rechazado'
+                    : 'error';
+                $estado === 'rechazado' ? $rechazados++ : $errores++;
+            } else {
+                $errores++;
+            }
+
+            $detalle[] = [
+                'registro_id' => $registro->id,
+                'documento' => $registro->documento_numero,
+                'actividad' => $registro->actividad_nombre,
+                'minutos' => $minutos,
+                'horas' => $horas,
+                'estado' => $estado,
+                'mensaje' => $resultado['message'] ?? ($resultado['error'] ?? null),
+            ];
+        }
+
+        $mensaje = $dryRun
+            ? 'Simulación: no se modificó el ERP.'
+            : "Ajuste aplicado: {$aplicados} actualizados, {$yaIguales} ya estaban igual, {$rechazados} rechazados, {$errores} con error.";
+
+        return response()->json([
+            'message' => $mensaje,
+            'dry_run' => $dryRun,
+            'total' => $enviados->count(),
+            'aplicados' => $aplicados,
+            'ya_iguales' => $yaIguales,
+            'rechazados' => $rechazados,
+            'errores' => $errores,
+            'detalle' => $detalle,
+        ], 200);
+    }
+
     public function storeGlobal(Request $request): JsonResponse
     {
         if (! Schema::hasTable('empleado_horas_ordinarias')) {

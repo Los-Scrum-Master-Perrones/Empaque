@@ -229,12 +229,52 @@ class ErpApiService
     }
 
     /**
-     * Ajusta SOLO las horas de una fila ya registrada en el ERP.
-     *
-     * Se usa cuando desde la app se edita la hora de un registro que ya
-     * estaba enviado: se manda la DIFERENCIA (delta) para no duplicar.
-     * Las cantidades (puros) no se tocan.
+     * Fija las horas EXACTAS de una fila ya registrada en el ERP.
+     * Lo usa el boton "Aplicar ajuste de horas" despues de repartir la jornada.
      */
+    public function fijarHorasVineta(VinetaRegistro $registro, float $horas, ?int $sucursal = null): array
+    {
+        $doc = trim((string) $registro->documento_numero);
+
+        if ($doc === '') {
+            return ['success' => false, 'message' => 'El registro no tiene documento.'];
+        }
+
+        $payload = [
+            'dry_run' => $this->dryRun,
+            'sucursal' => (int) ($sucursal ?? $registro->sucursal ?? $this->defaultSucursal),
+            'documento' => $doc,
+            'codigo_actividad' => (int) $registro->actividad_codigo,
+            'numero_de_orden' => (string) $registro->orden_del_sistema,
+            'empleado_codigo' => (string) $registro->empleado_codigo,
+            'horas' => round($horas, 2),
+            'motivo' => 'Aplicar ajuste de horas desde app_empaque',
+        ];
+
+        try {
+            $response = Http::timeout(15)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/fijar-horas-vineta", $payload);
+
+            $data = $response->json();
+
+            if (! is_array($data)) {
+                return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
+            }
+
+            return $data;
+        } catch (\Throwable $e) {
+            Log::error('ERP fijar-horas-vineta exception: '.$e->getMessage());
+
+            return ['success' => false, 'message' => 'Error al comunicar con ERP: '.$e->getMessage()];
+        }
+    }
+
     public function ajustarHorasVineta(VinetaRegistro $registro, float $deltaHoras, ?int $sucursal = null): array
     {
         $doc = trim((string) $registro->documento_numero);

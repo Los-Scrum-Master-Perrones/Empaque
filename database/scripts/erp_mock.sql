@@ -1,4 +1,4 @@
--- =====================================================================
+﻿-- =====================================================================
 -- Mock local del ERP (solo para pruebas)
 -- No toca ERP_TAOSA. Vive en MySQL local: erp_taosa_mock
 --
@@ -68,8 +68,8 @@ CREATE TABLE Produccion_EmpaquesDiariaG_Actividades (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------- detalle
--- PK REAL del ERP (6 columnas). No incluye viñeta ni producto: por eso el
--- sistema acumula los puros y las horas cuando se registra otra viñeta con
+-- PK REAL del ERP (6 columnas). No incluye viÃ±eta ni producto: por eso el
+-- sistema acumula los puros y las horas cuando se registra otra viÃ±eta con
 -- la misma llave.
 CREATE TABLE Produccion_EmpaquesDiariaG_Detalles (
   CodigoSucursal         INT           NOT NULL,
@@ -170,10 +170,10 @@ VALUES
 INSERT INTO Produccion_OrdenTrabajo
   (CodigoSucursal, Numero_de_Documento, Fecha, Codigo_Cliente, Nombre_del_Cliente, Estado, Cerrada, Anulado)
 VALUES
-  (2, '0000003593', '2026-10-10', 'C-001', 'CLIENTE DEMO UNO', 1, 0, 0),
-  (2, '0000003597', '2026-10-10', 'C-002', 'CLIENTE DEMO DOS', 1, 0, 0),
-  (2, '0000007262', '2026-10-12', 'C-003', 'CLIENTE DEMO TRES', 1, 0, 0),
-  (1, '0000007226', '2026-10-12', 'C-004', 'CLIENTE DEMO CUATRO', 1, 0, 0);
+  (2, '0000003593', '2026-10-10', 'C-001', 'CLIENTE DEMO UNO', 1, 0, 0, '115398'),
+  (2, '0000003597', '2026-10-10', 'C-002', 'CLIENTE DEMO DOS', 1, 0, 0, '115399'),
+  (2, '0000007262', '2026-10-12', 'C-003', 'CLIENTE DEMO TRES', 1, 0, 0, '111395'),
+  (1, '0000007226', '2026-10-12', 'C-004', 'CLIENTE DEMO CUATRO', 1, 0, 0, '111394');
 
 -- documentos del dia
 INSERT INTO Produccion_EmpaquesDiariaG
@@ -226,11 +226,11 @@ VALUES
 -- Tablas usadas por los lookups del registro (tambien necesarias)
 -- =====================================================================
 
-DROP TABLE IF EXISTS Produccion_EmpActBodega;
+DROP TABLE IF EXISTS Produccion_ActEmpaquesBodega;
 DROP TABLE IF EXISTS Facturas_Detalles;
 DROP TABLE IF EXISTS Inventario_SKU;
 
-CREATE TABLE Produccion_EmpActBodega (
+CREATE TABLE Produccion_ActEmpaquesBodega (
   CodigoSucursal  INT NOT NULL,
   CodigoActividad INT NOT NULL,
   Bodega          INT NOT NULL,
@@ -253,14 +253,17 @@ CREATE TABLE Inventario_SKU (
   PRIMARY KEY (CodigoSKU)
 ) ENGINE=InnoDB;
 
-INSERT INTO Produccion_EmpActBodega (CodigoSucursal, CodigoActividad, Bodega) VALUES
+INSERT INTO Produccion_ActEmpaquesBodega (CodigoSucursal, CodigoActividad, Bodega) VALUES
  (1,3,218),(1,4,218),(1,126,218),(2,2,218),(2,103,218),(2,133,218),(2,135,218),(2,141,218);
 
 INSERT INTO Facturas_Detalles (CodigoSucursal, Numero_de_Documento, Numero, CodigoSKU, Codigo_Producto, NumeroOrden) VALUES
- (2,'0000003593',1,'47604630','P-0001','115398'),
- (2,'0000003597',2,'47801428','P-0002','115399'),
- (1,'0000007226',3,'NSR-PM-1004','P-0003','111394'),
- (1,'0000007262',4,'NSR-PM-1000','P-0004','111395');
+ (2,'115398',1,'47604630','P-0001','115398'),
+ (2,'115399',2,'47801428','P-0002','115399'),
+ (1,'111394',3,'NSR-PM-1004','P-0003','111394'),
+ (1,'111395',4,'NSR-PM-1000','P-0004','111395');
 
 INSERT INTO Inventario_SKU (CodigoSKU, CodigoTipoEmpaque) VALUES
  ('47604630',4),('47801428',4),('NSR-PM-1004',4),('NSR-PM-1000',4),('TE-CC-2001',4);
+
+
+
