@@ -1345,11 +1345,12 @@ class VinetaRegistroController extends Controller
                 : ($this->inputInt($data, 'minutos_trabajados') ?? 0);
         }
 
-        // Datos previos para saber si hay que ajustar las horas en el ERP.
+        // Datos previos para saber si hay que ajustar horas/puros en el ERP.
         // Solo si el registro YA se envió y sigue siendo "por tarea".
         $minutosPrevios = $vinetaRegistro->minutos_trabajados !== null
             ? (int) $vinetaRegistro->minutos_trabajados
             : null;
+        $purosPrevios = (int) $vinetaRegistro->cantidad_puros;
         $estabaEnviadoAlErp = (bool) $vinetaRegistro->erp_enviado
             && trim((string) $vinetaRegistro->documento_numero) !== '';
 
@@ -1394,7 +1395,7 @@ class VinetaRegistroController extends Controller
             }
         }
 
-        // Ajuste en el ERP: SOLO horas (delta), sin tocar cantidades.
+        // Ajuste en el ERP: horas y puros por DIFERENCIA (sin tocar lo demas).
         // Si el documento ya está aplicado/contabilizado, el ERP lo rechaza
         // y se devuelve el motivo en 'erp_ajuste_horas'.
         $ajusteErp = null;
@@ -1404,10 +1405,11 @@ class VinetaRegistroController extends Controller
                 ? (int) $vinetaRegistro->minutos_trabajados
                 : 0;
             $deltaHoras = ($minutosNuevos - $minutosPrevios) / 60;
+            $deltaPuros = (int) $vinetaRegistro->cantidad_puros - (int) $purosPrevios;
 
-            if (abs($deltaHoras) >= 0.005) {
+            if (abs($deltaHoras) >= 0.005 || $deltaPuros !== 0) {
                 $ajusteErp = app(\App\Services\ErpApiService::class)
-                    ->ajustarHorasVineta($vinetaRegistro->refresh(), $deltaHoras, $vinetaRegistro->sucursal);
+                    ->ajustarHorasVineta($vinetaRegistro->refresh(), $deltaHoras, $vinetaRegistro->sucursal, $deltaPuros);
             }
         }
 

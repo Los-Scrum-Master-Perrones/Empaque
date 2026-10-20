@@ -282,7 +282,7 @@ class ErpApiService
         }
     }
 
-    public function ajustarHorasVineta(VinetaRegistro $registro, float $deltaHoras, ?int $sucursal = null): array
+    public function ajustarHorasVineta(VinetaRegistro $registro, float $deltaHoras, ?int $sucursal = null, ?int $deltaPuros = null): array
     {
         $doc = trim((string) $registro->documento_numero);
 
@@ -290,8 +290,10 @@ class ErpApiService
             return ['success' => false, 'message' => 'El registro no tiene documento: no hay nada que ajustar en el ERP.'];
         }
 
-        if (abs($deltaHoras) < 0.005) {
-            return ['success' => true, 'cambiado' => false, 'message' => 'Sin diferencia de horas.'];
+        $deltaPuros = (int) ($deltaPuros ?? 0);
+
+        if (abs($deltaHoras) < 0.005 && $deltaPuros === 0) {
+            return ['success' => true, 'cambiado' => false, 'message' => 'Sin diferencia de horas ni puros.'];
         }
 
         $payload = [
@@ -302,6 +304,7 @@ class ErpApiService
             'numero_de_orden' => (string) $registro->orden_del_sistema,
             'empleado_codigo' => (string) $registro->empleado_codigo,
             'delta_horas' => round($deltaHoras, 2),
+            'delta_puros' => $deltaPuros,
             'motivo' => 'Edicion de hora desde app_empaque',
             'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
             'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
