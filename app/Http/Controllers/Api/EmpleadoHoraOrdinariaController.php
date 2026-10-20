@@ -852,11 +852,23 @@ class EmpleadoHoraOrdinariaController extends Controller
         $errores = 0;
         $detalle = [];
 
-        foreach ($enviados as $registro) {
-            $minutos = (int) ($registro->minutos_trabajados ?? 0);
+        // Se agrupa por la llave del ERP: documento + actividad + orden + empleado.
+        // El ERP acumula las viñetas de esa llave, asi que se manda el TOTAL
+        // del sistema (puros y horas), no el valor de una viñeta sola.
+        $grupos = $enviados->groupBy(fn (VinetaRegistro $r) => implode('|', [
+            trim((string) $r->documento_numero),
+            (int) $r->actividad_codigo,
+            trim((string) $r->orden_del_sistema),
+            trim((string) $r->empleado_codigo),
+        ]));
+
+        foreach ($grupos as $items) {
+            $primero = $items->first();
+            $minutos = (int) $items->sum(fn (VinetaRegistro $r) => (int) ($r->minutos_trabajados ?? 0));
+            $puros = (int) $items->sum('cantidad_puros');
             $horas = round($minutos / 60, 2);
 
-            $resultado = $servicio->fijarHorasVineta($registro, $horas, $sucursal);
+            $resultado = $servicio->fijarHorasVineta($primero, $horas, $sucursal, $puros);
 
             $estado = 'error';
             if (! empty($resultado['success'])) {
@@ -877,11 +889,14 @@ class EmpleadoHoraOrdinariaController extends Controller
             }
 
             $detalle[] = [
-                'registro_id' => $registro->id,
-                'documento' => $registro->documento_numero,
-                'actividad' => $registro->actividad_nombre,
+                'documento' => $primero->documento_numero,
+                'actividad' => $primero->actividad_nombre,
+                'orden' => $primero->orden_del_sistema,
+                'empleado' => $primero->empleado_codigo,
+                'registros' => $items->count(),
                 'minutos' => $minutos,
                 'horas' => $horas,
+                'puros' => $puros,
                 'estado' => $estado,
                 'mensaje' => $resultado['message'] ?? ($resultado['error'] ?? null),
             ];
@@ -894,7 +909,8 @@ class EmpleadoHoraOrdinariaController extends Controller
         return response()->json([
             'message' => $mensaje,
             'dry_run' => $dryRun,
-            'total' => $enviados->count(),
+            'total' => $grupos->count(),
+            'registros' => $enviados->count(),
             'aplicados' => $aplicados,
             'ya_iguales' => $yaIguales,
             'rechazados' => $rechazados,

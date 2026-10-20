@@ -1137,6 +1137,9 @@ class VinetaRegistroController extends Controller
             'tipo_empaque' => ['nullable', 'string', 'max:255'],
             'precio_mo' => ['nullable', 'numeric', 'min:0'],
             'cantidad_actividades' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'documento_numero' => ['nullable', 'string', 'max:50'],
+            'documento_empaque_id' => ['nullable', 'integer'],
+            'sucursal' => ['nullable', 'integer', 'min:1', 'max:99'],
         ];
 
         $modoRegistro = $request->input('modo_registro', $vinetaRegistro->modoRegistro());
@@ -1322,6 +1325,45 @@ class VinetaRegistroController extends Controller
 
         $vinetaRegistro->update($payload);
 
+        // Asignar documento a una viñeta que no lo tiene (edicion viñeta por viñeta).
+        // Si ya estaba en el ERP con otro documento, no se mueve.
+        $documentoAsignado = $this->inputString($data, 'documento_numero');
+        $erpRegistro = null;
+
+        if ($documentoAsignado !== null && $documentoAsignado !== '') {
+            $documentoPrevio = trim((string) $vinetaRegistro->documento_numero);
+
+            if ($documentoPrevio !== '' && $documentoPrevio !== $documentoAsignado && $vinetaRegistro->erp_enviado) {
+                throw ValidationException::withMessages([
+                    'documento_numero' => 'Este registro ya está en el ERP con el documento '.$documentoPrevio.'.',
+                ]);
+            }
+
+            if ($documentoPrevio !== $documentoAsignado) {
+                $sucursalDoc = $this->inputInt($data, 'sucursal')
+                    ?? $vinetaRegistro->sucursal
+                    ?? (int) config('services.erp.default_sucursal', 2);
+
+                $camposDocumento = [
+                    'documento_numero' => $documentoAsignado,
+                    'sucursal' => $sucursalDoc,
+                ];
+
+                $documentoEmpaqueId = $this->inputInt($data, 'documento_empaque_id');
+                if ($documentoEmpaqueId !== null && Schema::hasColumn('vineta_registros', 'documento_empaque_id')) {
+                    $camposDocumento['documento_empaque_id'] = $documentoEmpaqueId;
+                }
+
+                $vinetaRegistro->update($camposDocumento);
+            }
+
+            // Si nunca se envió, ahora que tiene documento se registra en el ERP.
+            if (! $vinetaRegistro->erp_enviado) {
+                $erpRegistro = app(\App\Services\ErpApiService::class)
+                    ->enviarRegistroVineta($vinetaRegistro->refresh(), $documentoAsignado, $vinetaRegistro->sucursal);
+            }
+        }
+
         // Ajuste en el ERP: SOLO horas (delta), sin tocar cantidades.
         // Si el documento ya está aplicado/contabilizado, el ERP lo rechaza
         // y se devuelve el motivo en 'erp_ajuste_horas'.
@@ -1344,6 +1386,7 @@ class VinetaRegistroController extends Controller
             'registro' => $this->registroPayload($vinetaRegistro),
             'resumen_diario' => $this->resumenDiarioPayload($vinetaRegistro),
             'erp_ajuste_horas' => $ajusteErp,
+            'erp_registro' => $erpRegistro,
         ]);
     }
 
