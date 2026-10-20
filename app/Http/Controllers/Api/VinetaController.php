@@ -435,16 +435,24 @@ class VinetaController extends Controller
             return $modaEmpaqueMarca;
         }
 
-        // 5. La cantidad propia de la viñeta (ERP)
-        if ((int) $vineta->cantidad_puros > 0) {
-            return (int) $vineta->cantidad_puros;
-        }
-
-        // 6. Mismo tipo de empaque (sin marca)
+        // 5. Mismo tipo de empaque (sin marca)
         $modaEmpaque = $this->modaCantidadProceso(['tipo_empaque' => $vineta->tipo_empaque]);
 
         if ($modaEmpaque !== null) {
             return $modaEmpaque;
+        }
+
+        // 6. Cantidad tipica por viñeta (la que traen las viñetas: 250) hasta
+        //    que el producto ya tenga historial de rezago/anillado/llenado.
+        $cantidadTipica = $this->cantidadTipicaVineta();
+
+        if ($cantidadTipica !== null) {
+            return $cantidadTipica;
+        }
+
+        // 7. La cantidad propia de la viñeta (ERP)
+        if ((int) $vineta->cantidad_puros > 0) {
+            return (int) $vineta->cantidad_puros;
         }
 
         // 7. Un registro especial de esa misma viñeta (limpieza, prensado, rolado)
@@ -567,6 +575,29 @@ class VinetaController extends Controller
         }
 
         return $cantidadGanadora;
+    }
+
+    /**
+     * Cantidad tipica por viñeta (la que traen las viñetas del ERP: 250).
+     * Se usa solo cuando el producto todavia no tiene historial.
+     */
+    private function cantidadTipicaVineta(): ?int
+    {
+        static $cache = false;
+
+        if ($cache === false) {
+            $fila = Vineta::query()
+                ->selectRaw('cantidad_puros, COUNT(*) as total')
+                ->whereNotNull('cantidad_puros')
+                ->where('cantidad_puros', '>', 0)
+                ->groupBy('cantidad_puros')
+                ->orderByDesc('total')
+                ->first();
+
+            $cache = $fila ? (int) $fila->cantidad_puros : null;
+        }
+
+        return $cache;
     }
 
     private function vinetaPayload(Vineta $vineta, $scannedAt = null): array
