@@ -391,23 +391,56 @@ class VinetaController extends Controller
             }
         }
 
-        // 2. La cantidad propia de la viñeta (ERP): si la viñeta ya dice cuantos
-        //    puros tiene, esa manda. Es el caso del anillado sin rezago previo:
-        //    antes se heredaba de registros de otras viñetas y salian cantidades
-        //    infladas (ej. 1325 en una viñeta de 250).
+        // 2. Cantidad real del producto: el valor que MAS se ha registrado
+        //    (rezago/anillado/llenado) para ese item + empaque. Es la cantidad
+        //    que trae la viñeta segun su presentacion: 180, 240, 260...
+        //    Se usa la moda para que un registro raro (14400, 1325) no mande.
+        $modaItemEmpaque = $this->modaCantidadProceso([
+            'item' => $vineta->item,
+            'tipo_empaque' => $vineta->tipo_empaque,
+        ]);
+
+        if ($modaItemEmpaque !== null) {
+            return $modaItemEmpaque;
+        }
+
+        // 3. Solo el item
+        $modaItem = $this->modaCantidadProceso(['item' => $vineta->item]);
+
+        if ($modaItem !== null) {
+            return $modaItem;
+        }
+
+        // 4. Mismo empaque + marca
+        $modaEmpaqueMarca = $this->modaCantidadProceso([
+            'tipo_empaque' => $vineta->tipo_empaque,
+            'marca' => $vineta->marca,
+        ]);
+
+        if ($modaEmpaqueMarca !== null) {
+            return $modaEmpaqueMarca;
+        }
+
+        // 5. La cantidad propia de la viñeta (ERP)
         if ((int) $vineta->cantidad_puros > 0) {
             return (int) $vineta->cantidad_puros;
         }
 
-        // 2b. Solo si la viñeta no trae cantidad: un registro especial de esa
-        //     misma viñeta (limpieza, prensado, rolado)
+        // 6. Mismo tipo de empaque (sin marca)
+        $modaEmpaque = $this->modaCantidadProceso(['tipo_empaque' => $vineta->tipo_empaque]);
+
+        if ($modaEmpaque !== null) {
+            return $modaEmpaque;
+        }
+
+        // 7. Un registro especial de esa misma viñeta (limpieza, prensado, rolado)
         foreach ($registrosVineta as $registro) {
             if ($registro->cantidad_puros > 0) {
                 return (int) $registro->cantidad_puros;
             }
         }
 
-        // 3. Mismo item + orden del cliente (el ultimo registrado)
+        // 8. Mismo item + orden del cliente (el ultimo registrado)
         if (! empty($vineta->item) && ! empty($vineta->orden)) {
             $porItemOrdenCliente = (clone $query)
                 ->where('producto_item', $vineta->item)
@@ -420,7 +453,7 @@ class VinetaController extends Controller
             }
         }
 
-        // 4. Mismo item (cualquier orden)
+        // 9. Mismo item (cualquier orden)
         if (! empty($vineta->item)) {
             $porItem = (clone $query)
                 ->where('producto_item', $vineta->item)
@@ -432,7 +465,7 @@ class VinetaController extends Controller
             }
         }
 
-        // 5. Mismo tipo de empaque + marca (ej: CAJAS 1/20 de Romeo y Julieta)
+        // 10. Mismo tipo de empaque + marca (ej: CAJAS 1/20 de Romeo y Julieta)
         if (! empty($vineta->tipo_empaque) && ! empty($vineta->marca)) {
             $porEmpaqueMarca = (clone $query)
                 ->where('tipo_empaque', $vineta->tipo_empaque)
@@ -445,7 +478,7 @@ class VinetaController extends Controller
             }
         }
 
-        // 6. Mismo tipo de empaque (ej: si se rezaga una caja de 20, los puros que tiene una caja de 20)
+        // 11. Mismo tipo de empaque (ej: si se rezaga una caja de 20, los puros que tiene una caja de 20)
         if (! empty($vineta->tipo_empaque)) {
             $porEmpaque = (clone $query)
                 ->where('tipo_empaque', $vineta->tipo_empaque)
@@ -457,8 +490,67 @@ class VinetaController extends Controller
             }
         }
 
-        // 7. Sin cantidad propia ni historial: el llamador usa la viñeta
+        // 12. Sin cantidad propia ni historial: el llamador usa la viñeta
         return null;
+    }
+
+    /**
+     * Cantidad que MAS se ha registrado para el proceso (rezago/anillado/llenado)
+     * con los filtros dados. Es la cantidad real de la presentacion: 180, 240, 260...
+     * Se ignora lo que no sea del proceso (limpieza, prensado, rolado), porque
+     * esas actividades registran totales y no la cantidad de la viñeta.
+     */
+    private function modaCantidadProceso(array $filtros): ?int
+    {
+        $item = trim((string) ($filtros['item'] ?? ''));
+        $tipoEmpaque = trim((string) ($filtros['tipo_empaque'] ?? ''));
+        $marca = trim((string) ($filtros['marca'] ?? ''));
+
+        if ($item === '' && $tipoEmpaque === '' && $marca === '') {
+            return null;
+        }
+
+        $registros = VinetaRegistro::query()
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->where('cantidad_puros', '>', 0)
+            ->when($item !== '', fn ($query) => $query->where('producto_item', $item))
+            ->when($tipoEmpaque !== '', fn ($query) => $query->where('tipo_empaque', $tipoEmpaque))
+            ->when($marca !== '', fn ($query) => $query->where('marca', $marca))
+            ->orderByDesc('id')
+            ->limit(600)
+            ->get(['id', 'cantidad_puros', 'actividad_nombre', 'actividad_tipo_empaque', 'actividad_codigo']);
+
+        $conteo = [];
+
+        foreach ($registros as $registro) {
+            $grupo = $this->grupoActividadProceso(
+                $registro->actividad_nombre,
+                $registro->actividad_tipo_empaque,
+                $registro->actividad_codigo
+            );
+
+            if (! in_array($grupo, ['rezago', 'anillado', 'llenado'], true)) {
+                continue;
+            }
+
+            $cantidad = (int) $registro->cantidad_puros;
+            $conteo[$cantidad] = ($conteo[$cantidad] ?? 0) + 1;
+        }
+
+        if (empty($conteo)) {
+            return null;
+        }
+
+        arsort($conteo);
+        $cantidadGanadora = (int) array_key_first($conteo);
+
+        // Con un solo registro no hay evidencia suficiente: mejor seguir con el
+        // siguiente criterio (cantidad propia de la viñeta).
+        if ($conteo[$cantidadGanadora] < 2) {
+            return null;
+        }
+
+        return $cantidadGanadora;
     }
 
     private function vinetaPayload(Vineta $vineta, $scannedAt = null): array
