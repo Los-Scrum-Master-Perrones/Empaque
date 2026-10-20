@@ -392,9 +392,30 @@ class VinetaController extends Controller
         }
 
         // 2. Cantidad real del producto: el valor que MAS se ha registrado
-        //    (rezago/anillado/llenado) para ese item + empaque. Es la cantidad
-        //    que trae la viñeta segun su presentacion: 180, 240, 260...
-        //    Se usa la moda para que un registro raro (14400, 1325) no mande.
+        //    (rezago/anillado/llenado) para ese CODIGO de producto + item + empaque.
+        //    El codigo distingue las presentaciones/samplers que comparten item
+        //    (un codigo puede repetirse en varios items, por eso va con el item).
+        $modaCodigoEmpaque = $this->modaCantidadProceso([
+            'codigo' => $vineta->codigo_producto,
+            'item' => $vineta->item,
+            'tipo_empaque' => $vineta->tipo_empaque,
+        ]);
+
+        if ($modaCodigoEmpaque !== null) {
+            return $modaCodigoEmpaque;
+        }
+
+        // 2b. Codigo + item (sin empaque)
+        $modaCodigo = $this->modaCantidadProceso([
+            'codigo' => $vineta->codigo_producto,
+            'item' => $vineta->item,
+        ]);
+
+        if ($modaCodigo !== null) {
+            return $modaCodigo;
+        }
+
+        // 3. Item + empaque (cuando el codigo no tiene historial)
         $modaItemEmpaque = $this->modaCantidadProceso([
             'item' => $vineta->item,
             'tipo_empaque' => $vineta->tipo_empaque,
@@ -402,13 +423,6 @@ class VinetaController extends Controller
 
         if ($modaItemEmpaque !== null) {
             return $modaItemEmpaque;
-        }
-
-        // 3. Solo el item
-        $modaItem = $this->modaCantidadProceso(['item' => $vineta->item]);
-
-        if ($modaItem !== null) {
-            return $modaItem;
         }
 
         // 4. Mismo empaque + marca
@@ -502,17 +516,19 @@ class VinetaController extends Controller
      */
     private function modaCantidadProceso(array $filtros): ?int
     {
+        $codigo = trim((string) ($filtros['codigo'] ?? ''));
         $item = trim((string) ($filtros['item'] ?? ''));
         $tipoEmpaque = trim((string) ($filtros['tipo_empaque'] ?? ''));
         $marca = trim((string) ($filtros['marca'] ?? ''));
 
-        if ($item === '' && $tipoEmpaque === '' && $marca === '') {
+        if ($codigo === '' && $item === '' && $tipoEmpaque === '' && $marca === '') {
             return null;
         }
 
         $registros = VinetaRegistro::query()
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
             ->where('cantidad_puros', '>', 0)
+            ->when($codigo !== '', fn ($query) => $query->where('producto_codigo', $codigo))
             ->when($item !== '', fn ($query) => $query->where('producto_item', $item))
             ->when($tipoEmpaque !== '', fn ($query) => $query->where('tipo_empaque', $tipoEmpaque))
             ->when($marca !== '', fn ($query) => $query->where('marca', $marca))
