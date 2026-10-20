@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.0",
-    "version_code": 53,
-    "release_notes": "• Viñetas del empleado: los samplers aparecen separados por item + marca + orden + código de producto.\n• Cada linea muestra código de producto, marca, producto, item y orden.",
-    "apk_filename": "app-empaque-2.1.0-53-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.0-53-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.1.0-53-universal.apk",
+    "version_name": "2.1.1",
+    "version_code": 54,
+    "release_notes": "• Viñetas del empleado (Registros -> empleado): los samplers se separan por marca + item + código de producto + orden.\n• Cada grupo muestra el código de producto para distinguir samplers del mismo item y marca.",
+    "apk_filename": "app-empaque-2.1.1-54-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.1-54-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.1.1-54-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-20 15:30:00"
+    "published_at": "2026-10-20 16:00:00"
 }
