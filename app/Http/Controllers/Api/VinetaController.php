@@ -541,7 +541,7 @@ class VinetaController extends Controller
             ->when($tipoEmpaque !== '', fn ($query) => $query->where('tipo_empaque', $tipoEmpaque))
             ->when($marca !== '', fn ($query) => $query->where('marca', $marca))
             ->orderByDesc('id')
-            ->limit(600)
+            ->limit(100)
             ->get(['id', 'cantidad_puros', 'actividad_nombre', 'actividad_tipo_empaque', 'actividad_codigo']);
 
         $conteo = [];
