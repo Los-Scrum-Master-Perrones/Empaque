@@ -981,6 +981,14 @@ class VinetaRegistroController extends Controller
                 'documento_numero',
                 'sucursal',
                 'erp_enviado',
+                'producto_item',
+                'producto_codigo',
+                'producto_nombre',
+                'orden',
+                'orden_del_sistema',
+                'tipo_empaque',
+                'codigo_vineta',
+                'vineta_api_id',
             ])
             ->orderBy('fecha_registro')
             ->orderBy('hora_registro')
@@ -1041,10 +1049,29 @@ class VinetaRegistroController extends Controller
             $empGroups[$empKey]['minutos'] += $minutos;
             $empGroups[$empKey]['monto'] += $monto;
 
-            if (! isset($actGroups[$actNombre])) {
-                $actGroups[$actNombre] = [
+            // Los samplers comparten item: se separan por item + orden + codigo
+            // de producto para no mezclar varios samplers en una sola linea.
+            $actKey = $actNombre;
+            $esSampler = stripos($actNombre, 'sampler') !== false;
+            if ($esSampler) {
+                $actKey = implode('|', [
+                    $actNombre,
+                    trim((string) $r->producto_item),
+                    trim((string) $r->orden),
+                    trim((string) $r->producto_codigo),
+                ]);
+            }
+
+            if (! isset($actGroups[$actKey])) {
+                $actGroups[$actKey] = [
                     'actividad' => $actNombre,
                     'grupo' => $this->grupoActividadRegistro($r),
+                    'item' => $r->producto_item,
+                    'codigo_producto' => $r->producto_codigo,
+                    'producto' => $r->producto_nombre,
+                    'orden' => $r->orden,
+                    'orden_del_sistema' => $r->orden_del_sistema,
+                    'tipo_empaque' => $r->tipo_empaque,
                     'registros' => 0,
                     'puros' => 0,
                     'cajones' => 0,
@@ -1053,12 +1080,12 @@ class VinetaRegistroController extends Controller
                     'monto' => 0.0,
                 ];
             }
-            $actGroups[$actNombre]['registros']++;
-            $actGroups[$actNombre]['puros'] += $puros;
-            $actGroups[$actNombre]['cajones'] += $cajones;
-            $actGroups[$actNombre]['actividades'] += $actividades;
-            $actGroups[$actNombre]['minutos'] += $minutos;
-            $actGroups[$actNombre]['monto'] += $monto;
+            $actGroups[$actKey]['registros']++;
+            $actGroups[$actKey]['puros'] += $puros;
+            $actGroups[$actKey]['cajones'] += $cajones;
+            $actGroups[$actKey]['actividades'] += $actividades;
+            $actGroups[$actKey]['minutos'] += $minutos;
+            $actGroups[$actKey]['monto'] += $monto;
         }
 
         $summary = [
@@ -1941,15 +1968,36 @@ class VinetaRegistroController extends Controller
     private function seguimientoActividadSummariesPayload($registros): array
     {
         return $registros
-            ->groupBy(fn (VinetaRegistro $registro) => trim((string) $registro->actividad_nombre) ?: 'Actividad')
-            ->map(function ($items, string $actividad) {
+            ->groupBy(function (VinetaRegistro $registro) {
+                $actividad = trim((string) $registro->actividad_nombre) ?: 'Actividad';
+
+                // Los samplers comparten item: se separan por item + orden + codigo
+                // de producto para no mezclar varios samplers en una sola linea.
+                if (stripos($actividad, 'sampler') === false) {
+                    return $actividad;
+                }
+
+                return implode('|', [
+                    $actividad,
+                    trim((string) $registro->producto_item),
+                    trim((string) $registro->orden),
+                    trim((string) $registro->producto_codigo),
+                ]);
+            })
+            ->map(function ($items, string $clave) {
                 /** @var VinetaRegistro $first */
                 $first = $items->first();
                 $summary = $this->seguimientoResumenPayload($items);
 
                 return [
-                    'actividad' => $actividad,
+                    'actividad' => $first ? trim((string) $first->actividad_nombre) : 'Actividad',
                     'grupo' => $first ? $this->grupoActividadRegistro($first) : null,
+                    'item' => $first?->producto_item,
+                    'codigo_producto' => $first?->producto_codigo,
+                    'producto' => $first?->producto_nombre,
+                    'orden' => $first?->orden,
+                    'orden_del_sistema' => $first?->orden_del_sistema,
+                    'tipo_empaque' => $first?->tipo_empaque,
                     'registros' => $summary['registros'],
                     'puros' => $summary['puros'],
                     'cajones' => $summary['cajones'],

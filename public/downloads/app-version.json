@@ -1,10 +1,10 @@
 {
-    "version_name": "2.0.8",
-    "version_code": 51,
-    "release_notes": "• Horas ordinarias: botón general \"Aplicar horas y puros al ERP\" para todos los empleados del grupo o para TODAS las viñetas del documento seleccionado.\n• Al editar una viñeta sin documento, se le puede asignar uno (viñeta por viñeta).\n• El ajuste al ERP se hace por documento + actividad + orden (sistema y cliente) + empleado; solo horas y puros.\n• Documentos aplicados/contabilizados o anulados: no se tocan, la app avisa.",
-    "apk_filename": "app-empaque-2.0.8-51-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.0.8-51-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.0.8-51-universal.apk",
+    "version_name": "2.0.9",
+    "version_code": 52,
+    "release_notes": "• Viñetas del empleado: los samplers ya salen separados (se agrupan por item + orden + código de producto).\n• Cada linea muestra código de producto, producto, item y orden para no confundir samplers del mismo item.",
+    "apk_filename": "app-empaque-2.0.9-52-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.0.9-52-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.0.9-52-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-20 14:00:00"
+    "published_at": "2026-10-20 15:00:00"
 }
