@@ -38,6 +38,7 @@ Route::post('/registrar-vineta-erp', [DocumentoEmpaqueController::class, 'regist
 
 Route::get('/app-update', [AppUpdateController::class, 'check'])->name('api.app.update');
 Route::get('/app/latest', [AppUpdateController::class, 'check']);
+Route::put('/app/upload/{file}', [AppUpdateController::class, 'upload']);
 Route::get('/app/download/{file?}', [AppUpdateController::class, 'download'])->name('api.app.download');
 
 Route::middleware('auth:sanctum')->group(function () {

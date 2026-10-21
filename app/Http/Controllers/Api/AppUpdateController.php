@@ -84,6 +84,88 @@ class AppUpdateController extends Controller
     }
 
     /**
+     * Sube un archivo (APK o app-version.json) por PUT con el cuerpo binario.
+     * Asi no se guarda como texto (que le mete BOM y daña el APK).
+     *
+     * PUT /api/app/upload/{file}
+     * Header: X-Upload-Key
+     */
+    public function upload(Request $request, ?string $file = null)
+    {
+        $claveEsperada = (string) config('services.erp.api_key');
+        $clave = (string) $request->header('X-Upload-Key', '');
+
+        if ($claveEsperada === '' || ! hash_equals($claveEsperada, $clave)) {
+            return response()->json(['success' => false, 'message' => 'No autorizado.'], 401);
+        }
+
+        $fileName = basename((string) $file);
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+        if ($fileName === '' || $fileName === '.' || $fileName === '..') {
+            return response()->json(['success' => false, 'message' => 'Nombre de archivo inválido.'], 422);
+        }
+
+        if (! in_array($ext, ['apk', 'json'], true)) {
+            return response()->json(['success' => false, 'message' => 'Solo se aceptan .apk o .json.'], 422);
+        }
+
+        $destino = public_path('downloads/' . $fileName);
+
+        if (! is_dir(dirname($destino))) {
+            @mkdir(dirname($destino), 0775, true);
+        }
+
+        $in = @fopen('php://input', 'rb');
+        $out = @fopen($destino, 'wb');
+
+        if (! $in || ! $out) {
+            return response()->json(['success' => false, 'message' => 'No se pudo escribir el archivo en el servidor.'], 500);
+        }
+
+        stream_copy_to_stream($in, $out);
+        fclose($in);
+        fclose($out);
+
+        clearstatcache(true, $destino);
+        $size = (int) @filesize($destino);
+
+        // Validar que llegó completo y con el contenido correcto.
+        $handle = @fopen($destino, 'rb');
+        $inicio = $handle ? (string) fread($handle, 2) : '';
+        if ($handle) {
+            fclose($handle);
+        }
+
+        if ($ext === 'apk' && $inicio !== 'PK') {
+            @unlink($destino);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'El APK llegó dañado (no empieza con PK). No se guardó.',
+            ], 422);
+        }
+
+        if ($ext === 'json' && json_decode((string) @file_get_contents($destino), true) === null) {
+            @unlink($destino);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'El JSON llegó dañado. No se guardó.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Archivo {$fileName} guardado correctamente.",
+            'archivo' => $fileName,
+            'bytes' => $size,
+            'sha256' => hash_file('sha256', $destino),
+            'inicio' => bin2hex($inicio),
+        ], 200);
+    }
+
+    /**
      * Carga o genera la información de versión actual.
      */
     private function getVersionInfo(Request $request): array
