@@ -56,7 +56,6 @@ class DocumentoEmpaqueController extends Controller
             ->when(! empty($data['fecha']), fn ($q) => $q->whereDate('fecha_registro', $data['fecha']))
             ->when(! empty($data['sucursal']), fn ($q) => $q->where('sucursal', (int) $data['sucursal']))
             ->where('erp_enviado', true)
-            ->whereNotNull('minutos_trabajados')
             ->orderBy('id')
             ->get();
 

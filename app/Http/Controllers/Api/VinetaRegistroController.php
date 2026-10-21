@@ -1436,7 +1436,7 @@ class VinetaRegistroController extends Controller
         // y se devuelve el motivo en 'erp_ajuste_horas'.
         $ajusteErp = null;
 
-        if ($estabaEnviadoAlErp && ! $porHora && $minutosPrevios !== null) {
+        if ($estabaEnviadoAlErp && ! $porHora) {
             $minutosNuevos = $vinetaRegistro->minutos_trabajados !== null
                 ? (int) $vinetaRegistro->minutos_trabajados
                 : 0;
