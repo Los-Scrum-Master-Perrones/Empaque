@@ -53,6 +53,23 @@ class AppUpdateController extends Controller
 
         foreach ($possiblePaths as $path) {
             if (File::exists($path)) {
+                // El APK tiene que ser un ZIP (empieza con "PK"). Si se subio
+                // como texto (BOM UTF-8) Android lo rechaza con
+                // "Se produjo un error durante el análisis del paquete".
+                $inicio = '';
+                $handle = @fopen($path, 'rb');
+                if ($handle) {
+                    $inicio = (string) fread($handle, 2);
+                    fclose($handle);
+                }
+
+                if ($inicio !== 'PK') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "El APK '{$fileName}' del servidor está dañado (no es un archivo válido). Vuelve a subirlo en modo binario.",
+                    ], 500);
+                }
+
                 return response()->download($path, $fileName, [
                     'Content-Type' => 'application/vnd.android.package-archive',
                     'Cache-Control' => 'no-cache, no-store, must-revalidate',
