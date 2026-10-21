@@ -640,11 +640,6 @@ class VinetaRegistroController extends Controller
             ->get()
             ->keyBy(fn (Empleado $e) => trim((string) $e->codigo));
 
-        // El documento manda sobre el cargo y la actividad: hay viñetas de
-        // anilladoras registradas con una actividad de empaque (ej. "Petaca 4
-        // Puros") y sin eso se iban a la hoja de llenado.
-        $documentosMap = $this->textosDocumentosEmpaque();
-
         foreach ($registros as $registro) {
             $porHora = $registro->esPorHoraOrdinario();
             $estadistico = (int) $registro->total_actividades;
@@ -670,23 +665,16 @@ class VinetaRegistroController extends Controller
                 $registro->actividad_codigo
             );
 
-            // Prensado y Rolado son grupos propios: la actividad manda sobre el cargo del empleado
-            if (in_array($grupoActividad, ['prensado', 'rolado'], true)) {
+            // La ACTIVIDAD manda: cuenta lo que realmente hicieron. El cargo del
+            // empleado queda como respaldo cuando la actividad no dice nada
+            // (ej. "Control por hora"). Asi una anilladora que hizo llenado
+            // suma en LLENADO, no en el total de ANILLADO.
+            if ($grupoActividad !== null) {
                 $grupoArea = $grupoActividad;
+            } elseif (in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)) {
+                $grupoArea = $grupoPuesto;
             } else {
-                $grupoArea = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
-                    ? $grupoPuesto
-                    : ($grupoActividad ?? 'anillado');
-            }
-
-            // Si el documento dice la tarea (ANILLADO / ANILLADORAS, REZAGO,
-            // LIMPIEZA), esa manda: la actividad puede estar como empaque.
-            $grupoDocumento = $this->grupoAreaPorTextoDocumento(
-                $documentosMap[trim((string) $registro->documento_numero)] ?? null
-            );
-
-            if ($grupoDocumento !== null) {
-                $grupoArea = $grupoDocumento;
+                $grupoArea = 'anillado';
             }
 
             // Blindaje: si aparece un grupo sin area propia, va a anillado (nunca null)
@@ -1253,68 +1241,6 @@ class VinetaRegistroController extends Controller
         ];
 
         return $rows;
-    }
-
-    /**
-     * Texto (observaciones + descripcion) de cada documento de empaque,
-     * indexado por numero de documento. Sirve para saber la tarea real del
-     * documento (ANILLADORAS, REZAGADORAS, LIMPIADORAS, ...).
-     *
-     * @return array<string, string>
-     */
-    private function textosDocumentosEmpaque(): array
-    {
-        if (! Schema::hasTable('documento_empaques')) {
-            return [];
-        }
-
-        $mapa = [];
-
-        foreach (\App\Models\DocumentoEmpaque::query()->get(['numero', 'descripcion', 'observaciones']) as $doc) {
-            $numero = trim((string) $doc->numero);
-
-            if ($numero === '') {
-                continue;
-            }
-
-            $texto = trim(($doc->observaciones ?? '').' '.($doc->descripcion ?? ''));
-            $previo = $mapa[$numero] ?? '';
-
-            if (strlen($texto) > strlen($previo)) {
-                $mapa[$numero] = $texto;
-            }
-        }
-
-        return $mapa;
-    }
-
-    /**
-     * Area segun el texto del documento. Solo devuelve 'anillado' cuando el
-     * documento es de anillado/anilladoras/celofanado/etiquetado: hay
-     * anilladoras registradas con una actividad de llenado (ej. "Petaca 4
-     * Puros") y salian en la hoja de llenado.
-     *
-     * Devuelve null en cualquier otro caso, para no cambiar nada de lo que ya
-     * estaba bien (rezago, limpieza, llenado, prensado, rolado).
-     */
-    private function grupoAreaPorTextoDocumento(?string $texto): ?string
-    {
-        $norm = $this->normalizarTextoProceso((string) $texto);
-
-        if ($norm === '') {
-            return null;
-        }
-
-        if (
-            str_contains($norm, 'anill')
-            || str_contains($norm, 'anil')
-            || str_contains($norm, 'celof')
-            || str_contains($norm, 'etiquet')
-        ) {
-            return 'anillado';
-        }
-
-        return null;
     }
 
     private function grupoActividadProceso(?string $nombre, ?string $tipoEmpaque = null, ?string $codigo = null): ?string
