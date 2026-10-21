@@ -1289,9 +1289,13 @@ class VinetaRegistroController extends Controller
     }
 
     /**
-     * Area segun el texto del documento (ANILLADO/ANILLADORAS, REZAGO,
-     * LIMPIEZA). Devuelve null cuando el documento no dice nada de eso y se
-     * debe usar el cargo del empleado / la actividad.
+     * Area segun el texto del documento. Solo devuelve 'anillado' cuando el
+     * documento es de anillado/anilladoras/celofanado/etiquetado: hay
+     * anilladoras registradas con una actividad de llenado (ej. "Petaca 4
+     * Puros") y salian en la hoja de llenado.
+     *
+     * Devuelve null en cualquier otro caso, para no cambiar nada de lo que ya
+     * estaba bien (rezago, limpieza, llenado, prensado, rolado).
      */
     private function grupoAreaPorTextoDocumento(?string $texto): ?string
     {
@@ -1301,7 +1305,6 @@ class VinetaRegistroController extends Controller
             return null;
         }
 
-        // Anillado primero: hay documentos "EMPACADO ... (ANILLADORAS)".
         if (
             str_contains($norm, 'anill')
             || str_contains($norm, 'anil')
@@ -1309,14 +1312,6 @@ class VinetaRegistroController extends Controller
             || str_contains($norm, 'etiquet')
         ) {
             return 'anillado';
-        }
-
-        if (str_contains($norm, 'rezag') || str_contains($norm, 'resag') || str_contains($norm, 'rezad')) {
-            return 'rezago';
-        }
-
-        if (str_contains($norm, 'limpi')) {
-            return 'limpieza';
         }
 
         return null;
