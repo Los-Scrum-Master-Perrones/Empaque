@@ -178,14 +178,7 @@ class ErpApiService
 
         $minutosPorVineta = $registro->minutos_trabajados === null
             ? 0.0
-            : round((int) $registro->minutos_trabajados / 60, 2);
-
-        // El ERP no debe guardar cantidades muy pequeñas (ej. 0.03 h): si hay
-        // tiempo trabajado pero es menor a un cuarto de hora, se manda 0.25 h.
-        // (El minimo es solo para el ERP; la jornada queda normal en el sistema.)
-        if ($minutosPorVineta > 0 && $minutosPorVineta < 0.25) {
-            $minutosPorVineta = 0.25;
-        }
+            : round((int) $registro->minutos_trabajados / 60, 4);
 
         $payload = [
             'dry_run' => $this->dryRun,

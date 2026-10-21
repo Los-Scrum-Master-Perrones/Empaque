@@ -1057,10 +1057,9 @@ class EmpleadoHoraOrdinariaController extends Controller
             return [];
         }
 
-        // Total en cuartos de hora (redondeado al cuarto mas cercano).
-        // Se reparte EXACTAMENTE lo pedido: sin minimo por viñeta.
-        // (El minimo de 0.25 h se aplica solo al enviar al ERP.)
-        $totalQ = (int) round($totalMinutes / 15);
+        // Se reparte EXACTAMENTE lo pedido, en MINUTOS enteros (no en cuartos):
+        // asi ninguna viñeta queda en 0 y el total no sube ni baja.
+        $totalMin = max(0, $totalMinutes);
 
         $puros = $registros
             ->map(fn (VinetaRegistro $r) => max(0, (int) ($r->cantidad_puros ?? 0)))
@@ -1073,15 +1072,15 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         for ($i = 0; $i < $count; $i++) {
             $exact = $totalPuros > 0
-                ? ($puros[$i] / $totalPuros) * $totalQ
-                : $totalQ / $count;
+                ? ($puros[$i] / $totalPuros) * $totalMin
+                : $totalMin / $count;
             $floor = (int) floor($exact);
             $floors[$i] = $floor;
             $rems[$i] = $exact - $floor;
             $asignado += $floor;
         }
 
-        $sobra = $totalQ - $asignado;
+        $sobra = $totalMin - $asignado;
         $orden = range(0, $count - 1);
         usort($orden, function ($a, $b) use ($rems) {
             if ($rems[$a] == $rems[$b]) {
@@ -1098,8 +1097,30 @@ class EmpleadoHoraOrdinariaController extends Controller
             $sobra--;
         }
 
-        // Cuartos -> minutos
-        return array_map(fn ($q) => $q * 15, $floors);
+        // Que ninguna quede en 0: se le quita 1 minuto a la que mas tiene.
+        // (Si no alcanza, el total sube lo minimo; pero nunca se pasa de lo pedido.)
+        foreach ($floors as $i => $q) {
+            if ($q > 0) {
+                continue;
+            }
+
+            $maxIdx = -1;
+            $maxQ = 1;
+
+            foreach ($floors as $j => $v) {
+                if ($v > $maxQ) {
+                    $maxQ = $v;
+                    $maxIdx = $j;
+                }
+            }
+
+            if ($maxIdx >= 0) {
+                $floors[$maxIdx]--;
+                $floors[$i] = 1;
+            }
+        }
+
+        return $floors;
     }
 
     /** @return Collection<int, VinetaRegistro> */
