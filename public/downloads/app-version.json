@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.7",
-    "version_code": 60,
-    "release_notes": "• Jornada: se reparte en MINUTOS exactos (no en cuartos). Ninguna viñeta queda en 0 y el total es exactamente el que se ingresa (ej. 9.5 h = 9.5 h).\n• Al enviar al ERP se manda la hora exacta de cada viñeta (sin inflar a 0.25).",
-    "apk_filename": "app-empaque-2.1.7-60-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.7-60-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.1.7-60-universal.apk",
+    "version_name": "2.1.9",
+    "version_code": 62,
+    "release_notes": "• Editar viñeta: al guardar avisa qué pasó con el ERP: \"Registrado en el ERP\", \"Horas/puros actualizados en el ERP\", \"El ERP ya estaba igual\" o \"Solo en el sistema (sin documento / no enviado)\".\n• Editar: el documento actual del registro siempre aparece en la lista, aunque no venga en los documentos de la fecha.",
+    "apk_filename": "app-empaque-2.1.9-62-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.9-62-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.1.9-62-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-21 11:00:00"
+    "published_at": "2026-10-21 13:00:00"
 }
