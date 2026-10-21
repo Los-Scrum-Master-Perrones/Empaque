@@ -860,6 +860,8 @@ class EmpleadoHoraOrdinariaController extends Controller
             (int) $r->actividad_codigo,
             trim((string) $r->orden_del_sistema),
             trim((string) $r->empleado_codigo),
+            trim((string) $r->producto_item),
+            trim((string) $r->producto_codigo),
         ]));
 
         foreach ($grupos as $items) {
@@ -872,7 +874,10 @@ class EmpleadoHoraOrdinariaController extends Controller
 
             $estado = 'error';
             if (! empty($resultado['success'])) {
-                if (! empty($resultado['cambiado'])) {
+                if (! empty($resultado['insertado'])) {
+                    $estado = 'creado';
+                    $aplicados++;
+                } elseif (! empty($resultado['cambiado'])) {
                     $estado = 'aplicado';
                     $aplicados++;
                 } else {

@@ -247,6 +247,7 @@ class ErpApiService
             'codigo_actividad' => (int) $registro->actividad_codigo,
             'numero_de_orden' => (string) $registro->orden_del_sistema,
             'empleado_codigo' => (string) $registro->empleado_codigo,
+            'empleado_nombre' => (string) ($registro->empleado_nombre ?? ''),
             'horas' => round($horas, 2),
             'motivo' => 'Aplicar ajuste de horas desde app_empaque',
             'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
