@@ -178,7 +178,7 @@ class ErpApiService
 
         $minutosPorVineta = $registro->minutos_trabajados === null
             ? 0.0
-            : round((int) $registro->minutos_trabajados / 60, 4);
+            : round((int) $registro->minutos_trabajados / 60, 2);
 
         $payload = [
             'dry_run' => $this->dryRun,
@@ -243,8 +243,8 @@ class ErpApiService
             'empleado_nombre' => (string) ($registro->empleado_nombre ?? ''),
             'horas' => round($horas, 2),
             'motivo' => 'Aplicar ajuste de horas desde app_empaque',
-            'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
-            'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
+            'item' => (string) ($registro->producto_item ?: ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : '')),
+            'codigo_producto' => (string) ($registro->producto_codigo ?: ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : '')),
             'orden_del_cliente' => (string) ($registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : ($registro->orden ?? '')),
         ];
 
