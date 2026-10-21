@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.10",
-    "version_code": 63,
-    "release_notes": " Horas ordinarias: al seleccionar un documento aparece el boton \"Pasar a AL DIA (por hora)\", que pone todas sus viñetas en por hora, cambia el ERP a \"Pago por hora trabajada\" y deja las horas del ERP en 0.\n Horas ordinarias: al agregar horas ordinarias se sincronizan solas con el ERP (se fijan por empleado y documento, repartidas entre sus filas).",
-    "apk_filename": "app-empaque-2.1.10-63-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.10-63-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.1.10-63-universal.apk",
+    "version_name": "2.1.11",
+    "version_code": 64,
+    "release_notes": " Horas ordinarias: al seleccionar un documento aparece el boton \"Pasar a AL DIA (por hora)\", que pone todas sus viñetas en por hora, cambia el ERP a \"Pago por hora trabajada\" y deja las horas del ERP en 0 (no toca el precio de mano de obra).\n Horas ordinarias: al agregar horas ordinarias se sincronizan solas con el ERP (se fijan por empleado y documento, repartidas entre sus filas).\n Actualizacion: si el APK del servidor esta dañado, la app avisa en vez de fallar al instalar.",
+    "apk_filename": "app-empaque-2.1.11-64-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.11-64-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.1.11-64-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-21 18:30:00"
+    "published_at": "2026-10-21 19:15:00"
 }
