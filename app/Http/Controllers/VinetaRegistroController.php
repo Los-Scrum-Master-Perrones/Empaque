@@ -640,6 +640,11 @@ class VinetaRegistroController extends Controller
             ->get()
             ->keyBy(fn (Empleado $e) => trim((string) $e->codigo));
 
+        // El documento manda sobre el cargo y la actividad: hay viñetas de
+        // anilladoras registradas con una actividad de empaque (ej. "Petaca 4
+        // Puros") y sin eso se iban a la hoja de llenado.
+        $documentosMap = $this->textosDocumentosEmpaque();
+
         foreach ($registros as $registro) {
             $porHora = $registro->esPorHoraOrdinario();
             $estadistico = (int) $registro->total_actividades;
@@ -672,6 +677,16 @@ class VinetaRegistroController extends Controller
                 $grupoArea = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
                     ? $grupoPuesto
                     : ($grupoActividad ?? 'anillado');
+            }
+
+            // Si el documento dice la tarea (ANILLADO / ANILLADORAS, REZAGO,
+            // LIMPIEZA), esa manda: la actividad puede estar como empaque.
+            $grupoDocumento = $this->grupoAreaPorTextoDocumento(
+                $documentosMap[trim((string) $registro->documento_numero)] ?? null
+            );
+
+            if ($grupoDocumento !== null) {
+                $grupoArea = $grupoDocumento;
             }
 
             // Blindaje: si aparece un grupo sin area propia, va a anillado (nunca null)
@@ -1238,6 +1253,73 @@ class VinetaRegistroController extends Controller
         ];
 
         return $rows;
+    }
+
+    /**
+     * Texto (observaciones + descripcion) de cada documento de empaque,
+     * indexado por numero de documento. Sirve para saber la tarea real del
+     * documento (ANILLADORAS, REZAGADORAS, LIMPIADORAS, ...).
+     *
+     * @return array<string, string>
+     */
+    private function textosDocumentosEmpaque(): array
+    {
+        if (! Schema::hasTable('documento_empaques')) {
+            return [];
+        }
+
+        $mapa = [];
+
+        foreach (\App\Models\DocumentoEmpaque::query()->get(['numero', 'descripcion', 'observaciones']) as $doc) {
+            $numero = trim((string) $doc->numero);
+
+            if ($numero === '') {
+                continue;
+            }
+
+            $texto = trim(($doc->observaciones ?? '').' '.($doc->descripcion ?? ''));
+            $previo = $mapa[$numero] ?? '';
+
+            if (strlen($texto) > strlen($previo)) {
+                $mapa[$numero] = $texto;
+            }
+        }
+
+        return $mapa;
+    }
+
+    /**
+     * Area segun el texto del documento (ANILLADO/ANILLADORAS, REZAGO,
+     * LIMPIEZA). Devuelve null cuando el documento no dice nada de eso y se
+     * debe usar el cargo del empleado / la actividad.
+     */
+    private function grupoAreaPorTextoDocumento(?string $texto): ?string
+    {
+        $norm = $this->normalizarTextoProceso((string) $texto);
+
+        if ($norm === '') {
+            return null;
+        }
+
+        // Anillado primero: hay documentos "EMPACADO ... (ANILLADORAS)".
+        if (
+            str_contains($norm, 'anill')
+            || str_contains($norm, 'anil')
+            || str_contains($norm, 'celof')
+            || str_contains($norm, 'etiquet')
+        ) {
+            return 'anillado';
+        }
+
+        if (str_contains($norm, 'rezag') || str_contains($norm, 'resag') || str_contains($norm, 'rezad')) {
+            return 'rezago';
+        }
+
+        if (str_contains($norm, 'limpi')) {
+            return 'limpieza';
+        }
+
+        return null;
     }
 
     private function grupoActividadProceso(?string $nombre, ?string $tipoEmpaque = null, ?string $codigo = null): ?string
