@@ -837,13 +837,13 @@ class EmpleadoHoraOrdinariaController extends Controller
         }
 
         $conDocumento = $registros->filter(fn (VinetaRegistro $r) => trim((string) $r->documento_numero) !== '');
-        $enviados = $conDocumento->filter(fn (VinetaRegistro $r) => (bool) $r->erp_enviado);
+        $enviados = $conDocumento;
 
         if ($enviados->isEmpty()) {
             return response()->json([
                 'message' => $conDocumento->isEmpty()
                     ? 'No hay registros con documento para aplicar al ERP.'
-                    : 'Ninguno de esos registros se ha enviado al ERP todavía.',
+                    : 'No hay registros para aplicar al ERP.',
                 'total' => 0,
                 'aplicados' => 0,
                 'ya_iguales' => 0,
