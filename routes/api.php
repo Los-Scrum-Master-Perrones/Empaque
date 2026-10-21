@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\Api\ActividadController as ApiActividadController;
 use App\Http\Controllers\Api\AppUpdateController;
