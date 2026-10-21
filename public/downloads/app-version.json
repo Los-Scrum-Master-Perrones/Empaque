@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.4",
-    "version_code": 57,
-    "release_notes": "• Editar viñeta: el documento se elige en una lista (parte inferior) con el texto completo de la observación y la descripción, y el color por categoría. Ya no se corta el texto.",
-    "apk_filename": "app-empaque-2.1.4-57-arm64-v8a.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.4-57-armeabi-v7a.apk",
-    "apk_filename_universal": "app-empaque-2.1.4-57-universal.apk",
+    "version_name": "2.1.5",
+    "version_code": 58,
+    "release_notes": "• Viñetas del empleado: nuevo botón \"Aplicar esta marca al ERP\" dentro de cada marca. Ajusta solo esa marca (igualar horas y puros), sin tocar las demás.",
+    "apk_filename": "app-empaque-2.1.5-58-arm64-v8a.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.5-58-armeabi-v7a.apk",
+    "apk_filename_universal": "app-empaque-2.1.5-58-universal.apk",
     "force_update": false,
-    "published_at": "2026-10-21 08:00:00"
+    "published_at": "2026-10-21 09:00:00"
 }

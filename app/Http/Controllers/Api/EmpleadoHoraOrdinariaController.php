@@ -807,16 +807,24 @@ class EmpleadoHoraOrdinariaController extends Controller
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
             'grupo' => ['nullable', 'string', 'max:50'],
+            'marca' => ['nullable', 'string', 'max:120'],
             'sucursal' => ['nullable', 'integer'],
             'dry_run' => ['nullable', 'boolean'],
         ]);
 
         $fecha = $data['fecha'];
         $grupo = $data['grupo'] ?? null;
+        $marcaFiltro = trim((string) ($data['marca'] ?? ''));
         $sucursal = ! empty($data['sucursal']) ? (int) $data['sucursal'] : null;
         $dryRun = (bool) ($data['dry_run'] ?? false);
 
         $registros = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
+
+        if ($marcaFiltro !== '') {
+            $registros = $registros
+                ->filter(fn (VinetaRegistro $r) => strcasecmp(trim((string) $r->marca), $marcaFiltro) === 0)
+                ->values();
+        }
 
         if ($grupo === 'sin_documento') {
             $registros = $registros->filter(fn ($r) => empty($r->documento_numero));
@@ -922,6 +930,29 @@ class EmpleadoHoraOrdinariaController extends Controller
             'errores' => $errores,
             'detalle' => $detalle,
         ], 200);
+    }
+
+    /**
+     * Igual que aplicarHorasErp pero buscando al empleado por codigo.
+     * Lo usa la app desde "Viñetas del empleado" (aplicar por marca).
+     *
+     * POST /api/empleados/aplicar-erp
+     */
+    public function aplicarHorasErpPorCodigo(Request $request): JsonResponse
+    {
+        $codigo = trim((string) $request->input('empleado_codigo', ''));
+
+        if ($codigo === '') {
+            return response()->json(['message' => 'Falta el código del empleado.'], 422);
+        }
+
+        $empleado = Empleado::query()->where('codigo', $codigo)->first();
+
+        if (! $empleado) {
+            return response()->json(['message' => 'No se encontró el empleado '.$codigo.'.'], 404);
+        }
+
+        return $this->aplicarHorasErp($request, $empleado);
     }
 
     public function storeGlobal(Request $request): JsonResponse
