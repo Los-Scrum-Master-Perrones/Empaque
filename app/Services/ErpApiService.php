@@ -277,6 +277,97 @@ class ErpApiService
     }
 
     /**
+     * Cambia la forma de pago del documento completo en el ERP
+     * (1 = por hora / AL DIA, 2 = por unidades / A TAREA) y, si se pide,
+     * deja las horas de todas sus filas en 0.
+     */
+    public function cambiarFormaPagoDocumento(string $documento, ?int $sucursal = null, int $formaPago = 1, bool $horasCero = true, ?bool $dryRun = null): array
+    {
+        $doc = trim($documento);
+
+        if ($doc === '') {
+            return ['success' => false, 'message' => 'El documento está vacío.'];
+        }
+
+        $payload = [
+            'dry_run' => $dryRun ?? $this->dryRun,
+            'sucursal' => (int) ($sucursal ?? $this->defaultSucursal),
+            'documento' => $doc,
+            'forma_pago' => $formaPago,
+            'horas_cero' => $horasCero,
+        ];
+
+        try {
+            $response = Http::timeout(30)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/documento-empaque-forma-pago", $payload);
+
+            $data = $response->json();
+
+            if (! is_array($data)) {
+                return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
+            }
+
+            return $data;
+        } catch (\Throwable $e) {
+            Log::error('ERP documento-empaque-forma-pago exception: '.$e->getMessage());
+
+            return ['success' => false, 'message' => 'Error al comunicar con ERP: '.$e->getMessage()];
+        }
+    }
+
+    /**
+     * Fija en el ERP las horas de UN empleado dentro de un documento,
+     * repartidas entre sus filas. Lo usa la sincronizacion de horas ordinarias.
+     */
+    public function fijarHorasEmpleadoDocumento(string $empleadoCodigo, string $documento, float $horas, ?int $sucursal = null, ?bool $dryRun = null): array
+    {
+        $doc = trim($documento);
+        $emp = trim($empleadoCodigo);
+
+        if ($doc === '' || $emp === '') {
+            return ['success' => false, 'message' => 'Falta el documento o el empleado.'];
+        }
+
+        $payload = [
+            'dry_run' => $dryRun ?? $this->dryRun,
+            'sucursal' => (int) ($sucursal ?? $this->defaultSucursal),
+            'documento' => $doc,
+            'empleado_codigo' => $emp,
+            'horas' => round($horas, 2),
+            'motivo' => 'Horas ordinarias desde app_empaque',
+        ];
+
+        try {
+            $response = Http::timeout(20)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/fijar-horas-empleado-documento", $payload);
+
+            $data = $response->json();
+
+            if (! is_array($data)) {
+                return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
+            }
+
+            return $data;
+        } catch (\Throwable $e) {
+            Log::error('ERP fijar-horas-empleado-documento exception: '.$e->getMessage());
+
+            return ['success' => false, 'message' => 'Error al comunicar con ERP: '.$e->getMessage()];
+        }
+    }
+
+    /**
      * Mueve los puros/horas de UNA viñeta de una actividad a otra en el ERP.
      * Solo esa viñeta (por diferencia); no toca otras filas.
      */

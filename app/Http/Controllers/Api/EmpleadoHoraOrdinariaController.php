@@ -538,9 +538,19 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         $hora = EmpleadoHoraOrdinaria::create($payload);
 
+        $erp = $request->boolean('sincronizar_erp', true)
+            ? $this->sincronizarHorasOrdinarias(
+                $empleado,
+                $data['fecha'],
+                $documentoNumero ? (string) $documentoNumero : null,
+                $sucursal
+            )
+            : null;
+
         return response()->json([
             'message' => 'Hora ordinaria agregada correctamente.',
             'hora_ordinaria' => $this->horaPayload($hora),
+            'erp' => $erp,
         ], 201);
     }
 
@@ -558,9 +568,23 @@ class EmpleadoHoraOrdinariaController extends Controller
             'observacion' => $data['observacion'],
         ]);
 
+        $documento = Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero')
+            ? $horaOrdinaria->documento_numero
+            : null;
+
+        $erp = $request->boolean('sincronizar_erp', true)
+            ? $this->sincronizarHorasOrdinarias(
+                $empleado,
+                $data['fecha'],
+                $documento ? (string) $documento : null,
+                $horaOrdinaria->sucursal ? (int) $horaOrdinaria->sucursal : null
+            )
+            : null;
+
         return response()->json([
             'message' => 'Hora ordinaria actualizada correctamente.',
             'hora_ordinaria' => $this->horaPayload($horaOrdinaria->refresh()),
+            'erp' => $erp,
         ]);
     }
 
@@ -1028,14 +1052,97 @@ class EmpleadoHoraOrdinariaController extends Controller
             }
         });
 
+        $erp = [];
+
+        if ($request->boolean('sincronizar_erp', true)) {
+            foreach ($empleados as $empleado) {
+                $resultado = $this->sincronizarHorasOrdinarias(
+                    $empleado,
+                    $data['fecha'],
+                    $docNumeroParaGuardar,
+                    $sucursal
+                );
+
+                if ($resultado !== null) {
+                    $erp[] = $resultado;
+                }
+            }
+        }
+
         return response()->json([
             'message' => "Hora ordinaria agregada a {$creados} empleado(s) correctamente.",
             'empleados_actualizados' => $creados,
             'minutos' => $data['minutos_total'],
             'tiempo_texto' => VinetaRegistro::minutosATiempoTexto($data['minutos_total']),
+            'erp' => $erp,
         ], 201);
     }
 
+
+    /**
+     * Empuja al ERP las horas ordinarias del empleado para un documento.
+     *
+     * El ERP queda con el TOTAL de horas ordinarias del empleado en ese
+     * documento (se fija, no se suma), repartido entre sus filas. Solo aplica
+     * cuando el documento esta en modo "por hora" (AL DIA): en los documentos
+     * por tarea las horas van en cada vineta.
+     *
+     * Devuelve null cuando no hay nada que sincronizar.
+     */
+    private function sincronizarHorasOrdinarias(
+        Empleado $empleado,
+        string $fecha,
+        ?string $documento,
+        ?int $sucursal = null,
+        bool $dryRun = false
+    ): ?array {
+        $documento = trim((string) $documento);
+
+        if ($documento === '' || ! Schema::hasTable('empleado_horas_ordinarias')) {
+            return null;
+        }
+
+        $query = EmpleadoHoraOrdinaria::query()
+            ->where('empleado_codigo', $empleado->codigo)
+            ->whereDate('fecha', $fecha);
+
+        if (Schema::hasColumn('empleado_horas_ordinarias', 'documento_numero')) {
+            $query->where(function ($sub) use ($documento) {
+                $sub->where('documento_numero', $documento)->orWhereNull('documento_numero');
+            });
+        }
+
+        $minutos = (int) $query->sum('minutos');
+
+        $registros = VinetaRegistro::query()
+            ->where('empleado_codigo', $empleado->codigo)
+            ->where('documento_numero', $documento)
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+            ->get();
+
+        if ($registros->isEmpty()
+            || ! $registros->contains(fn (VinetaRegistro $r) => $r->esPorHoraOrdinario())) {
+            return null;
+        }
+
+        $horas = round($minutos / 60, 2);
+
+        $resultado = app(\App\Services\ErpApiService::class)->fijarHorasEmpleadoDocumento(
+            (string) $empleado->codigo,
+            $documento,
+            $horas,
+            $sucursal,
+            $dryRun
+        );
+
+        return array_merge($resultado, [
+            'documento' => $documento,
+            'empleado' => $empleado->codigo,
+            'minutos' => $minutos,
+            'horas' => $horas,
+        ]);
+    }
 
     /**
      * Reparte $totalMinutes entre los registros proporcionalmente a sus puros.

@@ -9,6 +9,7 @@ use App\Services\ErpApiService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class DocumentoEmpaqueController extends Controller
@@ -137,6 +138,104 @@ class DocumentoEmpaqueController extends Controller
             'rechazados' => $rechazados,
             'errores' => $errores,
             'detalle' => $detalle,
+        ], 200);
+    }
+
+    /**
+     * Cambia el modo de pago de un documento completo: por hora (AL DIA) o
+     * por tarea (por unidades).
+     *
+     * - En el sistema: todas las viñetas del documento quedan en ese modo.
+     *   Si es por hora, se les quitan los minutos y el precio de mano de obra.
+     * - En el ERP: se cambia la forma de pago del documento y se dejan las
+     *   horas de todas sus filas en 0 (para luego ir sumando las ordinarias).
+     *
+     * POST /api/documentos-empaques/{documento}/modo-pago
+     * Body: { modo: por_hora|por_tarea, fecha?, sucursal?, dry_run? }
+     */
+    public function cambiarModoPago(Request $request, string $documento): JsonResponse
+    {
+        $data = $request->validate([
+            'modo' => ['required', 'string', 'in:por_hora,por_tarea'],
+            'fecha' => ['nullable', 'date_format:Y-m-d'],
+            'sucursal' => ['nullable', 'integer'],
+            'dry_run' => ['nullable', 'boolean'],
+        ]);
+
+        $documento = trim($documento);
+        if ($documento === '') {
+            return response()->json(['message' => 'Documento inválido.'], 422);
+        }
+
+        $modo = $data['modo'];
+        $porHora = $modo === 'por_hora';
+        $dryRun = (bool) ($data['dry_run'] ?? false);
+        $sucursal = ! empty($data['sucursal']) ? (int) $data['sucursal'] : null;
+
+        $registros = VinetaRegistro::query()
+            ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+            ->where('documento_numero', $documento)
+            ->when(! empty($data['fecha']), fn ($q) => $q->whereDate('fecha_registro', $data['fecha']))
+            ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+            ->orderBy('id')
+            ->get();
+
+        if ($registros->isEmpty()) {
+            return response()->json([
+                'message' => 'El documento no tiene viñetas activas en el sistema.',
+                'documento' => $documento,
+                'modo' => $modo,
+                'registros' => 0,
+                'actualizados' => 0,
+            ], 200);
+        }
+
+        $actualizados = 0;
+
+        if (! $dryRun) {
+            DB::transaction(function () use ($registros, $porHora, &$actualizados) {
+                foreach ($registros as $registro) {
+                    $payload = is_array($registro->raw_payload) ? $registro->raw_payload : [];
+                    $payload['modo_registro'] = $porHora ? 'por_hora' : 'por_tarea';
+
+                    $cambios = ['raw_payload' => $payload];
+
+                    if ($porHora) {
+                        $cambios['minutos_trabajados'] = null;
+                        $cambios['precio_mo'] = 0;
+                    }
+
+                    $registro->update($cambios);
+                    $actualizados++;
+                }
+            });
+
+            DocumentoEmpaque::query()
+                ->where('numero', $documento)
+                ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+                ->update(['forma_pago' => $porHora ? 1 : 2]);
+        }
+
+        $resultadoErp = $this->erpService->cambiarFormaPagoDocumento(
+            $documento,
+            $sucursal,
+            $porHora ? 1 : 2,
+            true,
+            $dryRun
+        );
+
+        $mensajeErp = $resultadoErp['message'] ?? ($resultadoErp['error'] ?? 'Sin respuesta del ERP.');
+
+        return response()->json([
+            'message' => $dryRun
+                ? 'Simulación: no se cambió nada.'
+                : "Documento en modo " . ($porHora ? 'por hora (AL DIA)' : 'por tarea') . ": {$actualizados} viñetas actualizadas. ERP: {$mensajeErp}",
+            'documento' => $documento,
+            'modo' => $modo,
+            'dry_run' => $dryRun,
+            'registros' => $registros->count(),
+            'actualizados' => $actualizados,
+            'erp' => $resultadoErp,
         ], 200);
     }
 

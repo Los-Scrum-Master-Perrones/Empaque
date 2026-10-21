@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\Api\ActividadController as ApiActividadController;
 use App\Http\Controllers\Api\AppUpdateController;
@@ -32,6 +32,7 @@ Route::get('/reporte-orden', [ApiReporteOrdenController::class, 'index'])
 Route::get('/documentos-empaques', [DocumentoEmpaqueController::class, 'index'])
     ->name('api.documentos-empaques');
 Route::post('/documentos-empaques/{documento}/aplicar-horas-erp', [DocumentoEmpaqueController::class, 'aplicarHorasErp']);
+Route::post('/documentos-empaques/{documento}/modo-pago', [DocumentoEmpaqueController::class, 'cambiarModoPago']);
 Route::post('/registrar-vineta-erp', [DocumentoEmpaqueController::class, 'registrarVinetaErp'])
     ->name('api.registrar-vineta-erp');
 
