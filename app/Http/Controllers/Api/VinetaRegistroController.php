@@ -1424,8 +1424,10 @@ class VinetaRegistroController extends Controller
                 $vinetaRegistro->update($camposDocumento);
             }
 
-            // Si nunca se envió, ahora que tiene documento se registra en el ERP.
-            if (! $vinetaRegistro->erp_enviado) {
+            // Solo se registra en el ERP si el documento se ASIGNA en esta edicion
+            // (antes no tenia). Si ya traia documento, no se vuelve a registrar:
+            // ya existe en el ERP y solo se ajustan horas/puros.
+            if ($documentoPrevio === '' && ! $vinetaRegistro->erp_enviado) {
                 $erpRegistro = app(\App\Services\ErpApiService::class)
                     ->enviarRegistroVineta($vinetaRegistro->refresh(), $documentoAsignado, $vinetaRegistro->sucursal);
             }
