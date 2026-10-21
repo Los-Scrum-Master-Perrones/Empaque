@@ -202,7 +202,6 @@ class DocumentoEmpaqueController extends Controller
 
                     if ($porHora) {
                         $cambios['minutos_trabajados'] = null;
-                        $cambios['precio_mo'] = 0;
                     }
 
                     $registro->update($cambios);
