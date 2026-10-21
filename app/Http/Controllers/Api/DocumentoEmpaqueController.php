@@ -146,9 +146,13 @@ class DocumentoEmpaqueController extends Controller
      * por tarea (por unidades).
      *
      * - En el sistema: todas las viñetas del documento quedan en ese modo.
-     *   Si es por hora, se les quitan los minutos y el precio de mano de obra.
+     *   Si es por hora, se les quitan los minutos (el precio de mano de obra
+     *   se deja como esta, el de la actividad).
      * - En el ERP: se cambia la forma de pago del documento y se dejan las
      *   horas de todas sus filas en 0 (para luego ir sumando las ordinarias).
+     *
+     * Solo toca ESE documento (sucursal + numero): no mueve otras viñetas,
+     * otros documentos ni otros empleados.
      *
      * POST /api/documentos-empaques/{documento}/modo-pago
      * Body: { modo: por_hora|por_tarea, fecha?, sucursal?, dry_run? }
@@ -170,13 +174,16 @@ class DocumentoEmpaqueController extends Controller
         $modo = $data['modo'];
         $porHora = $modo === 'por_hora';
         $dryRun = (bool) ($data['dry_run'] ?? false);
-        $sucursal = ! empty($data['sucursal']) ? (int) $data['sucursal'] : null;
+        // Siempre con sucursal: el numero de documento se repite entre sucursales.
+        $sucursal = ! empty($data['sucursal'])
+            ? (int) $data['sucursal']
+            : (int) config('services.erp.default_sucursal', 2);
 
         $registros = VinetaRegistro::query()
             ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
             ->where('documento_numero', $documento)
             ->when(! empty($data['fecha']), fn ($q) => $q->whereDate('fecha_registro', $data['fecha']))
-            ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+            ->where('sucursal', $sucursal)
             ->orderBy('id')
             ->get();
 
@@ -211,7 +218,7 @@ class DocumentoEmpaqueController extends Controller
 
             DocumentoEmpaque::query()
                 ->where('numero', $documento)
-                ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+                ->where('sucursal', $sucursal)
                 ->update(['forma_pago' => $porHora ? 1 : 2]);
         }
 
