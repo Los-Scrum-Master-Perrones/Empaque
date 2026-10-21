@@ -33,6 +33,10 @@ class RouteServiceProvider extends ServiceProvider
 
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
+
+            // Rutas propias de empaque (documento: modo de pago de las viñetas).
+            Route::middleware('web')
+                ->group(base_path('routes/empaque-documento.php'));
         });
     }
 

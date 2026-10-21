@@ -245,6 +245,52 @@ class VinetaRegistroController extends Controller
         return back()->with('success', 'Registro eliminado correctamente.');
     }
 
+    /**
+     * Cambia el modo de pago de TODAS las viñetas de un documento
+     * (por tarea / por hora) y deja las horas del ERP en 0.
+     *
+     * POST /vinetas-registradas/documento/{documento}/modo-pago
+     */
+    public function cambiarModoPagoDocumento(Request $request, string $documento)
+    {
+        $data = $request->validate([
+            'modo' => ['required', 'in:por_tarea,por_hora'],
+            'fecha' => ['nullable', 'date_format:Y-m-d'],
+            'sucursal' => ['nullable', 'integer'],
+        ]);
+
+        $documento = trim($documento);
+
+        if ($documento === '' || $documento === 'sin_documento') {
+            return back()->with('error', 'Selecciona un documento válido.');
+        }
+
+        $apiRequest = Request::create(
+            '/api/documentos-empaques/'.$documento.'/modo-pago',
+            'POST',
+            [
+                'modo' => $data['modo'],
+                'fecha' => $data['fecha'] ?? null,
+                'sucursal' => $data['sucursal'] ?? config('services.erp.default_sucursal', 2),
+                'dry_run' => false,
+            ]
+        );
+        $apiRequest->headers->set('Accept', 'application/json');
+
+        $respuesta = app(\App\Http\Controllers\Api\DocumentoEmpaqueController::class)
+            ->cambiarModoPago($apiRequest, $documento);
+
+        $cuerpo = json_decode($respuesta->getContent(), true) ?: [];
+        $erpOk = (bool) ($cuerpo['erp']['success'] ?? false);
+        $mensaje = (string) ($cuerpo['message'] ?? 'No se pudo cambiar el modo del documento.');
+
+        if ($respuesta->getStatusCode() >= 400 || ! $erpOk) {
+            return back()->with('error', $mensaje);
+        }
+
+        return back()->with('success', $mensaje);
+    }
+
     public function storeHoraOrdinaria(Request $request)
     {
         if (! Schema::hasTable('empleado_horas_ordinarias')) {

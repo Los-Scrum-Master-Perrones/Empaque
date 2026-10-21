@@ -180,7 +180,30 @@
                                             class="gooey-action theme-button-secondary inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-white text-[#4f46e5] text-xs sm:text-sm font-semibold border theme-border hover:bg-[#eef2ff] transition whitespace-nowrap">
                                         Reporte por orden
                                     </button>
+
+                                    <button type="button"
+                                            id="modoPagoTarea"
+                                            title="Pone todas las viñetas del documento en por tarea y deja las horas del ERP en 0"
+                                            class="hidden gooey-action inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-[#7c2d12] text-white text-xs sm:text-sm font-semibold hover:bg-[#9a3412] transition whitespace-nowrap">
+                                        Pasar a A TAREA (horas 0)
+                                    </button>
+
+                                    <button type="button"
+                                            id="modoPagoHora"
+                                            title="Pone todas las viñetas del documento en por hora (AL DIA) y deja las horas del ERP en 0"
+                                            class="hidden gooey-action inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-[#0e7490] text-white text-xs sm:text-sm font-semibold hover:bg-[#155e75] transition whitespace-nowrap">
+                                        Pasar a AL DIA (horas 0)
+                                    </button>
                                 </div>
+                            </form>
+
+                            <form method="POST" action="#" id="formModoPagoDoc"
+                                  data-base="{{ url('/vinetas-registradas/documento') }}"
+                                  class="hidden">
+                                @csrf
+                                <input type="hidden" name="modo" value="">
+                                <input type="hidden" name="fecha" value="">
+                                <input type="hidden" name="sucursal" value="{{ config('services.erp.default_sucursal', 2) }}">
                             </form>
                         </div>
 
@@ -1174,6 +1197,53 @@
 
             fechaDesdeInput?.addEventListener('change', actualizarDocumentosPorFecha);
             fechaHastaInput?.addEventListener('change', actualizarDocumentosPorFecha);
+
+            // Botones "Pasar a A TAREA / AL DIA (horas 0)" del documento elegido.
+            const formModo = document.getElementById('formModoPagoDoc');
+            const btnModoTarea = document.getElementById('modoPagoTarea');
+            const btnModoHora = document.getElementById('modoPagoHora');
+
+            const documentoModo = () => (documentoSelect?.value || '').trim();
+            const hayDocumentoModo = () => {
+                const valor = documentoModo();
+                return valor !== '' && valor !== 'sin_documento';
+            };
+            const refrescarBotonesModo = () => {
+                const visible = hayDocumentoModo();
+                btnModoTarea?.classList.toggle('hidden', !visible);
+                btnModoHora?.classList.toggle('hidden', !visible);
+            };
+
+            documentoSelect?.addEventListener('change', refrescarBotonesModo);
+            refrescarBotonesModo();
+
+            const enviarModoPago = (modo) => {
+                if (!formModo) return;
+
+                if (!hayDocumentoModo()) {
+                    alert('Selecciona un documento primero.');
+                    return;
+                }
+
+                const documento = documentoModo();
+                const texto = modo === 'por_tarea' ? 'A TAREA (por unidades)' : 'AL DIA (por hora)';
+
+                if (!confirm(`Se pondran TODAS las viñetas del documento ${documento} en ${texto} y el ERP quedara con las horas en 0.\n\nContinuar?`)) {
+                    return;
+                }
+
+                const inputModo = formModo.querySelector('input[name="modo"]');
+                const inputFecha = formModo.querySelector('input[name="fecha"]');
+
+                if (inputModo) inputModo.value = modo;
+                if (inputFecha) inputFecha.value = fechaDesdeInput?.value || '';
+
+                formModo.action = `${formModo.dataset.base}/${documento}/modo-pago`;
+                formModo.submit();
+            };
+
+            btnModoTarea?.addEventListener('click', () => enviarModoPago('por_tarea'));
+            btnModoHora?.addEventListener('click', () => enviarModoPago('por_hora'));
 
             window.addEventListener('popstate', () => loadTable(window.location.href));
             initTableFeatures();
