@@ -3345,7 +3345,7 @@ class VinetaRegistroController extends Controller
 
         if ($otros !== []) {
             $bloque = reset($otros);
-            $relleno = [''];
+            $relleno = ['', ''];
 
             foreach ($bloque as $i => $fila) {
                 $fila = array_values($fila);
@@ -3359,6 +3359,7 @@ class VinetaRegistroController extends Controller
         }
 
         if ($hora !== null) {
+            $resultado[] = [];
             $resultado[] = [];
 
             foreach ($hora as $fila) {
@@ -3469,41 +3470,22 @@ class VinetaRegistroController extends Controller
                     }
                 }
 
-                if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
-                    if ($rowIndex === 0) {
-                        // solo la celda A1 lleva el color del titulo
-                        $styleId = $columnIndex === 0 ? ($this->xlsxHeaderStyle($format) ?? 11) : null;
-                    } elseif ($rowIndex === 2) {
-                        // encabezado de columnas: todas pintadas
-                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
-                    } elseif ($rowIndex >= 3) {
-                        $val = (string) ($row[0] ?? '');
+                if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado', 'anillado_summary'], true)) {
+                    $primera = trim((string) ($row[0] ?? ''));
 
-                        if (str_starts_with($val, '      ')) {
-                            // fila de actividad (indentada, sin negrita)
-                            $styleId = $columnIndex === 0 ? 13 : 14;
-                        } else {
-                            // fila de empleado o total (negrita con borde)
-                            $styleId = $columnIndex === 0 ? 15 : 16;
-                        }
+                    if ($primera === '') {
+                        $styleId = null;
+                    } elseif (str_starts_with($primera, 'REPORTE') || $primera === 'Etiquetas de fila') {
+                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
+                    } elseif ($primera === 'Total general') {
+                        $styleId = $columnIndex === 0 ? 15 : 16;
+                    } elseif (ctype_digit($primera)) {
+                        $styleId = $columnIndex === 0 ? 13 : 14;
+                    } else {
+                        $styleId = $columnIndex === 0 ? 13 : 14;
                     }
                 }
 
-                if ($format === 'anillado_summary') {
-                    if ($rowIndex === 0) {
-                        // solo la celda A1 lleva el color del titulo
-                        $styleId = $columnIndex === 0 ? ($this->xlsxHeaderStyle($format) ?? 11) : null;
-                    } elseif ($rowIndex === 2) {
-                        // encabezado de columnas: todas pintadas
-                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
-                    } elseif ($rowIndex >= 3) {
-                        if (str_starts_with((string) ($row[0] ?? ''), 'Total')) {
-                            $styleId = $columnIndex <= 1 ? 15 : 16;
-                        } else {
-                            $styleId = $columnIndex === 0 ? 13 : 14;
-                        }
-                    }
-                }
 
                 $style = $styleId === null ? '' : ' s="'.$styleId.'"';
 
@@ -3672,21 +3654,6 @@ class VinetaRegistroController extends Controller
             return $rowIndex === 0 ? 11 : 13;
         }
 
-        if ($format === 'anillado_summary') {
-            if ($rowIndex === 0 || $rowIndex === 2) {
-                return 11;
-            }
-
-            if ($rowIndex === 1) {
-                return null;
-            }
-
-            if (str_starts_with((string) ($row[0] ?? ''), '      ')) {
-                return null;
-            }
-
-            return str_starts_with((string) ($row[0] ?? ''), 'Total') ? 4 : 13;
-        }
 
         if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
             if ($rowIndex === 0) {
