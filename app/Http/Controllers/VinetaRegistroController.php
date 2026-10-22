@@ -1072,7 +1072,7 @@ class VinetaRegistroController extends Controller
 
         return $this->xlsxResumenGeneral(
             $compuesta,
-            count($empleados) + count($hora),
+            count($empleados) + count($hora) + array_sum(array_map('count', $otros)),
             round($totalMinutosGeneral / 60, 2),
             round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
             $totalEstadisticoGeneral,
@@ -1172,7 +1172,7 @@ class VinetaRegistroController extends Controller
 
         return $this->xlsxResumenGeneral(
             $compuesta,
-            count($empleados) + count($hora),
+            count($empleados) + count($hora) + array_sum(array_map('count', $otros)),
             round($totalMinutosGeneral / 60, 2),
             round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
             $totalPurosGeneral,
@@ -1273,7 +1273,7 @@ class VinetaRegistroController extends Controller
 
         return $this->xlsxResumenGeneral(
             $compuesta,
-            count($empleados) + count($hora),
+            count($empleados) + count($hora) + array_sum(array_map('count', $otros)),
             round($totalMinutosGeneral / 60, 2),
             round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
             $totalEstadisticoGeneral,
@@ -1374,7 +1374,7 @@ class VinetaRegistroController extends Controller
 
         return $this->xlsxResumenGeneral(
             $compuesta,
-            count($empleados) + count($hora),
+            count($empleados) + count($hora) + array_sum(array_map('count', $otros)),
             round($totalMinutosGeneral / 60, 2),
             round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
             $totalEstadisticoGeneral,
@@ -1478,7 +1478,7 @@ class VinetaRegistroController extends Controller
 
         return $this->xlsxResumenGeneral(
             $compuesta,
-            count($empleados) + count($hora),
+            count($empleados) + count($hora) + array_sum(array_map('count', $otros)),
             round($totalMinutosGeneral / 60, 2),
             round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
             $totalEstadisticoGeneral,
