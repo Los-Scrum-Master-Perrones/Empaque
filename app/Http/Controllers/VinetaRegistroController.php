@@ -640,11 +640,6 @@ class VinetaRegistroController extends Controller
             ->get()
             ->keyBy(fn (Empleado $e) => trim((string) $e->codigo));
 
-        // Area de cada empleado en cada documento (documento|empleado => area).
-        // Asi las horas ordinarias caen en el area del documento al que
-        // pertenecen y no en la primera area donde aparezca el empleado.
-        $areaPorDocumentoEmpleado = [];
-
         foreach ($registros as $registro) {
             $porHora = $registro->esPorHoraOrdinario();
             $estadistico = (int) $registro->total_actividades;
@@ -914,6 +909,14 @@ class VinetaRegistroController extends Controller
     ): void {
         $key = $codigo.'|'.$nombre;
 
+        foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupoExistente) {
+            if (isset($areaData[$grupoExistente]['empleados'][$key])) {
+                $areaData[$grupoExistente]['empleados'][$key]['minutos_ordinarios'] += $minutos;
+
+                return;
+            }
+        }
+
         $empCodigo = trim((string) $codigo);
         $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
 
@@ -953,11 +956,6 @@ class VinetaRegistroController extends Controller
         $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
     }
 
-    /**
-     * Hoja "Resumen Anillado": a la izquierda el reporte del anillado
-     * (estadistico, horas trabajadas, IHSS para llenar a mano) y a la derecha
-     * el reporte de horas ordinarias del anillado, en el mismo renglon.
-     */
     private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias, string $fechaTexto = ''): array
     {
         uasort($empleados, function (array $a, array $b) {
@@ -966,55 +964,31 @@ class VinetaRegistroController extends Controller
         });
 
         $rows = [
-            [
-                'REPORTE DEL ANILLADO '.$fechaTexto.'.',
-                '', '', '', '',
-                'REPORTE DE HORAS ORDINARIAS DEL ANILLADO '.$fechaTexto.'.',
-            ],
+            ['REPORTE DEL ANILLADO '.$fechaTexto.'.'],
             [],
             [
                 'Etiquetas de fila',
                 'Suma de ESTADISTICO',
                 'Suma de Horas Trabajadas',
                 'IHSS',
-                '',
-                'Etiquetas de fila',
-                'Suma de Horas Ordinarias',
             ],
         ];
 
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
-        $totalMinutosOrdinariosGeneral = 0;
 
         foreach ($empleados as $row) {
             $totalEstadisticoGeneral += (int) ($row['estadistico'] ?? 0);
             $totalMinutosGeneral += (int) ($row['minutos'] ?? 0);
-            $totalMinutosOrdinariosGeneral += (int) ($row['minutos_ordinarios'] ?? 0);
 
-            $codigo = (string) ($row['codigo_empleado'] ?? '');
-
-            // Renglon del empleado: nombre con sus totales.
             $rows[] = [
                 $row['empleado'],
                 $row['estadistico'],
                 round($row['minutos'] / 60, 2),
                 '',
-                '',
-                $row['empleado'],
-                round(($row['minutos_ordinarios'] ?? 0) / 60, 2),
             ];
 
-            // Renglon del codigo (igual que la tabla dinamica).
-            $rows[] = [
-                '      '.$codigo,
-                '',
-                '',
-                '',
-                '',
-                '      '.$codigo,
-                '',
-            ];
+            $rows[] = ['      '.($row['codigo_empleado'] ?? ''), '', '', ''];
         }
 
         $rows[] = [
@@ -1022,9 +996,6 @@ class VinetaRegistroController extends Controller
             $totalEstadisticoGeneral,
             round($totalMinutosGeneral / 60, 2),
             '',
-            '',
-            'Total general',
-            round($totalMinutosOrdinariosGeneral / 60, 2),
         ];
 
         return $rows;
@@ -3527,7 +3498,7 @@ class VinetaRegistroController extends Controller
         }
 
         if ($format === 'anillado_summary') {
-            return [34, 18, 16, 10, 3, 34, 20];
+            return [34, 18, 16, 12];
         }
 
         if ($format === 'weekly_report') {
