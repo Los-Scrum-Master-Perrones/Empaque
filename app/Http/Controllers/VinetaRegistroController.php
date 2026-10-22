@@ -3488,6 +3488,14 @@ class VinetaRegistroController extends Controller
                 }
 
 
+                // Columnas separadoras entre bloques (E y F): sin formato.
+                if (
+                    in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado', 'anillado_summary'], true)
+                    && in_array($columnIndex, [4, 5], true)
+                ) {
+                    $styleId = null;
+                }
+
                 $style = $styleId === null ? '' : ' s="'.$styleId.'"';
 
                 if (is_array($value) && isset($value['formula'])) {
