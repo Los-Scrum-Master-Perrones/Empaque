@@ -3394,20 +3394,32 @@ class VinetaRegistroController extends Controller
         }
 
         if ($otros !== []) {
-            $bloque = reset($otros);
             $relleno = ['', '', ''];
+            $baseIzquierda = ['', '', '', ''];
             $columnaBase = 8; // H
+            $derecha = [];
 
-            foreach ($bloque as $i => $fila) {
-                $fila = array_values($fila);
+            // Puede haber VARIAS tablas a la derecha (un grupo por tabla),
+            // una debajo de otra con 2 filas de separacion.
+            foreach ($otros as $bloque) {
+                $base = count($derecha);
 
-                while (count($fila) < 3) {
-                    $fila[] = '';
+                foreach ($bloque as $fila) {
+                    $fila = array_values($fila);
+
+                    while (count($fila) < 3) {
+                        $fila[] = '';
+                    }
+
+                    $derecha[] = $this->xlsxResolverSumas($fila, $base, $columnaBase);
                 }
 
-                $fila = $this->xlsxResolverSumas($fila, 0, $columnaBase);
+                $derecha[] = ['', '', ''];
+                $derecha[] = ['', '', ''];
+            }
 
-                $resultado[$i] = array_merge($resultado[$i] ?? $relleno, $relleno, $fila);
+            foreach ($derecha as $i => $fila) {
+                $resultado[$i] = array_merge($resultado[$i] ?? $baseIzquierda, $relleno, $fila);
             }
         }
 
