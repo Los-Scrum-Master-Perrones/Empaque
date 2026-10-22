@@ -1022,11 +1022,13 @@ class VinetaRegistroController extends Controller
 
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
+        $totalMinutosOrdinariosGeneral = 0;
         $filasEmpleado = [];
 
         foreach ($empleados as $row) {
             $totalEstadisticoGeneral += (int) ($row['estadistico'] ?? 0);
             $totalMinutosGeneral += (int) ($row['minutos'] ?? 0);
+            $totalMinutosOrdinariosGeneral += (int) ($row['minutos_ordinarios'] ?? 0);
 
             $rows[] = [
                 $row['empleado'],
@@ -1066,7 +1068,16 @@ class VinetaRegistroController extends Controller
             )
             : null;
 
-        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+        $compuesta = $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+
+        return $this->xlsxResumenGeneral(
+            $compuesta,
+            count($empleados) + count($hora),
+            round($totalMinutosGeneral / 60, 2),
+            round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
+            $totalEstadisticoGeneral,
+            'ANILLADO '.$fechaTexto
+        );
     }
     private function resumenRezagoExportRows(array $empleados, string $fechaTexto, array $otros = [], array $hora = []): array
     {
@@ -1157,7 +1168,16 @@ class VinetaRegistroController extends Controller
             )
             : null;
 
-        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+        $compuesta = $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+
+        return $this->xlsxResumenGeneral(
+            $compuesta,
+            count($empleados) + count($hora),
+            round($totalMinutosGeneral / 60, 2),
+            round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
+            $totalPurosGeneral,
+            'REZAGO '.$fechaTexto
+        );
     }
 
     private function resumenLlenadoExportRows(array $empleados, string $fechaTexto, array $otros = [], array $hora = []): array
@@ -1249,7 +1269,16 @@ class VinetaRegistroController extends Controller
             )
             : null;
 
-        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+        $compuesta = $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+
+        return $this->xlsxResumenGeneral(
+            $compuesta,
+            count($empleados) + count($hora),
+            round($totalMinutosGeneral / 60, 2),
+            round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
+            $totalEstadisticoGeneral,
+            'LLENADO '.$fechaTexto
+        );
     }
 
     private function resumenLimpiezaExportRows(array $empleados, string $fechaTexto, array $otros = [], array $hora = []): array
@@ -1341,7 +1370,16 @@ class VinetaRegistroController extends Controller
             )
             : null;
 
-        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+        $compuesta = $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+
+        return $this->xlsxResumenGeneral(
+            $compuesta,
+            count($empleados) + count($hora),
+            round($totalMinutosGeneral / 60, 2),
+            round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
+            $totalEstadisticoGeneral,
+            'LIMPIEZA '.$fechaTexto
+        );
     }
 
     /**
@@ -1436,7 +1474,16 @@ class VinetaRegistroController extends Controller
             )
             : null;
 
-        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+        $compuesta = $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+
+        return $this->xlsxResumenGeneral(
+            $compuesta,
+            count($empleados) + count($hora),
+            round($totalMinutosGeneral / 60, 2),
+            round(($totalMinutosOrdinariosGeneral + array_sum(array_map(fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora))) / 60, 2),
+            $totalEstadisticoGeneral,
+            $titulo.' '.$fechaTexto
+        );
     }
 
     private function grupoActividadProceso(?string $nombre, ?string $tipoEmpaque = null, ?string $codigo = null): ?string
@@ -3388,6 +3435,33 @@ class VinetaRegistroController extends Controller
      * Convierte las celdas "suma" de un bloque en formulas SUM con la fila y
      * columna reales donde queda el bloque.
      */
+    /**
+     * Agrega la tabla "RESUMEN GENERAL" al final de la hoja:
+     * empleados, horas de tarea, horas ordinarias y cantidad.
+     */
+    private function xlsxResumenGeneral(array $rows, int $empleados, float $horasTarea, float $horasOrdinarias, float $cantidad, string $titulo): array
+    {
+        $rows[] = [];
+        $rows[] = [];
+        $rows[] = ['RESUMEN GENERAL '.$titulo];
+        $rows[] = [];
+        $rows[] = [
+            'Etiquetas de fila',
+            'Empleados',
+            'Suma de Horas Trabajadas',
+            'Suma de Horas Ordinarias',
+            'Suma de Cantidad',
+        ];
+        $rows[] = [
+            'TOTAL',
+            $empleados,
+            round($horasTarea, 2),
+            round($horasOrdinarias, 2),
+            $cantidad,
+        ];
+
+        return $rows;
+    }
     private function xlsxResolverSumas(array $fila, int $filaBase, int $columnaBase): array
     {
         foreach ($fila as $i => $celda) {
@@ -3782,15 +3856,15 @@ class VinetaRegistroController extends Controller
         }
 
         if ($format === 'pivot_rezago' || $format === 'pivot_limpieza' || $format === 'pivot_prensado' || $format === 'pivot_rolado') {
-            return [45, 28, 26, 26];
+            return [45, 28, 26, 26, 3, 3, 45, 28, 26, 26];
         }
 
         if ($format === 'pivot_llenado') {
-            return [45, 24, 26, 26];
+            return [45, 26, 26, 26, 3, 3, 45, 26, 26, 26];
         }
 
         if ($format === 'anillado_summary') {
-            return [34, 18, 16, 12];
+            return [40, 24, 24, 12, 3, 3, 40, 24, 24, 12];
         }
 
         if ($format === 'weekly_report') {
