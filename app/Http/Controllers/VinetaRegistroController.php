@@ -642,7 +642,8 @@ class VinetaRegistroController extends Controller
 
         foreach ($registros as $registro) {
             $porHora = $registro->esPorHoraOrdinario();
-            $estadistico = (int) $registro->total_actividades;
+            // Las viñetas por hora (AL DIA) no llevan estadistico: se pagan por hora.
+            $estadistico = $porHora ? 0 : (int) $registro->total_actividades;
             $puros = (int) $registro->cantidad_puros;
             $minutos = $hasMinutosTrabajados && ! $porHora ? (int) ($registro->minutos_trabajados ?? 0) : 0;
 
