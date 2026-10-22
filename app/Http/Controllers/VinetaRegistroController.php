@@ -627,12 +627,12 @@ class VinetaRegistroController extends Controller
         $totalesEmpleadoExport = [];
 
         $areaData = [
-            'anillado' => ['empleados' => []],
-            'rezago' => ['empleados' => []],
-            'llenado' => ['empleados' => []],
-            'limpieza' => ['empleados' => []],
-            'prensado' => ['empleados' => []],
-            'rolado' => ['empleados' => []],
+            'anillado' => ['empleados' => [], 'otros' => [], 'hora' => []],
+            'rezago' => ['empleados' => [], 'otros' => [], 'hora' => []],
+            'llenado' => ['empleados' => [], 'otros' => [], 'hora' => []],
+            'limpieza' => ['empleados' => [], 'otros' => [], 'hora' => []],
+            'prensado' => ['empleados' => [], 'otros' => [], 'hora' => []],
+            'rolado' => ['empleados' => [], 'otros' => [], 'hora' => []],
         ];
 
         $empleadosMap = Empleado::query()
@@ -707,6 +707,8 @@ class VinetaRegistroController extends Controller
                 continue;
             }
 
+            // Bloque principal: SIEMPRE igual que antes (todos los que hicieron
+            // esa actividad), para que el cuadro original no cambie.
             $this->acumularAreaExport(
                 $areaData[$grupoArea]['empleados'],
                 $registro->empleado_nombre,
@@ -716,6 +718,37 @@ class VinetaRegistroController extends Controller
                 $estadistico,
                 $minutos
             );
+
+            // Bloques extra (solo se muestran si tienen datos):
+            //   hora  -> trabajo "al dia" (por hora) de esa area
+            //   otros -> empleados de otro grupo haciendo esa area (ej. anilladoras en rezago)
+            $grupoEmpleado = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true) ? $grupoPuesto : null;
+
+            if ($porHora) {
+                $this->acumularAreaExport(
+                    $areaData[$grupoArea]['hora'],
+                    $registro->empleado_nombre,
+                    $registro->empleado_codigo,
+                    $registro->actividad_nombre,
+                    $puros,
+                    $estadistico,
+                    $minutos
+                );
+            } elseif ($grupoEmpleado !== null && $grupoEmpleado !== $grupoArea) {
+                if (! isset($areaData[$grupoArea]['otros'][$grupoEmpleado])) {
+                    $areaData[$grupoArea]['otros'][$grupoEmpleado] = [];
+                }
+
+                $this->acumularAreaExport(
+                    $areaData[$grupoArea]['otros'][$grupoEmpleado],
+                    $registro->empleado_nombre,
+                    $registro->empleado_codigo,
+                    $registro->actividad_nombre,
+                    $puros,
+                    $estadistico,
+                    $minutos
+                );
+            }
 
             $detalle[] = [
                 $registro->fecha_registro?->format('Y-m-d') ?? 'N/A',
@@ -812,32 +845,32 @@ class VinetaRegistroController extends Controller
             ['name' => 'Detalle', 'rows' => $detalle, 'format' => 'detail'],
             [
                 'name' => 'Resumen Anillado',
-                'rows' => $this->resumenAnilladoExportRows($areaData['anillado']['empleados'], $hasHorasOrdinarias, $fechaTexto),
+                'rows' => $this->resumenAnilladoExportRows($areaData['anillado']['empleados'], $hasHorasOrdinarias, $fechaTexto, $areaData['anillado']['otros'], $areaData['anillado']['hora']),
                 'format' => 'anillado_summary',
             ],
             [
                 'name' => 'Resumen Rezago',
-                'rows' => $this->resumenRezagoExportRows($areaData['rezago']['empleados'], $fechaTexto),
+                'rows' => $this->resumenRezagoExportRows($areaData['rezago']['empleados'], $fechaTexto, $areaData['rezago']['otros'], $areaData['rezago']['hora']),
                 'format' => 'pivot_rezago',
             ],
             [
                 'name' => 'Resumen Llenado',
-                'rows' => $this->resumenLlenadoExportRows($areaData['llenado']['empleados'], $fechaTexto),
+                'rows' => $this->resumenLlenadoExportRows($areaData['llenado']['empleados'], $fechaTexto, $areaData['llenado']['otros'], $areaData['llenado']['hora']),
                 'format' => 'pivot_llenado',
             ],
             [
                 'name' => 'Resumen Limpieza',
-                'rows' => $this->resumenLimpiezaExportRows($areaData['limpieza']['empleados'], $fechaTexto),
+                'rows' => $this->resumenLimpiezaExportRows($areaData['limpieza']['empleados'], $fechaTexto, $areaData['limpieza']['otros'], $areaData['limpieza']['hora']),
                 'format' => 'pivot_limpieza',
             ],
             [
                 'name' => 'Resumen Prensado',
-                'rows' => $this->resumenGrupoSimpleExportRows($areaData['prensado']['empleados'], $fechaTexto, 'PRENSADO'),
+                'rows' => $this->resumenGrupoSimpleExportRows($areaData['prensado']['empleados'], $fechaTexto, 'PRENSADO', $areaData['prensado']['otros'], $areaData['prensado']['hora']),
                 'format' => 'pivot_prensado',
             ],
             [
                 'name' => 'Resumen Rolado',
-                'rows' => $this->resumenGrupoSimpleExportRows($areaData['rolado']['empleados'], $fechaTexto, 'ROLADO'),
+                'rows' => $this->resumenGrupoSimpleExportRows($areaData['rolado']['empleados'], $fechaTexto, 'ROLADO', $areaData['rolado']['otros'], $areaData['rolado']['hora']),
                 'format' => 'pivot_rolado',
             ],
         ];
@@ -909,13 +942,30 @@ class VinetaRegistroController extends Controller
     ): void {
         $key = $codigo.'|'.$nombre;
 
+        // 1) bloque principal (como siempre)
         foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupoExistente) {
             if (isset($areaData[$grupoExistente]['empleados'][$key])) {
                 $areaData[$grupoExistente]['empleados'][$key]['minutos_ordinarios'] += $minutos;
 
+                // Si tambien esta en el bloque "al dia", se le suman ahi.
+                if (isset($areaData[$grupoExistente]['hora'][$key])) {
+                    $areaData[$grupoExistente]['hora'][$key]['minutos_ordinarios'] += $minutos;
+                }
+
                 return;
             }
         }
+
+        // 2) bloque "al dia" (por hora)
+        foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupoExistente) {
+            if (isset($areaData[$grupoExistente]['hora'][$key])) {
+                $areaData[$grupoExistente]['hora'][$key]['minutos_ordinarios'] += $minutos;
+
+                return;
+            }
+        }
+
+
 
         $empCodigo = trim((string) $codigo);
         $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
@@ -956,7 +1006,7 @@ class VinetaRegistroController extends Controller
         $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
     }
 
-    private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias, string $fechaTexto = ''): array
+    private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias, string $fechaTexto = '', array $otros = [], array $hora = []): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
@@ -1000,9 +1050,29 @@ class VinetaRegistroController extends Controller
             '',
         ];
 
-        return $rows;
+        $bloquesOtros = [];
+
+        foreach ($otros as $grupoOtro => $empleadosOtros) {
+            $bloquesOtros[$grupoOtro] = $this->xlsxBloqueEmpleados(
+                $empleadosOtros,
+                'REPORTE DEL ANILLADO '.$fechaTexto.' ('.strtoupper($grupoOtro).')',
+                ['Etiquetas de fila', 'Suma de ESTADISTICO', 'Suma de Horas Trabajadas'],
+                fn (array $e) => [(int) $e['estadistico'], round($e['minutos'] / 60, 2)]
+            );
+        }
+
+        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+            ? $this->xlsxBloqueEmpleados(
+                $hora,
+                'REPORTE DEL ANILLADO '.$fechaTexto.' (AL DIA)',
+                ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            )
+            : null;
+
+        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
     }
-    private function resumenRezagoExportRows(array $empleados, string $fechaTexto): array
+    private function resumenRezagoExportRows(array $empleados, string $fechaTexto, array $otros = [], array $hora = []): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
@@ -1071,10 +1141,30 @@ class VinetaRegistroController extends Controller
             $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
-        return $rows;
+        $bloquesOtros = [];
+
+        foreach ($otros as $grupoOtro => $empleadosOtros) {
+            $bloquesOtros[$grupoOtro] = $this->xlsxBloqueEmpleados(
+                $empleadosOtros,
+                'REPORTE DE '.'REZAGO'.' '.$fechaTexto.' ('.strtoupper($grupoOtro).') A TAREA',
+                ['Etiquetas de fila', 'Suma de Cantidad Procesada', 'Suma de Horas Trabajadas', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [(int) $e['puros'], round($e['minutos'] / 60, 2), round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            );
+        }
+
+        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+            ? $this->xlsxBloqueEmpleados(
+                $hora,
+                'REPORTE DE '.'REZAGO'.' '.$fechaTexto.' (AL DIA)',
+                ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            )
+            : null;
+
+        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
     }
 
-    private function resumenLlenadoExportRows(array $empleados, string $fechaTexto): array
+    private function resumenLlenadoExportRows(array $empleados, string $fechaTexto, array $otros = [], array $hora = []): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
@@ -1143,10 +1233,30 @@ class VinetaRegistroController extends Controller
             $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
-        return $rows;
+        $bloquesOtros = [];
+
+        foreach ($otros as $grupoOtro => $empleadosOtros) {
+            $bloquesOtros[$grupoOtro] = $this->xlsxBloqueEmpleados(
+                $empleadosOtros,
+                'REPORTE DE '.'LLENADO'.' '.$fechaTexto.' ('.strtoupper($grupoOtro).') A TAREA',
+                ['Etiquetas de fila', 'Suma de Cantidad Procesada', 'Suma de Horas Trabajadas', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [(int) $e['puros'], round($e['minutos'] / 60, 2), round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            );
+        }
+
+        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+            ? $this->xlsxBloqueEmpleados(
+                $hora,
+                'REPORTE DE '.'LLENADO'.' '.$fechaTexto.' (AL DIA)',
+                ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            )
+            : null;
+
+        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
     }
 
-    private function resumenLimpiezaExportRows(array $empleados, string $fechaTexto): array
+    private function resumenLimpiezaExportRows(array $empleados, string $fechaTexto, array $otros = [], array $hora = []): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
@@ -1215,13 +1325,33 @@ class VinetaRegistroController extends Controller
             $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
-        return $rows;
+        $bloquesOtros = [];
+
+        foreach ($otros as $grupoOtro => $empleadosOtros) {
+            $bloquesOtros[$grupoOtro] = $this->xlsxBloqueEmpleados(
+                $empleadosOtros,
+                'REPORTE DE '.'LIMPIEZA'.' '.$fechaTexto.' ('.strtoupper($grupoOtro).') A TAREA',
+                ['Etiquetas de fila', 'Suma de Cantidad Procesada', 'Suma de Horas Trabajadas', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [(int) $e['puros'], round($e['minutos'] / 60, 2), round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            );
+        }
+
+        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+            ? $this->xlsxBloqueEmpleados(
+                $hora,
+                'REPORTE DE '.'LIMPIEZA'.' '.$fechaTexto.' (AL DIA)',
+                ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            )
+            : null;
+
+        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
     }
 
     /**
      * Reporte simple por grupo (Prensado / Rolado): mismo formato que Limpieza.
      */
-    private function resumenGrupoSimpleExportRows(array $empleados, string $fechaTexto, string $titulo): array
+    private function resumenGrupoSimpleExportRows(array $empleados, string $fechaTexto, string $titulo, array $otros = [], array $hora = []): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
@@ -1290,7 +1420,27 @@ class VinetaRegistroController extends Controller
             $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
-        return $rows;
+        $bloquesOtros = [];
+
+        foreach ($otros as $grupoOtro => $empleadosOtros) {
+            $bloquesOtros[$grupoOtro] = $this->xlsxBloqueEmpleados(
+                $empleadosOtros,
+                'REPORTE DE '.$titulo.' '.$fechaTexto.' ('.strtoupper($grupoOtro).') A TAREA',
+                ['Etiquetas de fila', 'Suma de Cantidad Procesada', 'Suma de Horas Trabajadas', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [(int) $e['puros'], round($e['minutos'] / 60, 2), round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            );
+        }
+
+        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+            ? $this->xlsxBloqueEmpleados(
+                $hora,
+                'REPORTE DE '.$titulo.' '.$fechaTexto.' (AL DIA)',
+                ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+            )
+            : null;
+
+        return $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
     }
 
     private function grupoActividadProceso(?string $nombre, ?string $tipoEmpaque = null, ?string $codigo = null): ?string
@@ -3129,6 +3279,101 @@ class VinetaRegistroController extends Controller
      * Total por formula (SUM) sobre las filas de empleados, para que Excel
      * lo recalcule si se edita algo. Si hay demasiadas filas, deja el numero.
      */
+    /**
+     * Arma un bloque (titulo, encabezados, empleados, codigos y total) para
+     * pegarlo al lado o abajo del principal. Devuelve filas de N columnas.
+     */
+    private function xlsxBloqueEmpleados(array $empleados, string $titulo, array $encabezados, callable $valoresDe): array
+    {
+        uasort($empleados, function (array $a, array $b) {
+            return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])]
+                <=> [$this->normalizarTextoReporte($b['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])];
+        });
+
+        $columnas = count($encabezados);
+        $rows = [[$titulo], [], $encabezados];
+        $totales = array_fill(0, $columnas - 1, 0);
+        $filasEmpleado = [];
+
+        foreach ($empleados as $emp) {
+            $valores = $valoresDe($emp);
+            $rows[] = array_merge([$emp['empleado']], $valores);
+            $filasEmpleado[] = count($rows);
+
+            $filaCodigo = array_fill(0, $columnas, '');
+            $filaCodigo[0] = $emp['codigo_empleado'] ?? '';
+            $rows[] = $filaCodigo;
+
+            foreach ($valores as $i => $v) {
+                $totales[$i] += (float) $v;
+            }
+        }
+
+        $filaTotal = array_fill(0, $columnas, '');
+        $filaTotal[0] = 'Total general';
+
+        foreach ($totales as $i => $t) {
+            $filaTotal[$i + 1] = $this->xlsxTotalFormula($filasEmpleado, $this->xlsxColumnName($i + 2), round($t, 2));
+        }
+
+        $rows[] = $filaTotal;
+
+        return $rows;
+    }
+
+    /**
+     * Pega a la derecha los bloques de otros grupos y abajo el bloque al dia.
+     * Si no hay datos, devuelve la hoja tal cual.
+     */
+    private function xlsxComponerBloques(array $principal, array $otros, ?array $hora): array
+    {
+        if ($otros === [] && $hora === null) {
+            return $principal;
+        }
+
+        $resultado = [];
+
+        foreach ($principal as $fila) {
+            $fila = array_values($fila);
+
+            while (count($fila) < 4) {
+                $fila[] = '';
+            }
+
+            $resultado[] = $fila;
+        }
+
+        if ($otros !== []) {
+            $bloque = reset($otros);
+            $relleno = [''];
+
+            foreach ($bloque as $i => $fila) {
+                $fila = array_values($fila);
+
+                while (count($fila) < 3) {
+                    $fila[] = '';
+                }
+
+                $resultado[$i] = array_merge($resultado[$i] ?? $relleno, $relleno, $fila);
+            }
+        }
+
+        if ($hora !== null) {
+            $resultado[] = [];
+
+            foreach ($hora as $fila) {
+                $fila = array_values($fila);
+
+                while (count($fila) < 4) {
+                    $fila[] = '';
+                }
+
+                $resultado[] = $fila;
+            }
+        }
+
+        return $resultado;
+    }
     private function xlsxTotalFormula(array $filasEmpleado, string $columna, $total): array|int|float
     {
         $filasEmpleado = array_values(array_filter($filasEmpleado));
