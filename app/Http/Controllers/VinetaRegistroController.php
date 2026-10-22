@@ -895,6 +895,11 @@ class VinetaRegistroController extends Controller
         $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
     }
 
+    /**
+     * Hoja "Resumen Anillado": a la izquierda el reporte del anillado
+     * (estadistico, horas trabajadas, IHSS para llenar a mano) y a la derecha
+     * el reporte de horas ordinarias del anillado, en el mismo renglon.
+     */
     private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias, string $fechaTexto = ''): array
     {
         uasort($empleados, function (array $a, array $b) {
@@ -902,22 +907,22 @@ class VinetaRegistroController extends Controller
                 <=> [$this->normalizarTextoReporte($b['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])];
         });
 
-        $headers = [
-            'Empleado',
-            'Codigo empleado',
-            'Estadistico',
-            'Horas de tarea',
-        ];
-
-        if ($hasHorasOrdinarias) {
-            $headers[] = 'Horas ordinarias';
-        }
-
-        // Mismo encabezado que los demas resumenes: titulo, renglon en blanco, columnas
         $rows = [
-            ['REPORTE DE ANILLADO '.$fechaTexto.'.'],
+            [
+                'REPORTE DEL ANILLADO '.$fechaTexto.'.',
+                '', '', '', '',
+                'REPORTE DE HORAS ORDINARIAS DEL ANILLADO '.$fechaTexto.'.',
+            ],
             [],
-            $headers,
+            [
+                'Etiquetas de fila',
+                'Suma de ESTADISTICO',
+                'Suma de Horas Trabajadas',
+                'IHSS',
+                '',
+                'Etiquetas de fila',
+                'Suma de Horas Ordinarias',
+            ],
         ];
 
         $totalEstadisticoGeneral = 0;
@@ -929,37 +934,43 @@ class VinetaRegistroController extends Controller
             $totalMinutosGeneral += (int) ($row['minutos'] ?? 0);
             $totalMinutosOrdinariosGeneral += (int) ($row['minutos_ordinarios'] ?? 0);
 
-            $horasTarea = round($row['minutos'] / 60, 2);
-            $fila = [
+            $codigo = (string) ($row['codigo_empleado'] ?? '');
+
+            // Renglon del empleado: nombre con sus totales.
+            $rows[] = [
                 $row['empleado'],
-                $row['codigo_empleado'],
                 $row['estadistico'],
-                $horasTarea,
+                round($row['minutos'] / 60, 2),
+                '',
+                '',
+                $row['empleado'],
+                round(($row['minutos_ordinarios'] ?? 0) / 60, 2),
             ];
 
-            if ($hasHorasOrdinarias) {
-                $fila[] = round(($row['minutos_ordinarios'] ?? 0) / 60, 2);
-            }
-
-            $rows[] = $fila;
+            // Renglon del codigo (igual que la tabla dinamica).
+            $rows[] = [
+                '      '.$codigo,
+                '',
+                '',
+                '',
+                '',
+                '      '.$codigo,
+                '',
+            ];
         }
 
-        $totalFila = [
+        $rows[] = [
             'Total general',
-            '',
             $totalEstadisticoGeneral,
             round($totalMinutosGeneral / 60, 2),
+            '',
+            '',
+            'Total general',
+            round($totalMinutosOrdinariosGeneral / 60, 2),
         ];
-
-        if ($hasHorasOrdinarias) {
-            $totalFila[] = round($totalMinutosOrdinariosGeneral / 60, 2);
-        }
-
-        $rows[] = $totalFila;
 
         return $rows;
     }
-
     private function resumenRezagoExportRows(array $empleados, string $fechaTexto): array
     {
         uasort($empleados, function (array $a, array $b) {
@@ -3359,6 +3370,10 @@ class VinetaRegistroController extends Controller
                 return null;
             }
 
+            if (str_starts_with((string) ($row[0] ?? ''), '      ')) {
+                return null;
+            }
+
             return str_starts_with((string) ($row[0] ?? ''), 'Total') ? 4 : 13;
         }
 
@@ -3454,7 +3469,7 @@ class VinetaRegistroController extends Controller
         }
 
         if ($format === 'anillado_summary') {
-            return [34, 18, 16, 16, 18];
+            return [34, 18, 16, 10, 3, 34, 20];
         }
 
         if ($format === 'weekly_report') {
