@@ -640,6 +640,11 @@ class VinetaRegistroController extends Controller
             ->get()
             ->keyBy(fn (Empleado $e) => trim((string) $e->codigo));
 
+        // Area de cada empleado en cada documento (documento|empleado => area).
+        // Asi las horas ordinarias caen en el area del documento al que
+        // pertenecen y no en la primera area donde aparezca el empleado.
+        $areaPorDocumentoEmpleado = [];
+
         foreach ($registros as $registro) {
             $porHora = $registro->esPorHoraOrdinario();
             $estadistico = (int) $registro->total_actividades;
@@ -680,6 +685,11 @@ class VinetaRegistroController extends Controller
             // Blindaje: si aparece un grupo sin area propia, va a anillado (nunca null)
             if (! isset($areaData[$grupoArea]['empleados'])) {
                 $grupoArea = 'anillado';
+            }
+
+            $docRegistro = trim((string) $registro->documento_numero);
+            if ($docRegistro !== '') {
+                $areaPorDocumentoEmpleado[$docRegistro.'|'.$empCodigo] = $grupoArea;
             }
 
             $this->acumularAreaExport(
@@ -740,6 +750,10 @@ class VinetaRegistroController extends Controller
                 $cargoHora = $empleadosMap->get(trim((string) $hora->empleado_codigo))?->cargo;
             }
 
+            // Las horas ordinarias van al area del CARGO del empleado (su area),
+            // no al area de la actividad: una anilladora que hizo petaca suma
+            // sus horas en el reporte de anillado, pero su produccion de petaca
+            // cuenta en llenado.
             $this->acumularHoraOrdinariaAreaExport(
                 $areaData,
                 $hora->empleado_nombre,
@@ -866,19 +880,29 @@ class VinetaRegistroController extends Controller
     ): void {
         $key = $codigo.'|'.$nombre;
 
-        foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupo) {
-            if (isset($areaData[$grupo]['empleados'][$key])) {
-                $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
+        $empCodigo = trim((string) $codigo);
+        $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
 
+        if (in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza', 'prensado', 'rolado'], true)) {
+            $grupo = $grupoPuesto;
+        } else {
+            // Sin area propia (revisadoras, supervisoras, etc.): las horas van
+            // al area donde ya tiene viñetas ese dia. Si no tiene, no entra a
+            // ningun resumen (solo aparece en el detalle).
+            $grupo = null;
+
+            foreach (['anillado', 'rezago', 'llenado', 'limpieza', 'prensado', 'rolado'] as $posible) {
+                if (isset($areaData[$posible]['empleados'][$key])) {
+                    $grupo = $posible;
+
+                    break;
+                }
+            }
+
+            if ($grupo === null) {
                 return;
             }
         }
-
-        $empCodigo = trim((string) $codigo);
-        $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
-        $grupo = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true)
-            ? $grupoPuesto
-            : 'anillado';
 
         if (! isset($areaData[$grupo]['empleados'][$key])) {
             $areaData[$grupo]['empleados'][$key] = [
