@@ -708,21 +708,8 @@ class VinetaRegistroController extends Controller
                 continue;
             }
 
-            // Bloque principal: SIEMPRE igual que antes (todos los que hicieron
-            // esa actividad), para que el cuadro original no cambie.
-            $this->acumularAreaExport(
-                $areaData[$grupoArea]['empleados'],
-                $registro->empleado_nombre,
-                $registro->empleado_codigo,
-                $registro->actividad_nombre,
-                $puros,
-                $estadistico,
-                $minutos
-            );
-
-            // Bloques extra (solo se muestran si tienen datos):
-            //   hora  -> trabajo "al dia" (por hora) de esa area
-            //   otros -> empleados de otro grupo haciendo esa area (ej. anilladoras en rezago)
+            // El trabajo "al dia" (por hora) NO va al bloque principal: solo
+            // aparece abajo, en su propia tabla (no ensucia el principal con 0).
             $grupoEmpleado = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true) ? $grupoPuesto : null;
 
             if ($porHora) {
@@ -735,7 +722,20 @@ class VinetaRegistroController extends Controller
                     $estadistico,
                     $minutos
                 );
-            } elseif ($grupoEmpleado !== null && $grupoEmpleado !== $grupoArea) {
+            } else {
+                $this->acumularAreaExport(
+                    $areaData[$grupoArea]['empleados'],
+                    $registro->empleado_nombre,
+                    $registro->empleado_codigo,
+                    $registro->actividad_nombre,
+                    $puros,
+                    $estadistico,
+                    $minutos
+                );
+            }
+
+            // Bloque de otros grupos (ej. anilladoras haciendo rezago), a la derecha.
+            if (! $porHora && $grupoEmpleado !== null && $grupoEmpleado !== $grupoArea) {
                 if (! isset($areaData[$grupoArea]['otros'][$grupoEmpleado])) {
                     $areaData[$grupoArea]['otros'][$grupoEmpleado] = [];
                 }
@@ -943,24 +943,19 @@ class VinetaRegistroController extends Controller
     ): void {
         $key = $codigo.'|'.$nombre;
 
-        // 1) bloque principal (como siempre)
+        // 1) bloque "al dia" (por hora): ahi van las horas del que trabajo por hora
         foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupoExistente) {
-            if (isset($areaData[$grupoExistente]['empleados'][$key])) {
-                $areaData[$grupoExistente]['empleados'][$key]['minutos_ordinarios'] += $minutos;
-
-                // Si tambien esta en el bloque "al dia", se le suman ahi.
-                if (isset($areaData[$grupoExistente]['hora'][$key])) {
-                    $areaData[$grupoExistente]['hora'][$key]['minutos_ordinarios'] += $minutos;
-                }
+            if (isset($areaData[$grupoExistente]['hora'][$key])) {
+                $areaData[$grupoExistente]['hora'][$key]['minutos_ordinarios'] += $minutos;
 
                 return;
             }
         }
 
-        // 2) bloque "al dia" (por hora)
+        // 2) bloque principal
         foreach (['llenado', 'rezago', 'anillado', 'limpieza', 'prensado', 'rolado'] as $grupoExistente) {
-            if (isset($areaData[$grupoExistente]['hora'][$key])) {
-                $areaData[$grupoExistente]['hora'][$key]['minutos_ordinarios'] += $minutos;
+            if (isset($areaData[$grupoExistente]['empleados'][$key])) {
+                $areaData[$grupoExistente]['empleados'][$key]['minutos_ordinarios'] += $minutos;
 
                 return;
             }
