@@ -988,7 +988,7 @@ class VinetaRegistroController extends Controller
                 '',
             ];
 
-            $rows[] = ['      '.($row['codigo_empleado'] ?? ''), '', '', ''];
+            $rows[] = [($row['codigo_empleado'] ?? ''), '', '', ''];
         }
 
         $rows[] = [
@@ -1039,7 +1039,7 @@ class VinetaRegistroController extends Controller
             ];
 
             $rows[] = [
-                '   '.$emp['codigo_empleado'],
+                $emp['codigo_empleado'],
                 $totalPuros,
                 $totalHoras,
                 $totalOrdinarias,
@@ -1051,7 +1051,7 @@ class VinetaRegistroController extends Controller
 
             foreach ($actividades as $act) {
                 $rows[] = [
-                    '      '.$act['nombre'],
+                    $act['nombre'],
                     (int) $act['puros'],
                     round($act['minutos'] / 60, 2),
                     $first ? $totalOrdinarias : 0,
@@ -1109,7 +1109,7 @@ class VinetaRegistroController extends Controller
             ];
 
             $rows[] = [
-                '   '.$emp['codigo_empleado'],
+                $emp['codigo_empleado'],
                 $totalEstadistico,
                 $totalHoras,
                 $totalOrdinarias,
@@ -1121,7 +1121,7 @@ class VinetaRegistroController extends Controller
 
             foreach ($actividades as $act) {
                 $rows[] = [
-                    '      '.$act['nombre'],
+                    $act['nombre'],
                     (int) $act['estadistico'],
                     round($act['minutos'] / 60, 2),
                     $first ? $totalOrdinarias : 0,
@@ -1179,7 +1179,7 @@ class VinetaRegistroController extends Controller
             ];
 
             $rows[] = [
-                '   '.$emp['codigo_empleado'],
+                $emp['codigo_empleado'],
                 $totalEstadistico,
                 $totalHoras,
                 $totalOrdinarias,
@@ -1191,7 +1191,7 @@ class VinetaRegistroController extends Controller
 
             foreach ($actividades as $act) {
                 $rows[] = [
-                    '      '.$act['nombre'],
+                    $act['nombre'],
                     (int) ($act['estadistico'] ?? 0),
                     round($act['minutos'] / 60, 2),
                     $first ? $totalOrdinarias : 0,
@@ -1252,7 +1252,7 @@ class VinetaRegistroController extends Controller
             ];
 
             $rows[] = [
-                '   '.$emp['codigo_empleado'],
+                $emp['codigo_empleado'],
                 $totalEstadistico,
                 $totalHoras,
                 $totalOrdinarias,
@@ -1264,7 +1264,7 @@ class VinetaRegistroController extends Controller
 
             foreach ($actividades as $act) {
                 $rows[] = [
-                    '      '.$act['nombre'],
+                    $act['nombre'],
                     (int) ($act['estadistico'] ?? 0),
                     round($act['minutos'] / 60, 2),
                     $first ? $totalOrdinarias : 0,
