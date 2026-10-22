@@ -976,6 +976,7 @@ class VinetaRegistroController extends Controller
 
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
+        $filasEmpleado = [];
 
         foreach ($empleados as $row) {
             $totalEstadisticoGeneral += (int) ($row['estadistico'] ?? 0);
@@ -987,14 +988,15 @@ class VinetaRegistroController extends Controller
                 round($row['minutos'] / 60, 2),
                 '',
             ];
+            $filasEmpleado[] = count($rows);
 
             $rows[] = [($row['codigo_empleado'] ?? ''), '', '', ''];
         }
 
         $rows[] = [
             'Total general',
-            $totalEstadisticoGeneral,
-            round($totalMinutosGeneral / 60, 2),
+            $this->xlsxTotalFormula($filasEmpleado, 'B', $totalEstadisticoGeneral),
+            $this->xlsxTotalFormula($filasEmpleado, 'C', round($totalMinutosGeneral / 60, 2)),
             '',
         ];
 
@@ -1021,6 +1023,7 @@ class VinetaRegistroController extends Controller
         $totalPurosGeneral = 0;
         $totalMinutosGeneral = 0;
         $totalMinutosOrdinariosGeneral = 0;
+        $filasEmpleado = [];
 
         foreach ($empleados as $emp) {
             $totalPuros = (int) $emp['puros'];
@@ -1037,6 +1040,7 @@ class VinetaRegistroController extends Controller
                 $totalHoras,
                 $totalOrdinarias,
             ];
+            $filasEmpleado[] = count($rows);
 
             $rows[] = [
                 $emp['codigo_empleado'],
@@ -1062,9 +1066,9 @@ class VinetaRegistroController extends Controller
 
         $rows[] = [
             'Total general',
-            $totalPurosGeneral,
-            round($totalMinutosGeneral / 60, 2),
-            round($totalMinutosOrdinariosGeneral / 60, 2),
+            $this->xlsxTotalFormula($filasEmpleado, 'B', $totalPurosGeneral),
+            $this->xlsxTotalFormula($filasEmpleado, 'C', round($totalMinutosGeneral / 60, 2)),
+            $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
         return $rows;
@@ -1091,6 +1095,7 @@ class VinetaRegistroController extends Controller
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
         $totalMinutosOrdinariosGeneral = 0;
+        $filasEmpleado = [];
 
         foreach ($empleados as $emp) {
             $totalEstadistico = (int) $emp['estadistico'];
@@ -1107,6 +1112,7 @@ class VinetaRegistroController extends Controller
                 $totalHoras,
                 $totalOrdinarias,
             ];
+            $filasEmpleado[] = count($rows);
 
             $rows[] = [
                 $emp['codigo_empleado'],
@@ -1132,9 +1138,9 @@ class VinetaRegistroController extends Controller
 
         $rows[] = [
             'Total general',
-            $totalEstadisticoGeneral,
-            round($totalMinutosGeneral / 60, 2),
-            round($totalMinutosOrdinariosGeneral / 60, 2),
+            $this->xlsxTotalFormula($filasEmpleado, 'B', $totalEstadisticoGeneral),
+            $this->xlsxTotalFormula($filasEmpleado, 'C', round($totalMinutosGeneral / 60, 2)),
+            $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
         return $rows;
@@ -1161,6 +1167,7 @@ class VinetaRegistroController extends Controller
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
         $totalMinutosOrdinariosGeneral = 0;
+        $filasEmpleado = [];
 
         foreach ($empleados as $emp) {
             $totalEstadistico = (int) ($emp['estadistico'] ?? 0);
@@ -1177,6 +1184,7 @@ class VinetaRegistroController extends Controller
                 $totalHoras,
                 $totalOrdinarias,
             ];
+            $filasEmpleado[] = count($rows);
 
             $rows[] = [
                 $emp['codigo_empleado'],
@@ -1202,9 +1210,9 @@ class VinetaRegistroController extends Controller
 
         $rows[] = [
             'Total general',
-            $totalEstadisticoGeneral,
-            round($totalMinutosGeneral / 60, 2),
-            round($totalMinutosOrdinariosGeneral / 60, 2),
+            $this->xlsxTotalFormula($filasEmpleado, 'B', $totalEstadisticoGeneral),
+            $this->xlsxTotalFormula($filasEmpleado, 'C', round($totalMinutosGeneral / 60, 2)),
+            $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
         return $rows;
@@ -1234,6 +1242,7 @@ class VinetaRegistroController extends Controller
         $totalEstadisticoGeneral = 0;
         $totalMinutosGeneral = 0;
         $totalMinutosOrdinariosGeneral = 0;
+        $filasEmpleado = [];
 
         foreach ($empleados as $emp) {
             $totalEstadistico = (int) ($emp['estadistico'] ?? 0);
@@ -1250,6 +1259,7 @@ class VinetaRegistroController extends Controller
                 $totalHoras,
                 $totalOrdinarias,
             ];
+            $filasEmpleado[] = count($rows);
 
             $rows[] = [
                 $emp['codigo_empleado'],
@@ -1275,9 +1285,9 @@ class VinetaRegistroController extends Controller
 
         $rows[] = [
             'Total general',
-            $totalEstadisticoGeneral,
-            round($totalMinutosGeneral / 60, 2),
-            round($totalMinutosOrdinariosGeneral / 60, 2),
+            $this->xlsxTotalFormula($filasEmpleado, 'B', $totalEstadisticoGeneral),
+            $this->xlsxTotalFormula($filasEmpleado, 'C', round($totalMinutosGeneral / 60, 2)),
+            $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutosOrdinariosGeneral / 60, 2)),
         ];
 
         return $rows;
@@ -3115,6 +3125,25 @@ class VinetaRegistroController extends Controller
         return $path;
     }
 
+    /**
+     * Total por formula (SUM) sobre las filas de empleados, para que Excel
+     * lo recalcule si se edita algo. Si hay demasiadas filas, deja el numero.
+     */
+    private function xlsxTotalFormula(array $filasEmpleado, string $columna, $total): array|int|float
+    {
+        $filasEmpleado = array_values(array_filter($filasEmpleado));
+
+        if (count($filasEmpleado) === 0 || count($filasEmpleado) > 200) {
+            return $total;
+        }
+
+        $referencias = array_map(fn ($fila) => $columna.$fila, $filasEmpleado);
+
+        return [
+            'formula' => 'SUM('.implode(',', $referencias).')',
+            'value' => $total,
+        ];
+    }
     private function xlsxWorksheetXml(array $rows, ?string $format = null, ?string $paperSize = null, ?int $employeesPerPage = null): string
     {
         $columnCount = max(1, collect($rows)->map(fn ($row) => count($row))->max() ?? 1);
@@ -3232,6 +3261,14 @@ class VinetaRegistroController extends Controller
                 }
 
                 $style = $styleId === null ? '' : ' s="'.$styleId.'"';
+
+                if (is_array($value) && isset($value['formula'])) {
+                    $rowsXml .= '<c r="'.$cell.'"'.$style.'><f>'
+                        .$this->xml((string) $value['formula'])
+                        .'</f><v>'.($value['value'] ?? 0).'</v></c>';
+
+                    continue;
+                }
 
                 if (is_int($value) || is_float($value)) {
                     $rowsXml .= '<c r="'.$cell.'"'.$style.'><v>'.$value.'</v></c>';
