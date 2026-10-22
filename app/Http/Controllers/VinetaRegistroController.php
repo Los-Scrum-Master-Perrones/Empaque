@@ -1059,7 +1059,7 @@ class VinetaRegistroController extends Controller
             );
         }
 
-        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+        $bloqueHora = ($hora !== [])
             ? $this->xlsxBloqueEmpleados(
                 $hora,
                 'REPORTE DEL ANILLADO '.$fechaTexto.' (AL DIA)',
@@ -1159,7 +1159,7 @@ class VinetaRegistroController extends Controller
             );
         }
 
-        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+        $bloqueHora = ($hora !== [])
             ? $this->xlsxBloqueEmpleados(
                 $hora,
                 'REPORTE DE '.'REZAGO'.' '.$fechaTexto.' (AL DIA)',
@@ -1260,7 +1260,7 @@ class VinetaRegistroController extends Controller
             );
         }
 
-        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+        $bloqueHora = ($hora !== [])
             ? $this->xlsxBloqueEmpleados(
                 $hora,
                 'REPORTE DE '.'LLENADO'.' '.$fechaTexto.' (AL DIA)',
@@ -1361,7 +1361,7 @@ class VinetaRegistroController extends Controller
             );
         }
 
-        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+        $bloqueHora = ($hora !== [])
             ? $this->xlsxBloqueEmpleados(
                 $hora,
                 'REPORTE DE '.'LIMPIEZA'.' '.$fechaTexto.' (AL DIA)',
@@ -1465,7 +1465,7 @@ class VinetaRegistroController extends Controller
             );
         }
 
-        $bloqueHora = ($hora !== [] && array_sum(array_map(fn ($e) => (int) ($e['minutos_ordinarios'] ?? 0), $hora)) > 0)
+        $bloqueHora = ($hora !== [])
             ? $this->xlsxBloqueEmpleados(
                 $hora,
                 'REPORTE DE '.$titulo.' '.$fechaTexto.' (AL DIA)',
