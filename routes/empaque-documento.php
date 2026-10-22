@@ -1,5 +1,6 @@
-<?php
+﻿<?php
 
+use App\Http\Controllers\EmpaqueComparativoErpController;
 use App\Http\Controllers\VinetaRegistroController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,4 +18,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // las horas del ERP en 0.
     Route::post('/vinetas-registradas/documento/{documento}/modo-pago', [VinetaRegistroController::class, 'cambiarModoPagoDocumento'])
         ->name('vineta-registros.documento.modo-pago');
+
+    // Comparativo ERP vs sistema (bajo Costos de empaque).
+    Route::get('/costos-empaque/comparativo', [EmpaqueComparativoErpController::class, 'index'])
+        ->name('costos-empaque.comparativo');
+
+    Route::post('/costos-empaque/comparativo/descargar', [EmpaqueComparativoErpController::class, 'descargar'])
+        ->name('costos-empaque.comparativo.descargar');
 });
