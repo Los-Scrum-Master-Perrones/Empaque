@@ -3396,7 +3396,7 @@ class VinetaRegistroController extends Controller
         if ($otros !== []) {
             $relleno = ['', '', ''];
             $baseIzquierda = ['', '', '', ''];
-            $columnaBase = 8; // H
+            $columnaBase = 7; // H (indice 0 = A)
             $derecha = [];
 
             // Puede haber VARIAS tablas a la derecha (un grupo por tabla),
