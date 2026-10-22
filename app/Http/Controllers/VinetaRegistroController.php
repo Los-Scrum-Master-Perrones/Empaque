@@ -3314,7 +3314,14 @@ class VinetaRegistroController extends Controller
         $filaTotal[0] = 'Total general';
 
         foreach ($totales as $i => $t) {
-            $filaTotal[$i + 1] = $this->xlsxTotalFormula($filasEmpleado, $this->xlsxColumnName($i + 2), round($t, 2));
+            // Se resuelve al colocar el bloque (depende de su fila y columna).
+            $filaTotal[$i + 1] = [
+                'suma' => [
+                    'filas' => $filasEmpleado,
+                    'col' => $i + 1,
+                    'value' => round($t, 2),
+                ],
+            ];
         }
 
         $rows[] = $filaTotal;
@@ -3347,6 +3354,7 @@ class VinetaRegistroController extends Controller
         if ($otros !== []) {
             $bloque = reset($otros);
             $relleno = ['', ''];
+            $columnaBase = 6; // G
 
             foreach ($bloque as $i => $fila) {
                 $fila = array_values($fila);
@@ -3355,6 +3363,8 @@ class VinetaRegistroController extends Controller
                     $fila[] = '';
                 }
 
+                $fila = $this->xlsxResolverSumas($fila, 0, $columnaBase);
+
                 $resultado[$i] = array_merge($resultado[$i] ?? $relleno, $relleno, $fila);
             }
         }
@@ -3362,6 +3372,7 @@ class VinetaRegistroController extends Controller
         if ($hora !== null) {
             $resultado[] = [];
             $resultado[] = [];
+            $filaBase = count($resultado);
 
             foreach ($hora as $fila) {
                 $fila = array_values($fila);
@@ -3370,11 +3381,39 @@ class VinetaRegistroController extends Controller
                     $fila[] = '';
                 }
 
+                $fila = $this->xlsxResolverSumas($fila, $filaBase, 0);
+
                 $resultado[] = $fila;
             }
         }
 
         return $resultado;
+    }
+    /**
+     * Convierte las celdas "suma" de un bloque en formulas SUM con la fila y
+     * columna reales donde queda el bloque.
+     */
+    private function xlsxResolverSumas(array $fila, int $filaBase, int $columnaBase): array
+    {
+        foreach ($fila as $i => $celda) {
+            if (! is_array($celda) || ! isset($celda['suma'])) {
+                continue;
+            }
+
+            $datos = $celda['suma'];
+            $columna = $this->xlsxColumnName($columnaBase + $datos['col'] + 1);
+            $referencias = [];
+
+            foreach ($datos['filas'] as $filaRelativa) {
+                $referencias[] = $columna.($filaBase + $filaRelativa);
+            }
+
+            $fila[$i] = count($referencias) > 0
+                ? ['formula' => 'SUM('.implode(',', $referencias).')', 'value' => $datos['value']]
+                : $datos['value'];
+        }
+
+        return $fila;
     }
     private function xlsxTotalFormula(array $filasEmpleado, string $columna, $total): array|int|float
     {
