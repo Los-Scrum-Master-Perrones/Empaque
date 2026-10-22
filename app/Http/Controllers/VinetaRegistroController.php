@@ -3395,8 +3395,8 @@ class VinetaRegistroController extends Controller
 
         if ($otros !== []) {
             $bloque = reset($otros);
-            $relleno = ['', ''];
-            $columnaBase = 6; // G
+            $relleno = ['', '', ''];
+            $columnaBase = 8; // H
 
             foreach ($bloque as $i => $fila) {
                 $fila = array_values($fila);
@@ -3599,7 +3599,8 @@ class VinetaRegistroController extends Controller
                 // Columnas separadoras entre bloques (E y F): sin formato.
                 if (
                     in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado', 'anillado_summary'], true)
-                    && in_array($columnIndex, [4, 5], true)
+                    && in_array($columnIndex, [4, 5, 6], true)
+                    && trim((string) $value) === ''
                 ) {
                     $styleId = null;
                 }
@@ -3856,15 +3857,15 @@ class VinetaRegistroController extends Controller
         }
 
         if ($format === 'pivot_rezago' || $format === 'pivot_limpieza' || $format === 'pivot_prensado' || $format === 'pivot_rolado') {
-            return [45, 28, 26, 26, 3, 3, 45, 28, 26, 26];
+            return [45, 28, 26, 26, 20, 3, 3, 45, 28, 26, 26];
         }
 
         if ($format === 'pivot_llenado') {
-            return [45, 26, 26, 26, 3, 3, 45, 26, 26, 26];
+            return [45, 26, 26, 26, 20, 3, 3, 45, 26, 26, 26];
         }
 
         if ($format === 'anillado_summary') {
-            return [40, 24, 24, 12, 3, 3, 40, 24, 24, 12];
+            return [40, 24, 24, 12, 20, 3, 3, 40, 24, 24, 12];
         }
 
         if ($format === 'weekly_report') {
