@@ -687,9 +687,29 @@ class VinetaRegistroController extends Controller
                 $grupoArea = 'anillado';
             }
 
-            $docRegistro = trim((string) $registro->documento_numero);
-            if ($docRegistro !== '') {
-                $areaPorDocumentoEmpleado[$docRegistro.'|'.$empCodigo] = $grupoArea;
+            // Las revisadoras de calidad no entran a ningun resumen de area
+            // (solo aparecen en el detalle).
+            if ($this->esCargoRevisadora($cargo)) {
+                $detalle[] = [
+                    $registro->fecha_registro?->format('Y-m-d') ?? 'N/A',
+                    $registro->empleado_nombre,
+                    $registro->empleado_codigo,
+                    $porHora ? 'Viñeta por hora' : 'Viñeta',
+                    $registro->vineta_api_id ? 'ID '.$registro->vineta_api_id : $registro->codigo_vineta,
+                    $this->valorExport($registro->productoCodigoReporte()),
+                    $this->valorExport($registro->marcaReporte()),
+                    $this->valorExport($registro->productoItemReporte()),
+                    $this->valorExport($registro->ordenDelSistemaReporte()),
+                    $this->valorExport($registro->ordenReporte()),
+                    $registro->actividad_nombre,
+                    $registro->cantidad_puros,
+                    $estadistico,
+                    $porHora ? '' : $minutos,
+                    $porHora ? 'Por hora ordinario' : VinetaRegistro::minutosATiempoTexto($minutos),
+                    '',
+                ];
+
+                continue;
             }
 
             $this->acumularAreaExport(
@@ -754,6 +774,11 @@ class VinetaRegistroController extends Controller
             // no al area de la actividad: una anilladora que hizo petaca suma
             // sus horas en el reporte de anillado, pero su produccion de petaca
             // cuenta en llenado.
+            // Las revisadoras no suman horas en ningun resumen.
+            if ($this->esCargoRevisadora($cargoHora)) {
+                continue;
+            }
+
             $this->acumularHoraOrdinariaAreaExport(
                 $areaData,
                 $hora->empleado_nombre,
@@ -871,6 +896,15 @@ class VinetaRegistroController extends Controller
         $empleados[$key]['actividades'][$actividad]['minutos'] += $minutos;
     }
 
+    /**
+     * Revisadoras de calidad: no entran a los resumenes por area, solo al detalle.
+     */
+    private function esCargoRevisadora(?string $cargo): bool
+    {
+        $texto = $this->normalizarTextoProceso((string) $cargo);
+
+        return $texto !== '' && str_contains($texto, 'revisa');
+    }
     private function acumularHoraOrdinariaAreaExport(
         array &$areaData,
         string $nombre,
