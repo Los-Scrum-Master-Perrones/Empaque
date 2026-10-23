@@ -225,7 +225,7 @@ class ErpApiService
      * Fija las horas EXACTAS de una fila ya registrada en el ERP.
      * Lo usa el boton "Aplicar ajuste de horas" despues de repartir la jornada.
      */
-    public function fijarHorasVineta(VinetaRegistro $registro, float $horas, ?int $sucursal = null, ?int $puros = null): array
+    public function fijarHorasVineta(VinetaRegistro $registro, float $horas, ?int $sucursal = null, ?int $puros = null, ?float $precio = null, ?float $salario = null): array
     {
         $doc = trim((string) $registro->documento_numero);
 
@@ -250,6 +250,14 @@ class ErpApiService
 
         if ($puros !== null) {
             $payload['cantidad_puros'] = (int) $puros;
+        }
+
+        if ($precio !== null && $precio > 0) {
+            $payload['precio_unitario'] = round($precio, 4);
+        }
+
+        if ($salario !== null && $salario > 0) {
+            $payload['salario_mensual'] = round($salario, 2);
         }
 
         try {

@@ -25,4 +25,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/costos-empaque/comparativo/descargar', [EmpaqueComparativoErpController::class, 'descargar'])
         ->name('costos-empaque.comparativo.descargar');
+
+    Route::post('/costos-empaque/comparativo/sincronizar', [EmpaqueComparativoErpController::class, 'sincronizar'])
+        ->name('costos-empaque.comparativo.sincronizar');
 });

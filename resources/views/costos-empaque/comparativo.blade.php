@@ -214,6 +214,7 @@
                                                 <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dbeafe">SISTEMA</th>
                                                 <th class="px-2 py-1.5 text-center" colspan="4" style="background:#dcfce7">ERP</th>
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Estado</th>
+                                                <th class="px-2 py-1.5 text-center" rowspan="2">Sincronizar</th>
                                             </tr>
                                             <tr>
                                                 <th class="px-2 py-1 text-right" style="background:#dbeafe">Puros</th>
@@ -260,6 +261,26 @@
                                                         @else OK
                                                         @endif
                                                     </td>
+                                                    <td class="px-2 py-1 text-center">
+                                                        @if($d['estado'] !== 'solo_erp')
+                                                            <form method="POST" action="{{ route('costos-empaque.comparativo.sincronizar') }}">
+                                                                @csrf
+                                                                <input type="hidden" name="fecha" value="{{ $fecha }}">
+                                                                <input type="hidden" name="sucursal" value="{{ $sucursal }}">
+                                                                <input type="hidden" name="numero" value="{{ $d['numero'] }}">
+                                                                <input type="hidden" name="actividad" value="{{ $d['actividad'] }}">
+                                                                <input type="hidden" name="orden" value="{{ $d['orden'] }}">
+                                                                <input type="hidden" name="empleado" value="{{ $d['empleado'] }}">
+                                                                <input type="hidden" name="producto" value="{{ $d['producto'] }}">
+                                                                <button type="submit"
+                                                                        title="Mandar al ERP los puros y horas del sistema (si no existe, lo registra)"
+                                                                        class="inline-flex items-center justify-center px-2 py-1 rounded-lg text-[11px] font-bold text-white"
+                                                                        style="background:#0e7490">⟳</button>
+                                                            </form>
+                                                        @else
+                                                            <span class="theme-text text-[11px]">—</span>
+                                                        @endif
+                                                    </td>
                                                 </tr>
                                             @endforeach
 
@@ -283,6 +304,7 @@
                                                 <td class="px-2 py-1.5 text-[11px]">
                                                     @if($difTotPuros || $difTotHoras) Diferencia @else OK @endif
                                                 </td>
+                                                <td class="px-2 py-1.5"></td>
                                             </tr>
                                             @empty
                                                 <tr><td colspan="12" class="px-2 py-3 text-center theme-text">Sin filas.</td></tr>
@@ -305,6 +327,7 @@
                                                     <td class="px-2 py-1.5"></td>
                                                     <td class="px-2 py-1.5"></td>
                                                     <td class="px-2 py-1.5 text-[11px]"></td>
+                                                    <td class="px-2 py-1.5"></td>
                                                 </tr>
                                             @endif
                                         </tbody>
