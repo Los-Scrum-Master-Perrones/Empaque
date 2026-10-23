@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es" class="h-full">
 <head>
     @include('layouts.favicon')
@@ -188,7 +188,9 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @forelse($detalle as $d)
+                                            @php $gruposDetalle = collect($detalle)->groupBy('numero'); @endphp
+                                            @forelse($gruposDetalle as $numeroDoc => $filasDoc)
+                                                @foreach($filasDoc as $d)
                                                 @php
                                                     $difPuros = (int) $d['sistema_puros'] !== (int) $d['erp_puros'];
                                                     $difHoras = abs((float) $d['sistema_horas'] - (float) $d['erp_horas']) > 0.01;
@@ -220,9 +222,50 @@
                                                         @endif
                                                     </td>
                                                 </tr>
+                                            @endforeach
+
+                                            @php
+                                                $totPurosSis = $filasDoc->sum('sistema_puros');
+                                                $totHorasSis = $filasDoc->sum('sistema_horas');
+                                                $totPurosErp = $filasDoc->sum('erp_puros');
+                                                $totHorasErp = $filasDoc->sum('erp_horas');
+                                                $difTotPuros = (int) $totPurosSis !== (int) $totPurosErp;
+                                                $difTotHoras = abs((float) $totHorasSis - (float) $totHorasErp) > 0.01;
+                                            @endphp
+                                            <tr class="bg-[#e8ecf1] font-black border-t-2 border-slate-400">
+                                                <td colspan="5" class="px-2 py-1.5 text-right">TOTAL DOC {{ $numeroDoc }} ({{ $filasDoc->count() }} filas)</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotPuros ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totPurosSis) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotHoras ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totHorasSis, 2) }}</td>
+                                                <td class="px-2 py-1.5"></td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotPuros ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totPurosErp) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotHoras ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totHorasErp, 2) }}</td>
+                                                <td class="px-2 py-1.5"></td>
+                                                <td class="px-2 py-1.5 text-[11px]">
+                                                    @if($difTotPuros || $difTotHoras) Diferencia @else OK @endif
+                                                </td>
+                                            </tr>
                                             @empty
                                                 <tr><td colspan="12" class="px-2 py-3 text-center theme-text">Sin filas.</td></tr>
                                             @endforelse
+
+                                            @if($gruposDetalle->isNotEmpty())
+                                                @php
+                                                    $gPurosSis = collect($detalle)->sum('sistema_puros');
+                                                    $gHorasSis = collect($detalle)->sum('sistema_horas');
+                                                    $gPurosErp = collect($detalle)->sum('erp_puros');
+                                                    $gHorasErp = collect($detalle)->sum('erp_horas');
+                                                @endphp
+                                                <tr class="bg-[#0f172a] text-white font-black">
+                                                    <td colspan="5" class="px-2 py-1.5 text-right">TOTAL GENERAL ({{ count($detalle) }} filas)</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gPurosSis) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gHorasSis, 2) }}</td>
+                                                    <td class="px-2 py-1.5"></td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gPurosErp) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gHorasErp, 2) }}</td>
+                                                    <td class="px-2 py-1.5"></td>
+                                                    <td class="px-2 py-1.5 text-[11px]"></td>
+                                                </tr>
+                                            @endif
                                         </tbody>
                                     </table>
                                 </div>
