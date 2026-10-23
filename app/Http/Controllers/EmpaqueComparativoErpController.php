@@ -19,6 +19,7 @@ class EmpaqueComparativoErpController extends Controller
     public function index(Request $request, ErpComparativoService $servicio)
     {
         $fecha = $this->fecha($request->get('fecha'));
+        $documento = trim((string) $request->get('documento', ''));
         $sucursal = (int) ($request->get('sucursal') ?: config('services.erp.default_sucursal', 2));
         if ($sucursal <= 0) {
             $sucursal = 2;
@@ -46,11 +47,19 @@ class EmpaqueComparativoErpController extends Controller
 
             if ($descargado) {
                 $resultado = $servicio->comparar($fecha, $sucursal);
+
+                if ($documento !== '') {
+                    $resultado['detalle'] = array_values(array_filter(
+                        $resultado['detalle'],
+                        fn (array $d) => (string) $d['numero'] === $documento
+                    ));
+                }
             }
         }
 
         return view('costos-empaque.comparativo', [
             'fecha' => $fecha,
+            'documento' => $documento,
             'sucursal' => $sucursal,
             'tieneEspejo' => $tieneEspejo,
             'descargado' => $descargado,

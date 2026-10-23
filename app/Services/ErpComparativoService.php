@@ -366,6 +366,7 @@ class ErpComparativoService
                 'erp_puros' => $purosE,
                 'erp_horas' => $horasE,
                 'erp_precio' => $e ? (float) $e->precio : null,
+                'erp_salario' => $e ? (float) $e->salario : null,
                 'sistema_precio' => $s->precio !== null ? (float) $s->precio : null,
                 'estado' => $estado,
             ];
@@ -387,6 +388,7 @@ class ErpComparativoService
                 'erp_puros' => (int) round((float) $e->puros),
                 'erp_horas' => round((float) $e->horas, 2),
                 'erp_precio' => (float) $e->precio,
+                'erp_salario' => (float) $e->salario,
                 'sistema_precio' => null,
                 'estado' => 'solo_erp',
             ];

@@ -115,8 +115,9 @@
                                             <tr class="bg-[#e8ecf1]">
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Documento</th>
                                                 <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dbeafe">SISTEMA</th>
-                                                <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dcfce7">ERP</th>
+                                                <th class="px-2 py-1.5 text-center" colspan="4" style="background:#dcfce7">ERP</th>
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Dónde está</th>
+                                                <th class="px-2 py-1.5 text-center" rowspan="2">Ver</th>
                                             </tr>
                                             <tr>
                                                 <th class="px-2 py-1 text-right" style="background:#dbeafe">Viñetas</th>
@@ -148,9 +149,19 @@
                                                         @else Solo en el ERP
                                                         @endif
                                                     </td>
+                                                    <td class="px-2 py-1 text-center">
+                                                        <a href="{{ route('costos-empaque.comparativo', ['fecha' => $fecha, 'sucursal' => $sucursal, 'documento' => $d['numero']]) }}#detalle"
+                                                           title="Ver los registros de este documento y señalar las diferencias"
+                                                           class="inline-flex items-center justify-center w-6 h-6 rounded-full hover:bg-[#dbeafe] transition">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:#1d4ed8">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            </svg>
+                                                        </a>
+                                                    </td>
                                                 </tr>
                                             @empty
-                                                <tr><td colspan="8" class="px-2 py-3 text-center theme-text">Sin documentos.</td></tr>
+                                                <tr><td colspan="9" class="px-2 py-3 text-center theme-text">Sin documentos.</td></tr>
                                             @endforelse
                                         </tbody>
                                         <tfoot>
@@ -168,6 +179,14 @@
                                     </table>
                                 </div>
                             </div>
+
+                            @if(!empty($documento))
+                                <div class="theme-card bg-[#dbeafe] border border-[#93c5fd] text-[#1e3a8a] rounded-2xl p-3 text-sm flex items-center justify-between">
+                                    <span>Mostrando solo el documento <strong>{{ $documento }}</strong> (los registros con diferencia están en rojo).</span>
+                                    <a href="{{ route('costos-empaque.comparativo', ['fecha' => $fecha, 'sucursal' => $sucursal]) }}"
+                                       class="px-3 py-1 rounded-xl bg-white text-[#1e3a8a] font-semibold border border-[#93c5fd]">Ver todos</a>
+                                </div>
+                            @endif
 
                             {{-- Detalle --}}
                             <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
@@ -193,7 +212,7 @@
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Empleado</th>
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Producto</th>
                                                 <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dbeafe">SISTEMA</th>
-                                                <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dcfce7">ERP</th>
+                                                <th class="px-2 py-1.5 text-center" colspan="4" style="background:#dcfce7">ERP</th>
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Estado</th>
                                             </tr>
                                             <tr>
@@ -203,6 +222,7 @@
                                                 <th class="px-2 py-1 text-right" style="background:#dcfce7">Puros</th>
                                                 <th class="px-2 py-1 text-right" style="background:#dcfce7">Horas</th>
                                                 <th class="px-2 py-1 text-right" style="background:#dcfce7">Precio</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Salario</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -231,6 +251,7 @@
                                                     <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#f0fdf4' }}" data-col="8" data-v="{{ (int) $d['erp_puros'] }}">{{ number_format($d['erp_puros']) }}</td>
                                                     <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#f0fdf4' }}" data-col="9" data-fmt="dec" data-v="{{ (float) $d['erp_horas'] }}">{{ number_format($d['erp_horas'], 2) }}</td>
                                                     <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#f0fdf4' }}" data-col="10" data-fmt="dec" data-v="{{ (float) ($d['erp_precio'] ?? 0) }}">{{ $d['erp_precio'] !== null ? number_format($d['erp_precio'], 4) : '—' }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#f0fdf4">{{ !empty($d['erp_salario']) ? number_format($d['erp_salario'], 2) : '—' }}</td>
 
                                                     <td class="px-2 py-1 text-[11px]">
                                                         @if($d['estado'] === 'solo_sistema') Falta en ERP
@@ -258,6 +279,7 @@
                                                 <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotPuros ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totPurosErp) }}</td>
                                                 <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotHoras ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totHorasErp, 2) }}</td>
                                                 <td class="px-2 py-1.5"></td>
+                                                <td class="px-2 py-1.5"></td>
                                                 <td class="px-2 py-1.5 text-[11px]">
                                                     @if($difTotPuros || $difTotHoras) Diferencia @else OK @endif
                                                 </td>
@@ -280,6 +302,7 @@
                                                     <td class="px-2 py-1.5"></td>
                                                     <td class="px-2 py-1.5 text-right tabular-nums" data-total="8">{{ number_format($gPurosErp) }}</td>
                                                     <td class="px-2 py-1.5 text-right tabular-nums" data-total="9" data-fmt="dec">{{ number_format($gHorasErp, 2) }}</td>
+                                                    <td class="px-2 py-1.5"></td>
                                                     <td class="px-2 py-1.5"></td>
                                                     <td class="px-2 py-1.5 text-[11px]"></td>
                                                 </tr>
