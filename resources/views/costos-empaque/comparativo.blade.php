@@ -108,39 +108,46 @@
                                 </div>
                                 <div class="overflow-x-auto max-h-72">
                                     <table class="min-w-full text-xs">
-                                        <thead class="bg-[#e8ecf1] theme-title sticky top-0">
+                                        <thead class="theme-title sticky top-0">
+                                            <tr class="bg-[#e8ecf1]">
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Documento</th>
+                                                <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dbeafe">SISTEMA</th>
+                                                <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dcfce7">ERP</th>
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Dónde está</th>
+                                            </tr>
                                             <tr>
-                                                <th class="px-2 py-1.5 text-left">Documento</th>
-                                                <th class="px-2 py-1.5 text-left">Dónde está</th>
-                                                <th class="px-2 py-1.5 text-right">Viñetas sist.</th>
-                                                <th class="px-2 py-1.5 text-right">Puros sist.</th>
-                                                <th class="px-2 py-1.5 text-right">Horas sist.</th>
-                                                <th class="px-2 py-1.5 text-left">ERP</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dbeafe">Viñetas</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dbeafe">Puros</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dbeafe">Horas</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Filas</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Puros</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Horas</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @forelse($documentos as $d)
+                                                @php
+                                                    $difPurosDoc = (int) $d['sistema_puros'] !== (int) ($d['erp_puros'] ?? 0);
+                                                    $difHorasDoc = abs((float) $d['sistema_horas'] - (float) ($d['erp_horas'] ?? 0)) > 0.01;
+                                                    $celdaDifDoc = 'background:#fecaca;color:#991b1b;font-weight:700;';
+                                                @endphp
                                                 <tr class="border-t theme-border {{ $d['origen'] === 'solo_sistema' ? 'bg-red-50' : ($d['origen'] === 'solo_erp' ? 'bg-orange-50' : '') }}">
                                                     <td class="px-2 py-1 font-semibold">{{ $d['numero'] }}</td>
-                                                    <td class="px-2 py-1">
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#eff6ff">{{ number_format($d['sistema_vinetas']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPurosDoc ? $celdaDifDoc : 'background:#eff6ff' }}">{{ number_format($d['sistema_puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHorasDoc ? $celdaDifDoc : 'background:#eff6ff' }}">{{ number_format($d['sistema_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#f0fdf4">{{ number_format($d['erp_vinetas'] ?? 0) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPurosDoc ? $celdaDifDoc : 'background:#f0fdf4' }}">{{ number_format($d['erp_puros'] ?? 0) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHorasDoc ? $celdaDifDoc : 'background:#f0fdf4' }}">{{ number_format($d['erp_horas'] ?? 0, 2) }}</td>
+                                                    <td class="px-2 py-1 text-[11px]">
                                                         @if($d['origen'] === 'ambos') En los dos
                                                         @elseif($d['origen'] === 'solo_sistema') Solo en el sistema (falta en ERP)
                                                         @else Solo en el ERP
                                                         @endif
                                                     </td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['sistema_vinetas']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['sistema_puros']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['sistema_horas'], 2) }}</td>
-                                                    <td class="px-2 py-1 text-[11px]">
-                                                        @if($d['origen'] !== 'solo_sistema')
-                                                            {{ $d['aplicada'] ? 'Aplicada' : 'Abierta' }} · {{ \Illuminate\Support\Str::limit($d['observaciones'] ?? '', 45) }}
-                                                        @else
-                                                            —
-                                                        @endif
-                                                    </td>
                                                 </tr>
                                             @empty
-                                                <tr><td colspan="6" class="px-2 py-3 text-center theme-text">Sin documentos.</td></tr>
+                                                <tr><td colspan="8" class="px-2 py-3 text-center theme-text">Sin documentos.</td></tr>
                                             @endforelse
                                         </tbody>
                                     </table>
@@ -151,40 +158,60 @@
                             <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
                                 <div class="px-3 py-2 border-b theme-border">
                                     <h2 class="theme-title text-sm font-black">Detalle por documento + actividad + orden + empleado + producto</h2>
-                                    <p class="theme-text text-[11px]">Rojo = falta en el ERP · Naranja = sobra en el ERP · Amarillo = puros/horas distintas</p>
+                                    <p class="theme-text text-[11px]">
+                                        <span class="px-1 rounded" style="background:#dbeafe">Azul = sistema</span>
+                                        <span class="px-1 rounded" style="background:#dcfce7">Verde = ERP</span>
+                                        <span class="px-1 rounded" style="background:#fecaca">Rojo = valor distinto</span>
+                                        · Rojo/fila = falta en el ERP · Naranja/fila = sobra en el ERP
+                                    </p>
                                 </div>
                                 <div class="overflow-x-auto max-h-[520px]">
                                     <table class="min-w-full text-xs">
-                                        <thead class="bg-[#e8ecf1] theme-title sticky top-0">
+                                        <thead class="theme-title sticky top-0">
+                                            <tr class="bg-[#e8ecf1]">
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Doc</th>
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Act</th>
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Orden</th>
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Empleado</th>
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Producto</th>
+                                                <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dbeafe">SISTEMA</th>
+                                                <th class="px-2 py-1.5 text-center" colspan="3" style="background:#dcfce7">ERP</th>
+                                                <th class="px-2 py-1.5 text-left" rowspan="2">Estado</th>
+                                            </tr>
                                             <tr>
-                                                <th class="px-2 py-1.5 text-left">Doc</th>
-                                                <th class="px-2 py-1.5 text-left">Act</th>
-                                                <th class="px-2 py-1.5 text-left">Orden</th>
-                                                <th class="px-2 py-1.5 text-left">Empleado</th>
-                                                <th class="px-2 py-1.5 text-left">Producto</th>
-                                                <th class="px-2 py-1.5 text-right">Puros sist.</th>
-                                                <th class="px-2 py-1.5 text-right">Puros ERP</th>
-                                                <th class="px-2 py-1.5 text-right">Horas sist.</th>
-                                                <th class="px-2 py-1.5 text-right">Horas ERP</th>
-                                                <th class="px-2 py-1.5 text-right">Precio sist.</th>
-                                                <th class="px-2 py-1.5 text-right">Precio ERP</th>
-                                                <th class="px-2 py-1.5 text-left">Estado</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dbeafe">Puros</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dbeafe">Horas</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dbeafe">Precio</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Puros</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Horas</th>
+                                                <th class="px-2 py-1 text-right" style="background:#dcfce7">Precio</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @forelse($detalle as $d)
-                                                <tr class="border-t theme-border {{ $d['estado'] === 'solo_sistema' ? 'bg-red-50' : ($d['estado'] === 'solo_erp' ? 'bg-orange-50' : ($d['estado'] === 'diferencia' ? 'bg-amber-50' : '')) }}">
+                                                @php
+                                                    $difPuros = (int) $d['sistema_puros'] !== (int) $d['erp_puros'];
+                                                    $difHoras = abs((float) $d['sistema_horas'] - (float) $d['erp_horas']) > 0.01;
+                                                    $difPrecio = $d['sistema_precio'] !== null
+                                                        && $d['erp_precio'] !== null
+                                                        && abs((float) $d['sistema_precio'] - (float) $d['erp_precio']) > 0.0001;
+                                                    $celdaDif = 'background:#fecaca;color:#991b1b;font-weight:700;';
+                                                @endphp
+                                                <tr class="border-t theme-border {{ $d['estado'] === 'solo_sistema' ? 'bg-red-50' : ($d['estado'] === 'solo_erp' ? 'bg-orange-50' : '') }}">
                                                     <td class="px-2 py-1">{{ $d['numero'] }}</td>
                                                     <td class="px-2 py-1">{{ $d['actividad'] }}</td>
                                                     <td class="px-2 py-1">{{ $d['orden'] }}</td>
                                                     <td class="px-2 py-1">{{ $d['empleado'] }} {{ \Illuminate\Support\Str::limit((string) $d['nombre_empleado'], 22) }}</td>
                                                     <td class="px-2 py-1">{{ $d['producto'] }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['sistema_puros']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['erp_puros']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['sistema_horas'], 2) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($d['erp_horas'], 2) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ $d['sistema_precio'] !== null ? number_format($d['sistema_precio'], 4) : '—' }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ $d['erp_precio'] !== null ? number_format($d['erp_precio'], 4) : '—' }}</td>
+
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#eff6ff' }}">{{ number_format($d['sistema_puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#eff6ff' }}">{{ number_format($d['sistema_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#eff6ff' }}">{{ $d['sistema_precio'] !== null ? number_format($d['sistema_precio'], 4) : '—' }}</td>
+
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#f0fdf4' }}">{{ number_format($d['erp_puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#f0fdf4' }}">{{ number_format($d['erp_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#f0fdf4' }}">{{ $d['erp_precio'] !== null ? number_format($d['erp_precio'], 4) : '—' }}</td>
+
                                                     <td class="px-2 py-1 text-[11px]">
                                                         @if($d['estado'] === 'solo_sistema') Falta en ERP
                                                         @elseif($d['estado'] === 'solo_erp') Sobra en ERP
