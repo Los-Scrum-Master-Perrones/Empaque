@@ -50,9 +50,20 @@ class ErpComparativoService
         $data = $response->json();
 
         if (! is_array($data) || ! ($data['success'] ?? false)) {
+            $mensaje = is_array($data)
+                ? ($data['message'] ?? 'respuesta no valida')
+                : 'respuesta no valida';
+
+            if ($response->status() === 404) {
+                $mensaje = 'El ERP no tiene la ruta /api/empaque-erp/todo (HTTP 404). '
+                    .'Falta subir EmpaqueErpApiController.php + routes/api.php y correr php artisan route:clear en facturacion.';
+            } elseif ($response->status() === 401) {
+                $mensaje = 'El ERP rechazo la clave (HTTP 401). Revisa ERP_API_KEY en el .env de Empaque.';
+            }
+
             return [
                 'success' => false,
-                'message' => 'El ERP respondio: '.($data['message'] ?? 'respuesta no valida (HTTP '.$response->status().')'),
+                'message' => 'El ERP respondio: '.$mensaje.' (HTTP '.$response->status().')',
             ];
         }
 

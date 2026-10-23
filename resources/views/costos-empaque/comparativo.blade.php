@@ -245,5 +245,7 @@
             </main>
         </div>
     </div>
+
+    @include('layouts.flash')
 </body>
 </html>
