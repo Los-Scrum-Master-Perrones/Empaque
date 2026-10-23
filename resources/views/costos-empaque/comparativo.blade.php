@@ -104,10 +104,13 @@
                             <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
                                 <div class="px-3 py-2 border-b theme-border flex items-center justify-between">
                                     <h2 class="theme-title text-sm font-black">Documentos del día</h2>
+                                    <input type="text" id="filtroDocs" placeholder="Filtrar..."
+                                           oninput="filtrarTabla('tablaDocs', this.value)"
+                                           class="rounded-lg border theme-border bg-white px-2 py-1 text-xs theme-title w-40">
                                     <span class="theme-text text-xs">ERP: {{ $resumen['documentos_erp'] ?? 0 }} | Sistema: {{ $resumen['documentos_sistema'] ?? 0 }}</span>
                                 </div>
                                 <div class="overflow-x-auto max-h-72">
-                                    <table class="min-w-full text-xs">
+                                    <table id="tablaDocs" class="min-w-full text-xs">
                                         <thead class="theme-title sticky top-0">
                                             <tr class="bg-[#e8ecf1]">
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Documento</th>
@@ -133,12 +136,12 @@
                                                 @endphp
                                                 <tr class="border-t theme-border {{ $d['origen'] === 'solo_sistema' ? 'bg-red-50' : ($d['origen'] === 'solo_erp' ? 'bg-orange-50' : '') }}">
                                                     <td class="px-2 py-1 font-semibold">{{ $d['numero'] }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#eff6ff">{{ number_format($d['sistema_vinetas']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPurosDoc ? $celdaDifDoc : 'background:#eff6ff' }}">{{ number_format($d['sistema_puros']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHorasDoc ? $celdaDifDoc : 'background:#eff6ff' }}">{{ number_format($d['sistema_horas'], 2) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#f0fdf4">{{ number_format($d['erp_vinetas'] ?? 0) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPurosDoc ? $celdaDifDoc : 'background:#f0fdf4' }}">{{ number_format($d['erp_puros'] ?? 0) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHorasDoc ? $celdaDifDoc : 'background:#f0fdf4' }}">{{ number_format($d['erp_horas'] ?? 0, 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#eff6ff" data-col="1" data-v="{{ (int) $d['sistema_vinetas'] }}">{{ number_format($d['sistema_vinetas']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPurosDoc ? $celdaDifDoc : 'background:#eff6ff' }}" data-col="2" data-v="{{ (int) $d['sistema_puros'] }}">{{ number_format($d['sistema_puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHorasDoc ? $celdaDifDoc : 'background:#eff6ff' }}" data-col="3" data-fmt="dec" data-v="{{ (float) $d['sistema_horas'] }}">{{ number_format($d['sistema_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="background:#f0fdf4" data-col="4" data-v="{{ (int) ($d['erp_vinetas'] ?? 0) }}">{{ number_format($d['erp_vinetas'] ?? 0) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPurosDoc ? $celdaDifDoc : 'background:#f0fdf4' }}" data-col="5" data-v="{{ (int) ($d['erp_puros'] ?? 0) }}">{{ number_format($d['erp_puros'] ?? 0) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHorasDoc ? $celdaDifDoc : 'background:#f0fdf4' }}" data-col="6" data-fmt="dec" data-v="{{ (float) ($d['erp_horas'] ?? 0) }}">{{ number_format($d['erp_horas'] ?? 0, 2) }}</td>
                                                     <td class="px-2 py-1 text-[11px]">
                                                         @if($d['origen'] === 'ambos') En los dos
                                                         @elseif($d['origen'] === 'solo_sistema') Solo en el sistema (falta en ERP)
@@ -150,6 +153,18 @@
                                                 <tr><td colspan="8" class="px-2 py-3 text-center theme-text">Sin documentos.</td></tr>
                                             @endforelse
                                         </tbody>
+                                        <tfoot>
+                                            <tr class="bg-[#0f172a] text-white font-black">
+                                                <td class="px-2 py-1.5 text-right">TOTAL GENERAL</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="1">{{ number_format(collect($documentos)->sum('sistema_vinetas')) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="2">{{ number_format(collect($documentos)->sum('sistema_puros')) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="3" data-fmt="dec">{{ number_format(collect($documentos)->sum('sistema_horas'), 2) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="4">{{ number_format(collect($documentos)->sum('erp_vinetas')) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="5">{{ number_format(collect($documentos)->sum('erp_puros')) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="6" data-fmt="dec">{{ number_format(collect($documentos)->sum('erp_horas'), 2) }}</td>
+                                                <td class="px-2 py-1.5 text-[11px]"></td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             </div>
@@ -158,6 +173,9 @@
                             <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
                                 <div class="px-3 py-2 border-b theme-border">
                                     <h2 class="theme-title text-sm font-black">Detalle por documento + actividad + orden + empleado + producto</h2>
+                                    <input type="text" id="filtroDetalle" placeholder="Filtrar..."
+                                           oninput="filtrarTabla('tablaDetalle', this.value)"
+                                           class="mt-1 rounded-lg border theme-border bg-white px-2 py-1 text-xs theme-title w-52">
                                     <p class="theme-text text-[11px]">
                                         <span class="px-1 rounded" style="background:#dbeafe">Azul = sistema</span>
                                         <span class="px-1 rounded" style="background:#dcfce7">Verde = ERP</span>
@@ -166,7 +184,7 @@
                                     </p>
                                 </div>
                                 <div class="overflow-x-auto max-h-[520px]">
-                                    <table class="min-w-full text-xs">
+                                    <table id="tablaDetalle" class="min-w-full text-xs">
                                         <thead class="theme-title sticky top-0">
                                             <tr class="bg-[#e8ecf1]">
                                                 <th class="px-2 py-1.5 text-left" rowspan="2">Doc</th>
@@ -206,13 +224,13 @@
                                                     <td class="px-2 py-1">{{ $d['empleado'] }} {{ \Illuminate\Support\Str::limit((string) $d['nombre_empleado'], 22) }}</td>
                                                     <td class="px-2 py-1">{{ $d['producto'] }}</td>
 
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#eff6ff' }}">{{ number_format($d['sistema_puros']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#eff6ff' }}">{{ number_format($d['sistema_horas'], 2) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#eff6ff' }}">{{ $d['sistema_precio'] !== null ? number_format($d['sistema_precio'], 4) : '—' }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#eff6ff' }}" data-col="5" data-v="{{ (int) $d['sistema_puros'] }}">{{ number_format($d['sistema_puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#eff6ff' }}" data-col="6" data-fmt="dec" data-v="{{ (float) $d['sistema_horas'] }}">{{ number_format($d['sistema_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#eff6ff' }}" data-col="7" data-fmt="dec" data-v="{{ (float) ($d['sistema_precio'] ?? 0) }}">{{ $d['sistema_precio'] !== null ? number_format($d['sistema_precio'], 4) : '—' }}</td>
 
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#f0fdf4' }}">{{ number_format($d['erp_puros']) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#f0fdf4' }}">{{ number_format($d['erp_horas'], 2) }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#f0fdf4' }}">{{ $d['erp_precio'] !== null ? number_format($d['erp_precio'], 4) : '—' }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPuros ? $celdaDif : 'background:#f0fdf4' }}" data-col="8" data-v="{{ (int) $d['erp_puros'] }}">{{ number_format($d['erp_puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difHoras ? $celdaDif : 'background:#f0fdf4' }}" data-col="9" data-fmt="dec" data-v="{{ (float) $d['erp_horas'] }}">{{ number_format($d['erp_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" style="{{ $difPrecio ? $celdaDif : 'background:#f0fdf4' }}" data-col="10" data-fmt="dec" data-v="{{ (float) ($d['erp_precio'] ?? 0) }}">{{ $d['erp_precio'] !== null ? number_format($d['erp_precio'], 4) : '—' }}</td>
 
                                                     <td class="px-2 py-1 text-[11px]">
                                                         @if($d['estado'] === 'solo_sistema') Falta en ERP
@@ -232,7 +250,7 @@
                                                 $difTotPuros = (int) $totPurosSis !== (int) $totPurosErp;
                                                 $difTotHoras = abs((float) $totHorasSis - (float) $totHorasErp) > 0.01;
                                             @endphp
-                                            <tr class="bg-[#e8ecf1] font-black border-t-2 border-slate-400">
+                                            <tr class="bg-[#e8ecf1] font-black border-t-2 border-slate-400" data-no-sum="1">
                                                 <td colspan="5" class="px-2 py-1.5 text-right">TOTAL DOC {{ $numeroDoc }} ({{ $filasDoc->count() }} filas)</td>
                                                 <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotPuros ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totPurosSis) }}</td>
                                                 <td class="px-2 py-1.5 text-right tabular-nums" style="{{ $difTotHoras ? 'background:#fecaca;color:#991b1b' : '' }}">{{ number_format($totHorasSis, 2) }}</td>
@@ -255,13 +273,13 @@
                                                     $gPurosErp = collect($detalle)->sum('erp_puros');
                                                     $gHorasErp = collect($detalle)->sum('erp_horas');
                                                 @endphp
-                                                <tr class="bg-[#0f172a] text-white font-black">
+                                                <tr class="bg-[#0f172a] text-white font-black" data-total-row="1">
                                                     <td colspan="5" class="px-2 py-1.5 text-right">TOTAL GENERAL ({{ count($detalle) }} filas)</td>
-                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gPurosSis) }}</td>
-                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gHorasSis, 2) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="5">{{ number_format($gPurosSis) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="6" data-fmt="dec">{{ number_format($gHorasSis, 2) }}</td>
                                                     <td class="px-2 py-1.5"></td>
-                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gPurosErp) }}</td>
-                                                    <td class="px-2 py-1.5 text-right tabular-nums">{{ number_format($gHorasErp, 2) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="8">{{ number_format($gPurosErp) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="9" data-fmt="dec">{{ number_format($gHorasErp, 2) }}</td>
                                                     <td class="px-2 py-1.5"></td>
                                                     <td class="px-2 py-1.5 text-[11px]"></td>
                                                 </tr>
@@ -275,10 +293,13 @@
                             <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
                                 <div class="px-3 py-2 border-b theme-border">
                                     <h2 class="theme-title text-sm font-black">Detalle del ERP vs planificación del día</h2>
+                                    <input type="text" id="filtroPlan" placeholder="Filtrar..."
+                                           oninput="filtrarTabla('tablaPlan', this.value)"
+                                           class="mt-1 rounded-lg border theme-border bg-white px-2 py-1 text-xs theme-title w-52">
                                     <p class="theme-text text-[11px]">Azul = esa actividad/orden/línea no está planificada para ese día</p>
                                 </div>
                                 <div class="overflow-x-auto max-h-96">
-                                    <table class="min-w-full text-xs">
+                                    <table id="tablaPlan" class="min-w-full text-xs">
                                         <thead class="bg-[#e8ecf1] theme-title sticky top-0">
                                             <tr>
                                                 <th class="px-2 py-1.5 text-left">Doc</th>
@@ -295,8 +316,8 @@
                                                     <td class="px-2 py-1">{{ $p['numero'] }}</td>
                                                     <td class="px-2 py-1">{{ $p['actividad'] }}</td>
                                                     <td class="px-2 py-1">{{ $p['orden'] }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ $p['linea'] }}</td>
-                                                    <td class="px-2 py-1 text-right tabular-nums">{{ number_format($p['puros']) }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" data-col="3" data-v="{{ (int) $p['linea'] }}">{{ $p['linea'] }}</td>
+                                                    <td class="px-2 py-1 text-right tabular-nums" data-col="4" data-v="{{ (int) $p['puros'] }}">{{ number_format($p['puros']) }}</td>
                                                     <td class="px-2 py-1 text-[11px]">
                                                         {{ $p['estado'] === 'sin_planificacion' ? 'Sin planificación ese día' : 'En planificación' }}
                                                     </td>
@@ -305,6 +326,14 @@
                                                 <tr><td colspan="6" class="px-2 py-3 text-center theme-text">Sin filas.</td></tr>
                                             @endforelse
                                         </tbody>
+                                        <tfoot>
+                                            <tr class="bg-[#0f172a] text-white font-black">
+                                                <td colspan="3" class="px-2 py-1.5 text-right">TOTAL GENERAL</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="3">{{ number_format(collect($planificacion)->sum('linea')) }}</td>
+                                                <td class="px-2 py-1.5 text-right tabular-nums" data-total="4">{{ number_format(collect($planificacion)->sum('puros')) }}</td>
+                                                <td class="px-2 py-1.5"></td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             </div>
@@ -316,6 +345,66 @@
         </div>
     </div>
 
+    <script>
+        function fmtNum(v, dec) {
+            return String(dec ? v.toFixed(2) : Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function sumarTabla(tablaId) {
+            const tabla = document.getElementById(tablaId);
+            if (!tabla) return;
+
+            const totales = {};
+
+            tabla.querySelectorAll('tbody tr').forEach(function (tr) {
+                if (tr.dataset.noSum === '1' || tr.dataset.totalRow === '1') return;
+                if (tr.style.display === 'none') return;
+
+                tr.querySelectorAll('[data-v]').forEach(function (td) {
+                    const c = td.dataset.col;
+                    totales[c] = (totales[c] || 0) + (parseFloat(td.dataset.v) || 0);
+                });
+            });
+
+            tabla.querySelectorAll('tfoot [data-total]').forEach(function (td) {
+                const c = td.dataset.total;
+                td.textContent = fmtNum(totales[c] || 0, td.dataset.fmt === 'dec');
+            });
+
+            const filasVisibles = Array.from(tabla.querySelectorAll('tbody tr'))
+                .filter(function (tr) { return tr.style.display !== 'none' && tr.dataset.noSum !== '1' && tr.dataset.totalRow !== '1'; });
+
+            tabla.querySelectorAll('tbody [data-total]').forEach(function (td) {
+                const c = td.dataset.total;
+                td.textContent = fmtNum(totales[c] || 0, td.dataset.fmt === 'dec');
+            });
+
+            const etiqueta = tabla.querySelector('tbody [data-total-row="1"] td');
+            if (etiqueta && etiqueta.textContent.indexOf('TOTAL GENERAL') === 0) {
+                etiqueta.textContent = 'TOTAL GENERAL (' + filasVisibles.length + ' filas)';
+            }
+        }
+
+        function filtrarTabla(tablaId, valor) {
+            const tabla = document.getElementById(tablaId);
+            if (!tabla) return;
+
+            const q = (valor || '').toLowerCase().trim();
+
+            tabla.querySelectorAll('tbody tr').forEach(function (tr) {
+                if (tr.dataset.totalRow === '1') return;
+                tr.style.display = (q === '' || tr.innerText.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+            });
+
+            sumarTabla(tablaId);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            sumarTabla('tablaDocs');
+            sumarTabla('tablaDetalle');
+            sumarTabla('tablaPlan');
+        });
+    </script>
     @include('layouts.flash')
 </body>
 </html>
