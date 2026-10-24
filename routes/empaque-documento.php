@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\EmpaqueComparativoErpController;
 use App\Http\Controllers\VinetaRegistroController;
