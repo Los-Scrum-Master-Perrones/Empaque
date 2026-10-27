@@ -68,22 +68,45 @@
                                     </div>
                                 </div>
 
-                                @if(!auth()->user()?->esSoloSupervisor())
-                                <form method="POST"
-                                      action="{{ route('empleados.sincronizar') }}"
-                                      class="form-sincronizar w-full sm:w-auto">
-                                    @csrf
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                                    <div class="flex flex-col sm:flex-row gap-2">
+                                        <button type="button"
+                                                id="btnGenerarQrEmpleados"
+                                                disabled
+                                                class="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#1d4ed8] text-white text-sm font-semibold hover:bg-[#1e40af] transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 3h3v3h-3v-3Zm3-3h3v3h-3v-3Z"/>
+                                            </svg>
 
-                                    <button type="submit"
-                                            class="gooey-action btn-sincronizar inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#0f172a] text-white text-sm font-semibold hover:bg-[#1e293b] transition disabled:opacity-70 disabled:cursor-not-allowed">
-                                        <div class="loader-sincronizar hidden"></div>
+                                            <span>Generar QR (<span id="qrSeleccionContador">0</span>)</span>
+                                        </button>
 
-                                        <span class="texto-sincronizar">
-                                            Sincronizar empleados
-                                        </span>
-                                    </button>
-                                </form>
-                                @endif
+                                        <button type="button"
+                                                id="btnLimpiarQrEmpleados"
+                                                disabled
+                                                class="inline-flex items-center justify-center w-full sm:w-auto px-3 py-2.5 rounded-xl bg-white text-[#0b1220] text-sm font-semibold border theme-border hover:bg-[#f1f5f9] transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            Limpiar
+                                        </button>
+                                    </div>
+
+                                    @if(!auth()->user()?->esSoloSupervisor())
+                                    <form method="POST"
+                                          action="{{ route('empleados.sincronizar') }}"
+                                          class="form-sincronizar w-full sm:w-auto">
+                                        @csrf
+
+                                        <button type="submit"
+                                                class="gooey-action btn-sincronizar inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#0f172a] text-white text-sm font-semibold hover:bg-[#1e293b] transition disabled:opacity-70 disabled:cursor-not-allowed">
+                                            <div class="loader-sincronizar hidden"></div>
+
+                                            <span class="texto-sincronizar">
+                                                Sincronizar empleados
+                                            </span>
+                                        </button>
+                                    </form>
+                                    @endif
+                                </div>
                             </div>
                         </div>
 
@@ -235,6 +258,54 @@
             const getTableContainer = () => document.getElementById('empleadosTableContainer');
             const getFilterForm = () => document.querySelector('.empleados-ajax-filter-form');
 
+            const QR_STORAGE_KEY = 'empleadosQrSeleccion';
+            const QR_URL = @json(route('empleados.qr'));
+
+            const leerSeleccionQr = () => {
+                try {
+                    return new Set(JSON.parse(sessionStorage.getItem(QR_STORAGE_KEY) || '[]'));
+                } catch (error) {
+                    return new Set();
+                }
+            };
+
+            const guardarSeleccionQr = (seleccion) => {
+                sessionStorage.setItem(QR_STORAGE_KEY, JSON.stringify(Array.from(seleccion)));
+            };
+
+            const aplicarSeleccionQr = () => {
+                const seleccion = leerSeleccionQr();
+                const checks = Array.from(document.querySelectorAll('.empleado-qr-check'));
+
+                checks.forEach((check) => {
+                    check.checked = seleccion.has(check.value);
+                });
+
+                const todos = document.getElementById('empleadosQrTodos');
+                const marcados = checks.filter((check) => check.checked).length;
+
+                if (todos) {
+                    todos.checked = checks.length > 0 && marcados === checks.length;
+                    todos.indeterminate = marcados > 0 && marcados < checks.length;
+                }
+
+                const botonQr = document.getElementById('btnGenerarQrEmpleados');
+                const botonLimpiar = document.getElementById('btnLimpiarQrEmpleados');
+                const contador = document.getElementById('qrSeleccionContador');
+
+                if (botonQr) {
+                    botonQr.disabled = seleccion.size === 0;
+                }
+
+                if (botonLimpiar) {
+                    botonLimpiar.disabled = seleccion.size === 0;
+                }
+
+                if (contador) {
+                    contador.textContent = seleccion.size;
+                }
+            };
+
             const showTableLoader = () => {
                 const container = getTableContainer();
                 const loader = document.getElementById('empleadosTableLoader');
@@ -299,6 +370,7 @@
 
                     container.innerHTML = await response.text();
                     window.history.pushState({}, '', url);
+                    aplicarSeleccionQr();
                 } catch (error) {
                     console.error(error);
                     window.location.href = url;
@@ -357,6 +429,52 @@
             window.addEventListener('popstate', () => {
                 loadEmpleadosTable(window.location.href);
             });
+
+            document.addEventListener('change', (event) => {
+                const check = event.target.closest('.empleado-qr-check');
+                const todos = event.target.closest('#empleadosQrTodos');
+
+                if (!check && !todos) {
+                    return;
+                }
+
+                const seleccion = leerSeleccionQr();
+
+                if (check) {
+                    if (check.checked) {
+                        seleccion.add(check.value);
+                    } else {
+                        seleccion.delete(check.value);
+                    }
+                } else {
+                    document.querySelectorAll('.empleado-qr-check').forEach((item) => {
+                        item.checked = todos.checked;
+                        item.checked ? seleccion.add(item.value) : seleccion.delete(item.value);
+                    });
+                }
+
+                guardarSeleccionQr(seleccion);
+                aplicarSeleccionQr();
+            });
+
+            document.addEventListener('click', (event) => {
+                if (event.target.closest('#btnLimpiarQrEmpleados')) {
+                    guardarSeleccionQr(new Set());
+                    aplicarSeleccionQr();
+                }
+
+                if (event.target.closest('#btnGenerarQrEmpleados')) {
+                    const seleccion = Array.from(leerSeleccionQr());
+
+                    if (!seleccion.length) {
+                        return;
+                    }
+
+                    window.open(`${QR_URL}?codigos=${encodeURIComponent(seleccion.join(','))}`, '_blank');
+                }
+            });
+
+            aplicarSeleccionQr();
         });
     </script>
 

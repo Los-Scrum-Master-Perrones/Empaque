@@ -28,4 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/costos-empaque/comparativo/sincronizar', [EmpaqueComparativoErpController::class, 'sincronizar'])
         ->name('costos-empaque.comparativo.sincronizar');
+
+    Route::post('/costos-empaque/comparativo/sincronizar-horas', [EmpaqueComparativoErpController::class, 'sincronizarHoras'])
+        ->name('costos-empaque.comparativo.sincronizar-horas');
 });

@@ -8,9 +8,69 @@
 
     @include('layouts.theme-script')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    <style>
+        .spinner-cargando {
+            width: 46px;
+            height: 46px;
+            border: 5px solid #e5e7eb;
+            border-top-color: #0e7490;
+            border-radius: 50%;
+            animation: girar-cargando .8s linear infinite;
+        }
+
+        @keyframes girar-cargando {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Colores de botones/overlay que no estan en el CSS compilado
+           (se arma con la vista, sin necesidad de correr npm run build). */
+        button[name="refrescar"],
+        form[action*="comparativo.descargar"] button[type="submit"] {
+            background: #0e7490;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .375rem;
+            border-radius: .75rem;
+            font-weight: 600;
+        }
+
+        button[style*="0e7490"],
+        button[style*="b45309"] {
+            color: #fff;
+        }
+
+        #cargandoOverlay {
+            position: fixed;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 10000;
+            background: rgba(0, 0, 0, .5);
+            backdrop-filter: blur(2px);
+        }
+
+        #tablaDetalle .overflow-wrapper {
+            max-height: 520px;
+            overflow-x: auto;
+        }
+    </style>
 </head>
 
 <body class="vinetas-page min-h-screen theme-bg antialiased">
+    {{-- Cargando (spinner) mientras baja el ERP o carga la pagina --}}
+    <div id="cargandoOverlay"
+         class="fixed inset-0 z-[10000] hidden items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+        <div class="theme-card bg-white rounded-2xl border theme-border shadow-2xl px-7 py-6 flex flex-col items-center gap-3">
+            <div class="spinner-cargando"></div>
+            <p id="cargandoTexto" class="theme-text text-sm font-semibold text-center">
+                Cargando comparativo...
+            </p>
+        </div>
+    </div>
     <div
         x-data="{ sidebarOpen: false, catalogos: false, seguridad: false, produccion: true }"
         class="min-h-screen flex theme-bg">
@@ -36,6 +96,7 @@
                                 </div>
 
                                 <form method="GET" action="{{ route('costos-empaque.comparativo') }}"
+                                      data-cargando="Cargando comparativo..."
                                       class="flex flex-wrap items-end gap-2">
                                     <div class="min-w-0">
                                         <label for="fecha" class="theme-text block text-[11px] font-semibold mb-1">Fecha</label>
@@ -53,11 +114,23 @@
                                             class="inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-[#0f172a] text-white text-sm font-semibold hover:bg-[#1e293b] transition">
                                         Ver
                                     </button>
+
+                                    <button type="submit"
+                                            name="refrescar"
+                                            value="1"
+                                            class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0e7490] text-white text-sm font-semibold hover:bg-[#155e75] transition"
+                                            title="Vuelve a traer los datos del ERP para esta fecha">
+                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Actualizar datos
+                                    </button>
                                 </form>
                             </div>
 
                             <div class="mt-3 flex flex-wrap items-center gap-2">
-                                <form method="POST" action="{{ route('costos-empaque.comparativo.descargar') }}">
+                                <form method="POST" action="{{ route('costos-empaque.comparativo.descargar') }}"
+                                      data-cargando="Descargando del ERP... esto puede tardar unos segundos">
                                     @csrf
                                     <input type="hidden" name="fecha" value="{{ $fecha }}">
                                     <input type="hidden" name="sucursal" value="{{ $sucursal }}">
@@ -74,6 +147,19 @@
                                 @endif
                             </div>
                         </div>
+
+                        @if($descargaError ?? null)
+                            <div class="theme-card bg-red-50 border border-red-200 text-red-800 rounded-2xl p-3 text-sm">
+                                No se pudo descargar {{ $fecha }}: {{ $descargaError }}
+                            </div>
+                        @endif
+
+                        @if($sinDocumentos ?? false)
+                            <div class="theme-card bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-sm">
+                                El ERP se consult� correctamente pero <strong>no tiene documentos para {{ $fecha }}</strong>
+                                (sucursal {{ $sucursal }}).
+                            </div>
+                        @endif
 
                         @if(! $tieneEspejo)
                             <div class="theme-card bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-sm">
@@ -99,6 +185,101 @@
                                     </div>
                                 @endforeach
                             </div>
+
+                            {{-- Totales por empleado (suma de puros y de horas) --}}
+                            @if(!empty($totalesEmpleados['filas']))
+                                <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
+                                    <div class="px-3 py-2 border-b theme-border flex items-center justify-between gap-2 flex-wrap">
+                                        <h2 class="theme-title text-sm font-black">Totales por empleado (puros y horas)</h2>
+                                        <input type="text" id="filtroEmpleados" placeholder="Filtrar..."
+                                               oninput="filtrarTabla('tablaEmpleados', this.value)"
+                                               class="rounded-lg border theme-border bg-white px-2 py-1 text-xs theme-title w-40">
+                                        <span class="theme-text text-xs">
+                                            Empleados: {{ $totalesEmpleados['total']['empleados'] }}
+                                            | Filas: {{ $totalesEmpleados['total']['filas'] }}
+                                        </span>
+                                    </div>
+
+                                    <div class="overflow-x-auto max-h-[420px]">
+                                        <table id="tablaEmpleados" class="min-w-full text-xs">
+                                            <thead class="theme-title sticky top-0">
+                                                <tr class="bg-[#e8ecf1]">
+                                                    <th class="px-2 py-1.5 text-left" rowspan="2">Empleado</th>
+                                                    <th class="px-2 py-1.5 text-right" rowspan="2">Filas</th>
+                                                    <th class="px-2 py-1.5 text-center" colspan="2" style="background:#dbeafe">SISTEMA</th>
+                                                    <th class="px-2 py-1.5 text-center" colspan="2" style="background:#dcfce7">ERP</th>
+                                                    <th class="px-2 py-1.5 text-center" colspan="2" style="background:#fecaca">DIFERENCIA</th>
+                                                    <th class="px-2 py-1.5 text-center" rowspan="2">Ajustar hora</th>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-2 py-1 text-right" style="background:#dbeafe">Puros</th>
+                                                    <th class="px-2 py-1 text-right" style="background:#dbeafe">Horas</th>
+                                                    <th class="px-2 py-1 text-right" style="background:#dcfce7">Puros</th>
+                                                    <th class="px-2 py-1 text-right" style="background:#dcfce7">Horas</th>
+                                                    <th class="px-2 py-1 text-right" style="background:#fecaca">Puros</th>
+                                                    <th class="px-2 py-1 text-right" style="background:#fecaca">Horas</th>
+                                                </tr>
+                                            </thead>
+
+                                            <tbody>
+                                                @php $celdaDifEmp = 'background:#fecaca;color:#991b1b;font-weight:700;'; @endphp
+                                                @foreach($totalesEmpleados['filas'] as $t)
+                                                    @php
+                                                        $dif = $t['estado'] === 'diferencia';
+                                                        $estiloSis = $dif ? $celdaDifEmp : 'background:#eff6ff';
+                                                        $estiloErp = $dif ? $celdaDifEmp : 'background:#f0fdf4';
+                                                    @endphp
+                                                    <tr class="border-t theme-border {{ $dif ? 'bg-red-50' : '' }}">
+                                                        <td class="px-2 py-1">
+                                                            <span class="font-bold">{{ $t['empleado'] }}</span>
+                                                            {{ \Illuminate\Support\Str::limit((string) $t['nombre_empleado'], 24) }}
+                                                        </td>
+                                                        <td class="px-2 py-1 text-right tabular-nums" data-col="1" data-v="{{ (int) $t['filas'] }}">{{ number_format($t['filas']) }}</td>
+
+                                                        <td class="px-2 py-1 text-right tabular-nums" style="{{ $estiloSis }}" data-col="2" data-v="{{ (int) $t['sistema_puros'] }}">{{ number_format($t['sistema_puros']) }}</td>
+                                                        <td class="px-2 py-1 text-right tabular-nums" style="{{ $estiloSis }}" data-col="3" data-fmt="dec" data-v="{{ (float) $t['sistema_horas'] }}">{{ number_format($t['sistema_horas'], 2) }}</td>
+
+                                                        <td class="px-2 py-1 text-right tabular-nums" style="{{ $estiloErp }}" data-col="4" data-v="{{ (int) $t['erp_puros'] }}">{{ number_format($t['erp_puros']) }}</td>
+                                                        <td class="px-2 py-1 text-right tabular-nums" style="{{ $estiloErp }}" data-col="5" data-fmt="dec" data-v="{{ (float) $t['erp_horas'] }}">{{ number_format($t['erp_horas'], 2) }}</td>
+
+                                                        <td class="px-2 py-1 text-right tabular-nums" style="{{ $t['dif_puros'] !== 0 ? $celdaDifEmp : '' }}" data-col="6" data-v="{{ (int) $t['dif_puros'] }}">{{ ($t['dif_puros'] > 0 ? '+' : '').number_format($t['dif_puros']) }}</td>
+                                                        <td class="px-2 py-1 text-right tabular-nums" style="{{ abs($t['dif_horas']) > 0.01 ? $celdaDifEmp : '' }}" data-col="7" data-fmt="dec" data-v="{{ (float) $t['dif_horas'] }}">{{ ($t['dif_horas'] > 0 ? '+' : '').number_format($t['dif_horas'], 2) }}</td>
+                                                        <td class="px-2 py-1 text-center">
+                                                            @if($t['estado'] === 'diferencia')
+                                                                <form method="POST" action="{{ route('costos-empaque.comparativo.sincronizar-horas') }}">
+                                                                    @csrf
+                                                                    <input type="hidden" name="fecha" value="{{ $fecha }}">
+                                                                    <input type="hidden" name="sucursal" value="{{ $sucursal }}">
+                                                                    <input type="hidden" name="empleado" value="{{ $t['empleado'] }}">
+                                                                    <button type="submit"
+                                                                            title="Pone en el ERP las horas reales del sistema de {{ $fecha }} (documento por documento)"
+                                                                            class="inline-flex items-center justify-center px-2 py-1 rounded-lg text-[11px] font-bold text-white whitespace-nowrap"
+                                                                            style="background:#b45309">
+                                                                        Ajustar {{ number_format($t['sistema_horas'], 2) }} h
+                                                                    </button>
+                                                                </form>
+                                                            @else
+                                                                <span class="theme-text text-[11px]">-</span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+
+                                                <tr class="bg-[#e8ecf1] font-black border-t-2 border-slate-400" data-total-row="1">
+                                                    <td class="px-2 py-1.5 text-right">TOTAL GENERAL</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="1">{{ number_format($totalesEmpleados['total']['filas']) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="2">{{ number_format($totalesEmpleados['total']['sistema_puros']) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="3" data-fmt="dec">{{ number_format($totalesEmpleados['total']['sistema_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="4">{{ number_format($totalesEmpleados['total']['erp_puros']) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="5" data-fmt="dec">{{ number_format($totalesEmpleados['total']['erp_horas'], 2) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="6">{{ number_format($totalesEmpleados['total']['dif_puros']) }}</td>
+                                                    <td class="px-2 py-1.5 text-right tabular-nums" data-total="7" data-fmt="dec">{{ number_format($totalesEmpleados['total']['dif_horas'], 2) }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
 
                             {{-- Documentos --}}
                             <div class="theme-card bg-white rounded-2xl border theme-border theme-shadow">
@@ -449,7 +630,57 @@
             sumarTabla('tablaDocs');
             sumarTabla('tablaDetalle');
             sumarTabla('tablaPlan');
+            sumarTabla('tablaEmpleados');
         });
+    </script>
+
+    {{-- Spinner de carga: aparece al navegar/al enviar un formulario y se
+         oculta cuando la pagina termina de pintarse. --}}
+    <script>
+        (function () {
+            const overlay = document.getElementById('cargandoOverlay');
+            const texto = document.getElementById('cargandoTexto');
+
+            if (!overlay) return;
+
+            const mostrar = (mensaje) => {
+                if (mensaje && texto) texto.textContent = mensaje;
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            };
+
+            const ocultar = () => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            };
+
+            // Cada formulario con data-cargando muestra el spinner antes de irse.
+            document.querySelectorAll('form[data-cargando]').forEach(function (form) {
+                form.addEventListener('submit', function (evento) {
+                    if (form.dataset.listo === '1') return;
+
+                    evento.preventDefault();
+                    mostrar(form.dataset.cargando || 'Cargando...');
+
+                    // Pinta el spinner y luego sale (submit() nativo no vuelve
+                    // a disparar el evento, asi que no se repite).
+                    window.setTimeout(function () {
+                        form.dataset.listo = '1';
+                        form.submit();
+                    }, 120);
+                });
+            });
+
+            // Al cargar: se ve mientras el servidor arma el comparativo.
+            mostrar('Cargando comparativo...');
+
+            window.addEventListener('load', function () {
+                window.setTimeout(ocultar, 400);
+            });
+
+            // Si algo se queda colgado, a los 30 s se despega.
+            window.setTimeout(ocultar, 30000);
+        })();
     </script>
     @include('layouts.flash')
 </body>

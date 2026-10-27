@@ -179,6 +179,86 @@
         </div>
     </div>
 
+    <!-- Modal Generar viñetas (limpieza / brocha) -->
+    <div id="vinetaGenerarModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
+        <div class="theme-card w-full max-w-md overflow-hidden rounded-3xl border theme-border shadow-2xl">
+            <div class="flex items-center justify-between border-b theme-border px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <span class="theme-badge inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold border">
+                        Viñetas
+                    </span>
+                    <h2 class="theme-title text-base font-bold">Generar viñetas</h2>
+                </div>
+                <button type="button"
+                        id="vinetaGenerarModalClose"
+                        class="theme-button-secondary inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border theme-border text-base font-bold transition hover:opacity-80 cursor-pointer"
+                        aria-label="Cerrar">&times;</button>
+            </div>
+
+            <form method="POST" action="{{ route('vinetas-pendientes.generar') }}" class="p-5 space-y-3">
+                @csrf
+
+                <input type="hidden" name="id_pendiente" id="generar_id_pendiente">
+                <input type="hidden" name="item" id="generar_item">
+                <input type="hidden" name="codigo_producto" id="generar_codigo_producto">
+                <input type="hidden" name="marca" id="generar_marca">
+                <input type="hidden" name="nombre" id="generar_nombre">
+                <input type="hidden" name="vitola" id="generar_vitola">
+                <input type="hidden" name="capa" id="generar_capa">
+                <input type="hidden" name="tipo_empaque" id="generar_tipo_empaque">
+                <input type="hidden" name="orden_del_sistema" id="generar_orden_del_sistema">
+                <input type="hidden" name="orden" id="generar_orden">
+                <input type="hidden" name="mes" id="generar_mes">
+
+                <div class="rounded-xl border theme-border theme-soft px-3 py-2">
+                    <p class="theme-text text-xs">Pendiente</p>
+                    <p class="theme-title text-sm font-bold" id="generar_resumen">—</p>
+                </div>
+
+                <div>
+                    <label for="generar_area" class="theme-text block text-xs font-semibold mb-1">Area de la viñeta</label>
+                    <select name="area" id="generar_area"
+                            class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
+                        <option value="LIMPIEZA">LIMPIEZA</option>
+                        <option value="BROCHA">BROCHA</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="generar_cantidad" class="theme-text block text-xs font-semibold mb-1">Cantidad de viñetas</label>
+                        <input type="number" name="cantidad" id="generar_cantidad" min="1" max="500" value="1" required
+                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title">
+                    </div>
+
+                    <div>
+                        <label for="generar_puros" class="theme-text block text-xs font-semibold mb-1">Puros por viñeta</label>
+                        <input type="number" name="cantidad_puros" id="generar_puros" min="0" max="100000" value="250"
+                               class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title">
+                    </div>
+                </div>
+
+                <p class="theme-text text-[11px] leading-snug">
+                    Se generan en Empaque con su propio QR (li-1, li-2...) y se escanean igual que las demás.
+                    Después de generar se abre la hoja para imprimir.
+                </p>
+
+                <div class="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" id="vinetaGenerarModalCancel"
+                            class="px-4 py-2 rounded-xl border theme-border text-xs font-bold theme-button-secondary transition cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 rounded-xl text-xs font-bold text-white transition"
+                            style="background:#0f766e">
+                        Generar e imprimir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal Ver QR -->
     <div id="vinetaQrModal"
          class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
@@ -501,6 +581,80 @@
             });
 
             initTableFeatures();
+        });
+    </script>
+
+    <!-- Modal Generar viñetas Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('vinetaGenerarModal');
+            if (!modal) return;
+
+            const campos = {
+                id_pendiente: document.getElementById('generar_id_pendiente'),
+                item: document.getElementById('generar_item'),
+                codigo_producto: document.getElementById('generar_codigo_producto'),
+                marca: document.getElementById('generar_marca'),
+                nombre: document.getElementById('generar_nombre'),
+                vitola: document.getElementById('generar_vitola'),
+                capa: document.getElementById('generar_capa'),
+                tipo_empaque: document.getElementById('generar_tipo_empaque'),
+                orden_del_sistema: document.getElementById('generar_orden_del_sistema'),
+                orden: document.getElementById('generar_orden'),
+                mes: document.getElementById('generar_mes'),
+            };
+
+            const resumen = document.getElementById('generar_resumen');
+
+            const abrir = (btn) => {
+                campos.id_pendiente.value = btn.dataset.idPendiente || '';
+                campos.item.value = btn.dataset.item || '';
+                campos.codigo_producto.value = btn.dataset.codigoProducto || '';
+                campos.marca.value = btn.dataset.marca || '';
+                campos.nombre.value = btn.dataset.nombre || '';
+                campos.vitola.value = btn.dataset.vitola || '';
+                campos.capa.value = btn.dataset.capa || '';
+                campos.tipo_empaque.value = btn.dataset.tipoEmpaque || '';
+                campos.orden_del_sistema.value = btn.dataset.ordenSistema || '';
+                campos.orden.value = btn.dataset.orden || '';
+                campos.mes.value = btn.dataset.mes || '';
+
+                if (resumen) {
+                    resumen.textContent = [
+                        btn.dataset.idPendiente ? '#' + btn.dataset.idPendiente : 'Sin ID',
+                        btn.dataset.codigoProducto || '',
+                        btn.dataset.marca || '',
+                        'OS ' + (btn.dataset.ordenSistema || '-'),
+                    ].filter(Boolean).join(' · ');
+                }
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            };
+
+            const cerrar = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            };
+
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-generar-vinetas');
+                if (btn) {
+                    e.preventDefault();
+                    abrir(btn);
+                }
+            });
+
+            document.getElementById('vinetaGenerarModalClose')?.addEventListener('click', cerrar);
+            document.getElementById('vinetaGenerarModalCancel')?.addEventListener('click', cerrar);
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) cerrar();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.classList.contains('hidden')) cerrar();
+            });
         });
     </script>
 

@@ -106,6 +106,43 @@ class EmpleadoController extends Controller
         ));
     }
 
+    /**
+     * Hoja imprimible con el QR de los empleados seleccionados.
+     */
+    public function qr(Request $request)
+    {
+        $codigos = $request->input('codigos', []);
+
+        if (is_string($codigos)) {
+            $codigos = explode(',', $codigos);
+        }
+
+        $codigos = collect($codigos)
+            ->map(fn ($codigo) => trim((string) $codigo))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($codigos->isEmpty()) {
+            return redirect()
+                ->route('empleados.index')
+                ->with('error', 'Selecciona al menos un empleado para generar los QR.');
+        }
+
+        $empleados = Empleado::query()
+            ->whereIn('codigo', $codigos)
+            ->orderBy('nombre')
+            ->get();
+
+        if ($empleados->isEmpty()) {
+            return redirect()
+                ->route('empleados.index')
+                ->with('error', 'No se encontraron empleados con los códigos seleccionados.');
+        }
+
+        return view('empleados.qr', compact('empleados'));
+    }
+
     public function sincronizar()
     {
         try {

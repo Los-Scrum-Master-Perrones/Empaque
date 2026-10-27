@@ -214,14 +214,40 @@ class AppUpdateController extends Controller
             $default['download_url'] = $baseUrl . '/api/app/download/' . ($default['apk_filename'] ?? 'app-release.apk');
         }
 
-        $arm64File = $default['apk_filename'] ?? 'app-arm64-v8a-release.apk';
-        $armFile = $default['apk_filename_armeabi_v7a'] ?? 'app-armeabi-v7a-release.apk';
-        $universalFile = $default['apk_filename_universal'] ?? 'app-release.apk';
+        $universalFile = $default['apk_filename_universal'] ?? ($default['apk_filename'] ?? 'app-release.apk');
+
+        // Solo se publica el APK universal (sin splits por ABI). Si el JSON
+        // todavia apunta a un APK por ABI que ya no existe en el servidor, se
+        // responde con el universal para que la app no reciba un 404.
+        $existeApk = static function (?string $fileName): bool {
+            $fileName = basename((string) $fileName);
+
+            if ($fileName === '' || $fileName === '.' || $fileName === '..') {
+                return false;
+            }
+
+            foreach ([
+                public_path('downloads/' . $fileName),
+                public_path('apks/' . $fileName),
+                storage_path('app/public/apks/' . $fileName),
+                storage_path('app/apks/' . $fileName),
+            ] as $ruta) {
+                if (File::exists($ruta)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $resolver = static function (?string $fileName) use ($universalFile, $existeApk): string {
+            return $existeApk($fileName) ? basename((string) $fileName) : $universalFile;
+        };
 
         $default['split_apks'] = [
-            'arm64-v8a' => $baseUrl . '/api/app/download/' . $arm64File,
-            'armeabi-v7a' => $baseUrl . '/api/app/download/' . $armFile,
-            'universal' => $baseUrl . '/api/app/download/' . $universalFile,
+            'arm64-v8a' => $baseUrl . '/api/app/download/' . $resolver($default['apk_filename'] ?? null),
+            'armeabi-v7a' => $baseUrl . '/api/app/download/' . $resolver($default['apk_filename_armeabi_v7a'] ?? null),
+            'universal' => $baseUrl . '/api/app/download/' . $resolver($universalFile),
         ];
 
         return $default;

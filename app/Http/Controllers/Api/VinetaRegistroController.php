@@ -1392,24 +1392,48 @@ class VinetaRegistroController extends Controller
 
         $vinetaRegistro->update($payload);
 
-        // Asignar documento a una viñeta que no lo tiene (edicion viñeta por viñeta).
-        // Si ya estaba en el ERP con otro documento, no se mueve.
+        // Documento de la vineta: se ASIGNA o se CAMBIA de documento.
+        // Si el registro ya vive en el ERP (lo marco el envio directo o un
+        // "Aplicar" del comparativo), primero se le quita del documento viejo
+        // y despues se da de alta en el nuevo: si no, el ERP se quedaba con
+        // la fila en el documento anterior (sobra en uno y falta en el otro).
         $documentoAsignado = $this->inputString($data, 'documento_numero');
         $erpRegistro = null;
 
         if ($documentoAsignado !== null && $documentoAsignado !== '') {
             $documentoPrevio = trim((string) $vinetaRegistro->documento_numero);
 
-            if ($documentoPrevio !== '' && $documentoPrevio !== $documentoAsignado && $vinetaRegistro->erp_enviado) {
-                throw ValidationException::withMessages([
-                    'documento_numero' => 'Este registro ya está en el ERP con el documento '.$documentoPrevio.'.',
-                ]);
-            }
-
             if ($documentoPrevio !== $documentoAsignado) {
                 $sucursalDoc = $this->inputInt($data, 'sucursal')
                     ?? $vinetaRegistro->sucursal
                     ?? (int) config('services.erp.default_sucursal', 2);
+
+                $estabaEnElErp = (bool) $vinetaRegistro->erp_enviado
+                    || $this->existeFilaEnErp($documentoPrevio, $vinetaRegistro);
+
+                if ($estabaEnElErp && $documentoPrevio !== '') {
+                    $purosViejos = max(0, (int) $purosPrevios);
+                    $horasViejas = max(0, round(((int) ($minutosPrevios ?? 0)) / 60, 2));
+
+                    if ($purosViejos > 0 || $horasViejas > 0) {
+                        $salida = app(\App\Services\ErpApiService::class)->ajustarHorasVineta(
+                            $vinetaRegistro->refresh(),
+                            -$horasViejas,
+                            $vinetaRegistro->sucursal ?? $sucursalDoc,
+                            -$purosViejos
+                        );
+
+                        if (empty($salida['success'])) {
+                            $motivo = $salida['message'] ?? ($salida['error'] ?? 'el ERP rechazó el cambio.');
+                            throw ValidationException::withMessages([
+                                'documento_numero' => 'No se puede mover al documento '.$documentoAsignado
+                                    .': en el ERP el registro sigue en el documento '.$documentoPrevio.' ('.$motivo.').',
+                            ]);
+                        }
+                    }
+
+                    $vinetaRegistro->erp_enviado = false;
+                }
 
                 $camposDocumento = [
                     'documento_numero' => $documentoAsignado,
@@ -1424,10 +1448,12 @@ class VinetaRegistroController extends Controller
                 $vinetaRegistro->update($camposDocumento);
             }
 
-            // Solo se registra en el ERP si el documento se ASIGNA en esta edicion
-            // (antes no tenia). Si ya traia documento, no se vuelve a registrar:
-            // ya existe en el ERP y solo se ajustan horas/puros.
-            if ($documentoPrevio === '' && ! $vinetaRegistro->erp_enviado) {
+            // Si el registro NO estaba en el ERP, se da de alta en el documento
+            // (nuevo o recien asignado). Si ya estaba, no se vuelve a registrar.
+            $faltaEnElErp = ! $vinetaRegistro->erp_enviado
+                && ! $this->existeFilaEnErp($documentoAsignado, $vinetaRegistro);
+
+            if ($faltaEnElErp) {
                 $erpRegistro = app(\App\Services\ErpApiService::class)
                     ->enviarRegistroVineta($vinetaRegistro->refresh(), $documentoAsignado, $vinetaRegistro->sucursal);
             }
@@ -2208,6 +2234,40 @@ class VinetaRegistroController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * ¿Esa fila del registro ya existe en el ERP? Se consulta la tabla espejo
+     * del comparativo (lo ultimo que se bajo del ERP). Si no existe la tabla
+     * se responde con la bandera erp_enviado del registro.
+     */
+    private function existeFilaEnErp(?string $documento, VinetaRegistro $registro): bool
+    {
+        $documento = trim((string) ($documento ?? ''));
+
+        if ($documento === '') {
+            return false;
+        }
+
+        if ($registro->erp_enviado) {
+            return true;
+        }
+
+        try {
+            if (! Schema::hasTable('erp_empaques_detalles')) {
+                return false;
+            }
+
+            return DB::table('erp_empaques_detalles')
+                ->where('numero', $documento)
+                ->when($registro->sucursal, fn ($q) => $q->where('sucursal', (int) $registro->sucursal))
+                ->where('actividad', (int) $registro->actividad_codigo)
+                ->where('orden', (string) $registro->orden_del_sistema)
+                ->where('empleado', (string) $registro->empleado_codigo)
+                ->exists();
+        } catch (\Throwable) {
+            return (bool) $registro->erp_enviado;
+        }
     }
 
     private function registroPayload(VinetaRegistro $registro, ?string $grupoEmpleado = null): array

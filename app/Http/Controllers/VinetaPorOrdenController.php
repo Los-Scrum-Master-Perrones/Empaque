@@ -75,6 +75,7 @@ class VinetaPorOrdenController extends Controller
                 'vinetas_por_orden.capa',
                 'vinetas_por_orden.vitola',
                 'vinetas_por_orden.tipo_empaque',
+                'vinetas_por_orden.area',
                 'vinetas_por_orden.codigo_producto',
                 'vinetas_por_orden.item',
                 'vinetas_por_orden.orden_del_sistema',

@@ -47,6 +47,29 @@ class VinetaController extends Controller
 
     public function actividades(Vineta $vineta): JsonResponse
     {
+        // Viñetas generadas en Empaque (limpieza / brocha): sus actividades
+        // salen del AREA, no del producto de facturacion.
+        if (filled($vineta->area)) {
+            $areaService = app(\App\Services\VinetaAreaService::class);
+            $actividades = $areaService->actividades($vineta->area);
+
+            return response()->json([
+                'message' => 'Actividades de '.$areaService->titulo($vineta->area).'.',
+                'source' => 'area',
+                'area' => $vineta->area,
+                'area_titulo' => $areaService->titulo($vineta->area),
+                'product' => $this->vinetaProductoPayload($vineta),
+                'activities' => $actividades->map(fn ($actividad) => [
+                    'id' => $actividad->id,
+                    'api_id_actividad' => $actividad->api_id_actividad,
+                    'codigo_actividad' => $actividad->codigo_actividad,
+                    'nombre' => $actividad->nombre,
+                    'tipo_empaque' => $vineta->tipo_empaque,
+                    'precio_mo' => (string) ($actividad->precio_mo ?? '0'),
+                ])->values()->all(),
+            ]);
+        }
+
         $producto = $this->findProducto($vineta);
 
         if ($producto && $producto->actividades->isNotEmpty()) {
@@ -152,9 +175,41 @@ class VinetaController extends Controller
             ->all();
     }
 
-    private function isVinetaPorOrden(Vineta $vineta): bool
+    /**
+     * Crea/actualiza la viñeta local (tabla vinetas) a partir de una viñeta
+     * por orden, conservando el AREA cuando la viñeta se genero en Empaque
+     * (limpieza / brocha).
+     */
+    private function espejarVinetaPorOrden(VinetaPorOrden $vpo): Vineta
     {
-        $idPendiente = strtolower(trim((string) $vineta->id_pendiente_empaque));
+        $area = $vpo->area ?: null;
+
+        return Vineta::updateOrCreate(
+            ['id_pendiente_empaque' => $vpo->codigo_qr],
+            [
+                'api_id' => $vpo->api_id ?: (900000 + $vpo->id),
+                'id_detalle_programacion' => $vpo->id_pendiente_empaque,
+                'fecha' => $vpo->fecha,
+                'cantidad_puros' => $vpo->cantidad_puros,
+                'item' => $vpo->item,
+                'codigo_producto' => $vpo->codigo_producto,
+                'orden_del_sistema' => $vpo->orden_del_sistema,
+                'mes' => $vpo->mes,
+                'orden' => $vpo->orden,
+                'marca' => $vpo->marca,
+                'nombre' => $vpo->nombre,
+                'capa' => $vpo->capa,
+                'vitola' => $vpo->vitola,
+                'tipo_empaque' => $vpo->tipo_empaque,
+                'area' => $area,
+                'estado' => $vpo->estado ?: 'activo',
+                'impreso' => true,
+            ]
+        );
+    }
+
+    private function isVinetaPorOrden(Vineta $vineta): bool
+    {        $idPendiente = strtolower(trim((string) $vineta->id_pendiente_empaque));
         if (str_starts_with($idPendiente, 'or-') || str_starts_with($idPendiente, 'o-') || str_starts_with($idPendiente, 'li-')) {
             return true;
         }
@@ -225,15 +280,30 @@ class VinetaController extends Controller
             }
         }
 
-        // 3. Viñeta pendiente format (LI-1, li-1, etc.)
-        if (preg_match('/^li-(\d+)$/i', $candidate, $m)) {
-            $num = (int) $m[1];
-            $vineta = Vineta::query()
-                ->whereRaw('LOWER(id_pendiente_empaque) = ?', ['li-' . $num])
+        // 3. Viñeta pendiente / area (LI-1, BR-1, etc.)
+        if (preg_match('/^(li|br)-(\d+)$/i', $candidate, $m)) {
+            $codigo = strtolower($m[1].'-'.$m[2]);
+            $num = (int) $m[2];
+
+            $espejada = Vineta::query()
+                ->whereRaw('LOWER(id_pendiente_empaque) = ?', [$codigo])
                 ->first();
 
-            if ($vineta) {
-                return $vineta;
+            if ($espejada) {
+                return $espejada;
+            }
+
+            // Generada en Empaque (limpieza / brocha): se espeja con su area.
+            $vpo = VinetaPorOrden::query()
+                ->whereRaw('LOWER(codigo_qr) = ?', [$codigo])
+                ->first();
+
+            if ($vpo) {
+                return $this->espejarVinetaPorOrden($vpo);
+            }
+
+            if (strtolower($m[1]) !== 'li') {
+                return null;
             }
 
             $pendienteService = app(\App\Services\VinetaPendienteService::class);
@@ -262,30 +332,13 @@ class VinetaController extends Controller
             }
         }
 
-        // 3. Exact match in VinetaPorOrden by codigo_qr
+        // 3b. Exact match in VinetaPorOrden by codigo_qr
         $vpo = VinetaPorOrden::query()
             ->whereRaw('LOWER(codigo_qr) = ?', [$candidateLower])
             ->first();
 
         if ($vpo) {
-            return Vineta::updateOrCreate(
-                ['id_pendiente_empaque' => $vpo->codigo_qr],
-                [
-                    'api_id' => $vpo->api_id ?: (900000 + $vpo->id),
-                    'item' => $vpo->item,
-                    'codigo_producto' => $vpo->codigo_producto,
-                    'orden_del_sistema' => $vpo->orden_del_sistema,
-                    'mes' => $vpo->mes,
-                    'orden' => $vpo->orden,
-                    'marca' => $vpo->marca,
-                    'nombre' => $vpo->nombre,
-                    'capa' => $vpo->capa,
-                    'vitola' => $vpo->vitola,
-                    'tipo_empaque' => $vpo->tipo_empaque,
-                    'estado' => $vpo->estado ?: 'activo',
-                    'impreso' => true,
-                ]
-            );
+            return $this->espejarVinetaPorOrden($vpo);
         }
 
         // 4. Exact match by id_pendiente_empaque on Vineta
@@ -619,6 +672,10 @@ class VinetaController extends Controller
             'capa' => $vineta->capa,
             'vitola' => $vineta->vitola,
             'tipo_empaque' => $vineta->tipo_empaque,
+            'area' => $vineta->area,
+            'area_titulo' => $vineta->area
+                ? app(\App\Services\VinetaAreaService::class)->titulo($vineta->area)
+                : null,
             'presentacion' => $producto?->presentacion?->nombre,
             'codigo_producto' => $vineta->codigo_producto,
             'item' => $vineta->item,

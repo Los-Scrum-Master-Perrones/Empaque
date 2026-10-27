@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentoEmpaque;
+use App\Models\EmpleadoHoraOrdinaria;
 use App\Models\VinetaRegistro;
+use Illuminate\Support\Facades\Schema;
 use App\Services\ErpApiService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -59,6 +61,18 @@ class DocumentoEmpaqueController extends Controller
             ->orderBy('id')
             ->get();
 
+        // El documento abarca varios dias: si el filtro por fecha no trajo
+        // nada (la viñeta se registro en otro dia que el seleccionado), se
+        // busca solo por documento para que no salga "no tiene viñetas".
+        if ($registros->isEmpty() && ! empty($data['fecha'])) {
+            $registros = VinetaRegistro::query()
+                ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                ->where('documento_numero', $documento)
+                ->when(! empty($data['sucursal']), fn ($q) => $q->where('sucursal', (int) $data['sucursal']))
+                ->orderBy('id')
+                ->get();
+        }
+
         if ($registros->isEmpty()) {
             return response()->json([
                 'message' => 'El documento no tiene viñetas enviadas al ERP para aplicar.',
@@ -87,13 +101,83 @@ class DocumentoEmpaqueController extends Controller
         $errores = 0;
         $detalle = [];
 
-        foreach ($grupos as $items) {
+        // Las vinetas POR HORA (al dia) no traen minutos: sin sumar las horas
+        // ordinarias del empleado, "Aplicar" mandaba 0 y el ERP quedaba en cero.
+        // Se reparten entre las filas del MISMO empleado, con el mismo criterio
+        // del ERP: centesimas de hora proporcionales a los puros.
+        $repartoOrdinarias = [];
+
+        if (Schema::hasTable('empleado_horas_ordinarias')) {
+            EmpleadoHoraOrdinaria::query()
+                ->where('documento_numero', $documento)
+                ->selectRaw('TRIM(empleado_codigo) AS empleado, SUM(minutos) AS minutos')
+                ->groupBy('empleado_codigo')
+                ->get()
+                ->each(function ($ord) use ($grupos, &$repartoOrdinarias) {
+                    $empleado = trim((string) $ord->empleado);
+                    $minutosOrd = (int) $ord->minutos;
+
+                    if ($minutosOrd <= 0) {
+                        return;
+                    }
+
+                    $filas = [];
+
+                    foreach ($grupos as $clave => $items) {
+                        if (trim((string) $items->first()->empleado_codigo) !== $empleado) {
+                            continue;
+                        }
+
+                        $filas[] = ['clave' => $clave, 'puros' => (int) $items->sum('cantidad_puros')];
+                    }
+
+                    if ($filas === []) {
+                        return;
+                    }
+
+                    $totalCentesimas = (int) round(($minutosOrd / 60) * 100);
+                    $purosTotal = array_sum(array_column($filas, 'puros'));
+                    $asignado = 0;
+                    $reparto = [];
+
+                    foreach ($filas as $i => $fila) {
+                        $parte = $purosTotal > 0
+                            ? (int) floor($totalCentesimas * ($fila['puros'] / $purosTotal))
+                            : (int) floor($totalCentesimas / count($filas));
+
+                        $reparto[$i] = $parte;
+                        $asignado += $parte;
+                    }
+
+                    $resto = $totalCentesimas - $asignado;
+
+                    if ($resto > 0) {
+                        $orden = array_keys($filas);
+                        usort($orden, fn ($a, $b) => $filas[$b]['puros'] <=> $filas[$a]['puros']);
+                        $pos = 0;
+
+                        while ($resto > 0) {
+                            $reparto[$orden[$pos % count($orden)]]++;
+                            $resto--;
+                            $pos++;
+                        }
+                    }
+
+                    foreach ($filas as $i => $fila) {
+                        $repartoOrdinarias[$fila['clave']] = $reparto[$i];
+                    }
+                });
+        }
+
+        foreach ($grupos as $claveGrupo => $items) {
             $primero = $items->first();
             $minutos = (int) $items->sum(fn (VinetaRegistro $r) => (int) ($r->minutos_trabajados ?? 0));
             $puros = (int) $items->sum('cantidad_puros');
-            $horas = round($minutos / 60, 2);
+            // minutos de vineta + horas ordinarias (1 centesima = 0.6 minuto)
+            $minutosTotales = $minutos + ((int) ($repartoOrdinarias[$claveGrupo] ?? 0) * 0.6);
+            $horas = round($minutosTotales / 60, 2);
 
-            $resultado = $this->erpService->fijarHorasVineta($primero, $horas, $data['sucursal'] ?? null, $puros);
+            $resultado = $this->erpService->fijarHorasVineta($primero, $horas, $data['sucursal'] ?? null, $puros, null, null, $data['dry_run'] ?? null);
 
             $estado = 'error';
             if (! empty($resultado['success'])) {
@@ -186,6 +270,18 @@ class DocumentoEmpaqueController extends Controller
             ->where('sucursal', $sucursal)
             ->orderBy('id')
             ->get();
+
+        // El documento abarca varios dias: si el filtro por fecha no trajo
+        // nada (la viñeta se registro en otro dia que el seleccionado), se
+        // busca solo por documento para que no salga "no tiene viñetas".
+        if ($registros->isEmpty() && ! empty($data['fecha'])) {
+            $registros = VinetaRegistro::query()
+                ->where('estado', VinetaRegistro::ESTADO_ACTIVO)
+                ->where('documento_numero', $documento)
+                ->when(! empty($data['sucursal']), fn ($q) => $q->where('sucursal', (int) $data['sucursal']))
+                ->orderBy('id')
+                ->get();
+        }
 
         if ($registros->isEmpty()) {
             return response()->json([

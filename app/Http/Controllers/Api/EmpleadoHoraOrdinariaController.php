@@ -842,7 +842,7 @@ class EmpleadoHoraOrdinariaController extends Controller
         $sucursal = ! empty($data['sucursal']) ? (int) $data['sucursal'] : null;
         $dryRun = (bool) ($data['dry_run'] ?? false);
 
-        $registros = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal);
+        $registros = $this->registrosTareaEmpleado($empleado, $fecha, $sucursal, true);
 
         if ($marcaFiltro !== '') {
             $registros = $registros
@@ -896,13 +896,97 @@ class EmpleadoHoraOrdinariaController extends Controller
             trim((string) $r->producto_codigo),
         ]));
 
-        foreach ($grupos as $items) {
+        // Las viñetas POR HORA (al dia) no traen minutos: sin sumar las horas
+        // ordinarias del empleado, el "Aplicar" mandaba 0 y el ERP quedaba en
+        // cero. Se reparten entre las filas del mismo documento, igual que lo
+        // hace el ERP (centesimas proporcionales a los puros).
+        $horasOrdinarias = [];
+
+        if (Schema::hasTable('empleado_horas_ordinarias')) {
+            EmpleadoHoraOrdinaria::query()
+                ->where('empleado_codigo', $empleado->codigo)
+                ->whereDate('fecha', $fecha)
+                ->when($sucursal !== null, fn ($q) => $q->where('sucursal', $sucursal))
+                ->get()
+                ->each(function ($hora) use (&$horasOrdinarias) {
+                    $documento = trim((string) ($hora->documento_numero ?? ''));
+
+                    if ($documento === '' || $documento === 'sin_documento') {
+                        return;
+                    }
+
+                    $horasOrdinarias[$documento] = ($horasOrdinarias[$documento] ?? 0) + (int) $hora->minutos;
+                });
+        }
+
+        $repartoOrdinarias = [];
+
+        if ($horasOrdinarias !== []) {
+            $porDocumento = [];
+
+            foreach ($grupos as $clave => $items) {
+                $documento = trim((string) $items->first()->documento_numero);
+
+                if (! isset($horasOrdinarias[$documento])) {
+                    continue;
+                }
+
+                $porDocumento[$documento][] = [
+                    'clave' => $clave,
+                    'puros' => (int) $items->sum('cantidad_puros'),
+                ];
+            }
+
+            foreach ($horasOrdinarias as $documento => $minutosOrdinarios) {
+                if (! isset($porDocumento[$documento]) || $minutosOrdinarios <= 0) {
+                    continue;
+                }
+
+                $filas = $porDocumento[$documento];
+                $totalCentesimas = (int) round(($minutosOrdinarios / 60) * 100);
+                $purosTotal = array_sum(array_column($filas, 'puros'));
+                $asignado = 0;
+                $reparto = [];
+
+                foreach ($filas as $i => $fila) {
+                    $parte = $purosTotal > 0
+                        ? (int) floor($totalCentesimas * ($fila['puros'] / $purosTotal))
+                        : (int) floor($totalCentesimas / count($filas));
+
+                    $reparto[$i] = $parte;
+                    $asignado += $parte;
+                }
+
+                $resto = $totalCentesimas - $asignado;
+
+                if ($resto > 0) {
+                    $orden = array_keys($filas);
+                    usort($orden, fn ($a, $b) => $filas[$b]['puros'] <=> $filas[$a]['puros']);
+                    $pos = 0;
+
+                    while ($resto > 0) {
+                        $reparto[$orden[$pos % count($orden)]]++;
+                        $resto--;
+                        $pos++;
+                    }
+                }
+
+                foreach ($filas as $i => $fila) {
+                    $repartoOrdinarias[$fila['clave']] = $reparto[$i];
+                }
+            }
+        }
+
+        foreach ($grupos as $claveGrupo => $items) {
             $primero = $items->first();
             $minutos = (int) $items->sum(fn (VinetaRegistro $r) => (int) ($r->minutos_trabajados ?? 0));
             $puros = (int) $items->sum('cantidad_puros');
-            $horas = round($minutos / 60, 2);
 
-            $resultado = $servicio->fijarHorasVineta($primero, $horas, $sucursal, $puros);
+            // Minutos de viñeta + horas ordinarias (1 centesima = 0.6 minuto).
+            $minutosTotales = $minutos + ((int) ($repartoOrdinarias[$claveGrupo] ?? 0) * 0.6);
+            $horas = round($minutosTotales / 60, 2);
+
+            $resultado = $servicio->fijarHorasVineta($primero, $horas, $sucursal, $puros, null, null, $dryRun);
 
             $estado = 'error';
             if (! empty($resultado['success'])) {
@@ -1231,7 +1315,7 @@ class EmpleadoHoraOrdinariaController extends Controller
     }
 
     /** @return Collection<int, VinetaRegistro> */
-    private function registrosTareaEmpleado(Empleado $empleado, string $fecha, ?int $sucursal = null): Collection
+    private function registrosTareaEmpleado(Empleado $empleado, string $fecha, ?int $sucursal = null, bool $incluirPorHora = false): Collection
     {
         return VinetaRegistro::query()
             ->where('empleado_codigo', $empleado->codigo)
@@ -1242,7 +1326,10 @@ class EmpleadoHoraOrdinariaController extends Controller
             ->orderBy('hora_registro')
             ->orderBy('id')
             ->get()
-            ->filter(fn (VinetaRegistro $registro) => ! $registro->esPorHoraOrdinario())
+            // $incluirPorHora: el "Aplicar" del ERP tambien sirve para gente
+            // AL DIA, cuyas vinetas son por hora (sus horas vienen de las horas
+            // ordinarias). Sin esto no encontraba registros y no mandaba nada.
+            ->filter(fn (VinetaRegistro $registro) => $incluirPorHora || ! $registro->esPorHoraOrdinario())
             ->values();
     }
 

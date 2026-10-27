@@ -183,6 +183,12 @@
                                 <span class="theme-badge inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border text-[#2563eb] bg-[#eff6ff]">
                                     {{ $vineta->codigo_qr ?? 'N/A' }}
                                 </span>
+                                @if(!empty($vineta->area))
+                                    <span class="theme-badge inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-black border text-white"
+                                          style="background:#0f766e">
+                                        {{ strtoupper($vineta->area) }}
+                                    </span>
+                                @endif
                                 @if(!empty($vineta->codigo_qr))
                                     <button type="button"
                                             class="btn-ver-qr theme-button-secondary inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border theme-border transition cursor-pointer"

@@ -25,6 +25,7 @@ class Vineta extends Model
         'capa',
         'vitola',
         'tipo_empaque',
+        'area',
         'codigo_producto',
         'raw_payload',
     ];

@@ -642,6 +642,16 @@ class VinetaRegistroController extends Controller
 
         foreach ($registros as $registro) {
             $porHora = $registro->esPorHoraOrdinario();
+            $empCodigo = trim((string) $registro->empleado_codigo);
+            $empleadoObj = $empleadosMap->get($empCodigo);
+            $cargo = $empleadoObj?->cargo;
+
+            // Revisadoras, supervisoras y personal de prensado son "al dia":
+            // no entran al reporte de produccion por tarea.
+            if ($this->esEmpleadoExcluidoReporte($cargo)) {
+                continue;
+            }
+
             // Las viñetas por hora (AL DIA) no llevan estadistico: se pagan por hora.
             $estadistico = $porHora ? 0 : (int) $registro->total_actividades;
             $puros = (int) $registro->cantidad_puros;
@@ -654,10 +664,6 @@ class VinetaRegistroController extends Controller
                 $estadistico,
                 $minutos
             );
-
-            $empCodigo = trim((string) $registro->empleado_codigo);
-            $empleadoObj = $empleadosMap->get($empCodigo);
-            $cargo = $empleadoObj?->cargo;
 
             $grupoPuesto = EmployeeProductionGroup::fromCargo($cargo, $empCodigo);
             $grupoActividad = $this->grupoActividadProceso(
@@ -683,34 +689,14 @@ class VinetaRegistroController extends Controller
                 $grupoArea = 'anillado';
             }
 
-            // Las revisadoras de calidad no entran a ningun resumen de area
-            // (solo aparecen en el detalle).
-            if ($this->esCargoRevisadora($cargo)) {
-                $detalle[] = [
-                    $registro->fecha_registro?->format('Y-m-d') ?? 'N/A',
-                    $registro->empleado_nombre,
-                    $registro->empleado_codigo,
-                    $porHora ? 'Viñeta por hora' : 'Viñeta',
-                    $registro->vineta_api_id ? 'ID '.$registro->vineta_api_id : $registro->codigo_vineta,
-                    $this->valorExport($registro->productoCodigoReporte()),
-                    $this->valorExport($registro->marcaReporte()),
-                    $this->valorExport($registro->productoItemReporte()),
-                    $this->valorExport($registro->ordenDelSistemaReporte()),
-                    $this->valorExport($registro->ordenReporte()),
-                    $registro->actividad_nombre,
-                    $registro->cantidad_puros,
-                    $estadistico,
-                    $porHora ? '' : $minutos,
-                    $porHora ? 'Por hora ordinario' : VinetaRegistro::minutosATiempoTexto($minutos),
-                    '',
-                ];
-
-                continue;
-            }
-
             // El trabajo "al dia" (por hora) NO va al bloque principal: solo
             // aparece abajo, en su propia tabla (no ensucia el principal con 0).
-            $grupoEmpleado = in_array($grupoPuesto, ['rezago', 'anillado', 'llenado', 'limpieza'], true) ? $grupoPuesto : null;
+            //
+            // La tabla PRINCIPAL es de las personas cuyo ROL es esa area
+            // (llenadoras en Llenado, rezagadoras en Rezago). Si alguien de
+            // OTRO rol esta haciendo esa actividad (ej. una rezagadora
+            // llenando), va a la tabla "(SU ROL) A TAREA" a la derecha de la
+            // hoja. Asi no se mezclan y no se repite en la misma hoja.
 
             if ($porHora) {
                 $this->acumularAreaExport(
@@ -722,9 +708,14 @@ class VinetaRegistroController extends Controller
                     $estadistico,
                     $minutos
                 );
-            } else {
+            } elseif ($grupoPuesto !== null && $grupoPuesto !== $grupoArea) {
+                // Otro rol trabajando en esta area: tabla aparte por rol.
+                if (! isset($areaData[$grupoArea]['otros'][$grupoPuesto])) {
+                    $areaData[$grupoArea]['otros'][$grupoPuesto] = [];
+                }
+
                 $this->acumularAreaExport(
-                    $areaData[$grupoArea]['empleados'],
+                    $areaData[$grupoArea]['otros'][$grupoPuesto],
                     $registro->empleado_nombre,
                     $registro->empleado_codigo,
                     $registro->actividad_nombre,
@@ -732,16 +723,9 @@ class VinetaRegistroController extends Controller
                     $estadistico,
                     $minutos
                 );
-            }
-
-            // Bloque de otros grupos (ej. anilladoras haciendo rezago), a la derecha.
-            if (! $porHora && $grupoEmpleado !== null && $grupoEmpleado !== $grupoArea) {
-                if (! isset($areaData[$grupoArea]['otros'][$grupoEmpleado])) {
-                    $areaData[$grupoArea]['otros'][$grupoEmpleado] = [];
-                }
-
+            } else {
                 $this->acumularAreaExport(
-                    $areaData[$grupoArea]['otros'][$grupoEmpleado],
+                    $areaData[$grupoArea]['empleados'],
                     $registro->empleado_nombre,
                     $registro->empleado_codigo,
                     $registro->actividad_nombre,
@@ -772,6 +756,17 @@ class VinetaRegistroController extends Controller
         }
 
         foreach ($horasOrdinarias as $hora) {
+            $cargoHora = $hora->empleado?->cargo ?? $hora->empleado?->area;
+            if (empty($cargoHora)) {
+                $cargoHora = $empleadosMap->get(trim((string) $hora->empleado_codigo))?->cargo;
+            }
+
+            // Las horas ordinarias de revisadoras, supervisoras y prensado
+            // tampoco entran al reporte por tarea.
+            if ($this->esEmpleadoExcluidoReporte($cargoHora)) {
+                continue;
+            }
+
             $minutos = (int) ($hora->minutos ?? 0);
             $fecha = $hora->fecha?->format('Y-m-d') ?? 'N/A';
 
@@ -793,20 +788,6 @@ class VinetaRegistroController extends Controller
                 VinetaRegistro::minutosATiempoTexto($minutos),
                 $hora->observacion,
             ];
-
-            $cargoHora = $hora->empleado?->cargo ?? $hora->empleado?->area;
-            if (empty($cargoHora)) {
-                $cargoHora = $empleadosMap->get(trim((string) $hora->empleado_codigo))?->cargo;
-            }
-
-            // Las horas ordinarias van al area del CARGO del empleado (su area),
-            // no al area de la actividad: una anilladora que hizo petaca suma
-            // sus horas en el reporte de anillado, pero su produccion de petaca
-            // cuenta en llenado.
-            // Las revisadoras no suman horas en ningun resumen.
-            if ($this->esCargoRevisadora($cargoHora)) {
-                continue;
-            }
 
             $this->acumularHoraOrdinariaAreaExport(
                 $areaData,
@@ -846,32 +827,32 @@ class VinetaRegistroController extends Controller
             ['name' => 'Detalle', 'rows' => $detalle, 'format' => 'detail'],
             [
                 'name' => 'Resumen Anillado',
-                'rows' => $this->resumenAnilladoExportRows($areaData['anillado']['empleados'], $hasHorasOrdinarias, $fechaTexto, $areaData['anillado']['otros'], $areaData['anillado']['hora']),
+                'rows' => $this->resumenAreaExportRows($areaData['anillado']['empleados'], $fechaTexto, 'REPORTE DEL ANILLADO', 'ANILLADO', $areaData['anillado']['otros'], $areaData['anillado']['hora']),
                 'format' => 'anillado_summary',
             ],
             [
                 'name' => 'Resumen Rezago',
-                'rows' => $this->resumenRezagoExportRows($areaData['rezago']['empleados'], $fechaTexto, $areaData['rezago']['otros'], $areaData['rezago']['hora']),
+                'rows' => $this->resumenAreaExportRows($areaData['rezago']['empleados'], $fechaTexto, 'REPORTE DE REZAGO', 'REZAGO', $areaData['rezago']['otros'], $areaData['rezago']['hora']),
                 'format' => 'pivot_rezago',
             ],
             [
                 'name' => 'Resumen Llenado',
-                'rows' => $this->resumenLlenadoExportRows($areaData['llenado']['empleados'], $fechaTexto, $areaData['llenado']['otros'], $areaData['llenado']['hora']),
+                'rows' => $this->resumenAreaExportRows($areaData['llenado']['empleados'], $fechaTexto, 'REPORTE DEL LLENADO', 'LLENADO', $areaData['llenado']['otros'], $areaData['llenado']['hora']),
                 'format' => 'pivot_llenado',
             ],
             [
                 'name' => 'Resumen Limpieza',
-                'rows' => $this->resumenLimpiezaExportRows($areaData['limpieza']['empleados'], $fechaTexto, $areaData['limpieza']['otros'], $areaData['limpieza']['hora']),
+                'rows' => $this->resumenAreaExportRows($areaData['limpieza']['empleados'], $fechaTexto, 'REPORTE DE LIMPIEZA', 'LIMPIEZA', $areaData['limpieza']['otros'], $areaData['limpieza']['hora']),
                 'format' => 'pivot_limpieza',
             ],
             [
                 'name' => 'Resumen Prensado',
-                'rows' => $this->resumenGrupoSimpleExportRows($areaData['prensado']['empleados'], $fechaTexto, 'PRENSADO', $areaData['prensado']['otros'], $areaData['prensado']['hora']),
+                'rows' => $this->resumenAreaExportRows($areaData['prensado']['empleados'], $fechaTexto, 'REPORTE DE PRENSADO', 'PRENSADO', $areaData['prensado']['otros'], $areaData['prensado']['hora']),
                 'format' => 'pivot_prensado',
             ],
             [
                 'name' => 'Resumen Rolado',
-                'rows' => $this->resumenGrupoSimpleExportRows($areaData['rolado']['empleados'], $fechaTexto, 'ROLADO', $areaData['rolado']['otros'], $areaData['rolado']['hora']),
+                'rows' => $this->resumenAreaExportRows($areaData['rolado']['empleados'], $fechaTexto, 'REPORTE DE ROLADO', 'ROLADO', $areaData['rolado']['otros'], $areaData['rolado']['hora']),
                 'format' => 'pivot_rolado',
             ],
         ];
@@ -933,6 +914,28 @@ class VinetaRegistroController extends Controller
         $texto = $this->normalizarTextoProceso((string) $cargo);
 
         return $texto !== '' && str_contains($texto, 'revisa');
+    }
+
+    /**
+     * Personal "al dia" que no debe aparecer en el reporte de produccion:
+     * revisadoras, supervisoras/jefes, control de calidad y chequeadores.
+     * El PRENSADO NO se excluye: es produccion (van a Resumen Prensado).
+     */
+    private function esEmpleadoExcluidoReporte(?string $cargo): bool
+    {
+        $texto = $this->normalizarTextoProceso((string) $cargo);
+
+        if ($texto === '') {
+            return false;
+        }
+
+        foreach (['revis', 'supervis', 'jefe', 'calidad', 'chequeador'] as $palabra) {
+            if (str_contains($texto, $palabra)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     private function acumularHoraOrdinariaAreaExport(
         array &$areaData,
@@ -1002,6 +1005,164 @@ class VinetaRegistroController extends Controller
         $areaData[$grupo]['empleados'][$key]['minutos_ordinarios'] += $minutos;
     }
 
+    /**
+     * Estructura unica para todas las hojas de resumen por area:
+     * Puros | Estadistico | Horas de tarea | Horas ordinarias.
+     */
+    private function resumenAreaExportRows(
+        array $empleados,
+        string $fechaTexto,
+        string $tituloReporte,
+        string $tituloResumen,
+        array $otros = [],
+        array $hora = []
+    ): array {
+        uasort($empleados, function (array $a, array $b) {
+            return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($a['codigo_empleado'])]
+                <=> [$this->normalizarTextoReporte($b['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])];
+        });
+
+        $encabezados = ['Etiquetas de fila', 'Puros', 'Estadistico', 'Horas de tarea', 'Horas ordinarias'];
+
+        $rows = [
+            [$tituloReporte.' '.$fechaTexto.'.'],
+            [],
+            $encabezados,
+        ];
+
+        $totalPuros = 0;
+        $totalEstadistico = 0;
+        $totalMinutos = 0;
+        $totalMinutosOrdinarios = 0;
+        $filasEmpleado = [];
+
+        foreach ($empleados as $emp) {
+            $puros = (int) ($emp['puros'] ?? 0);
+            $estadistico = (int) ($emp['estadistico'] ?? 0);
+            $minutos = (int) ($emp['minutos'] ?? 0);
+            $minutosOrdinarios = (int) ($emp['minutos_ordinarios'] ?? 0);
+
+            $totalPuros += $puros;
+            $totalEstadistico += $estadistico;
+            $totalMinutos += $minutos;
+            $totalMinutosOrdinarios += $minutosOrdinarios;
+
+            $rows[] = [
+                $emp['empleado'],
+                $puros,
+                $estadistico,
+                round($minutos / 60, 2),
+                round($minutosOrdinarios / 60, 2),
+            ];
+            $filasEmpleado[] = count($rows);
+
+            $rows[] = [
+                $emp['codigo_empleado'] ?? '',
+                $puros,
+                $estadistico,
+                round($minutos / 60, 2),
+                round($minutosOrdinarios / 60, 2),
+            ];
+
+            $actividades = $emp['actividades'];
+            uksort($actividades, 'strnatcasecmp');
+            $first = true;
+
+            foreach ($actividades as $act) {
+                $rows[] = [
+                    $act['nombre'],
+                    (int) ($act['puros'] ?? 0),
+                    (int) ($act['estadistico'] ?? 0),
+                    round(((int) ($act['minutos'] ?? 0)) / 60, 2),
+                    $first ? round($minutosOrdinarios / 60, 2) : 0,
+                ];
+                $first = false;
+            }
+        }
+
+        $rows[] = [
+            'Total general',
+            $this->xlsxTotalFormula($filasEmpleado, 'B', $totalPuros),
+            $this->xlsxTotalFormula($filasEmpleado, 'C', $totalEstadistico),
+            $this->xlsxTotalFormula($filasEmpleado, 'D', round($totalMinutos / 60, 2)),
+            $this->xlsxTotalFormula($filasEmpleado, 'E', round($totalMinutosOrdinarios / 60, 2)),
+        ];
+
+        $bloquesOtros = [];
+
+        foreach ($otros as $grupoOtro => $empleadosOtros) {
+            $bloquesOtros[$grupoOtro] = $this->xlsxBloqueEmpleados(
+                $empleadosOtros,
+                $tituloReporte.' '.$fechaTexto.' ('.strtoupper($grupoOtro).') A TAREA',
+                $encabezados,
+                fn (array $e) => [
+                    (int) ($e['puros'] ?? 0),
+                    (int) ($e['estadistico'] ?? 0),
+                    round(((int) ($e['minutos'] ?? 0)) / 60, 2),
+                    round(((int) ($e['minutos_ordinarios'] ?? 0)) / 60, 2),
+                ]
+            );
+        }
+
+        $bloqueHora = ($hora !== [])
+            ? $this->xlsxBloqueEmpleados(
+                $hora,
+                $tituloReporte.' '.$fechaTexto.' (AL DIA)',
+                // AL DIA: solo las HORAS ORDINARIAS (como estaba antes).
+                ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
+                fn (array $e) => [round(((int) ($e['minutos_ordinarios'] ?? 0)) / 60, 2)],
+                false
+            )
+            : null;
+
+        $compuesta = $this->xlsxComponerBloques($rows, $bloquesOtros, $bloqueHora);
+
+        // Empleados distintos: principal + al dia. Los bloques "otros" son
+        // subconjuntos del principal y no deben contarse dos veces.
+        $empleadosUnicos = count(array_unique(array_merge(array_keys($empleados), array_keys($hora))));
+        $purosHora = array_sum(array_map(fn (array $e) => (int) ($e['puros'] ?? 0), $hora));
+        $estadisticoHora = array_sum(array_map(fn (array $e) => (int) ($e['estadistico'] ?? 0), $hora));
+        $minutosHora = array_sum(array_map(fn (array $e) => (int) ($e['minutos'] ?? 0), $hora));
+        $horasOrdinariasHora = array_sum(array_map(
+            fn (array $e) => (int) ($e['minutos_ordinarios'] ?? 0),
+            $hora
+        ));
+
+        // Los bloques "A TAREA" son gente de OTRO rol trabajando en esta area:
+        // no estan en la tabla principal, asi que tambien suman al resumen.
+        $empleadosOtros = [];
+        $purosOtros = 0;
+        $estadisticoOtros = 0;
+        $minutosOtros = 0;
+        $horasOrdinariasOtros = 0;
+
+        foreach ($otros as $empleadosOtrosGrupo) {
+            foreach ($empleadosOtrosGrupo as $clave => $empOtro) {
+                $empleadosOtros[$clave] = true;
+                $purosOtros += (int) ($empOtro['puros'] ?? 0);
+                $estadisticoOtros += (int) ($empOtro['estadistico'] ?? 0);
+                $minutosOtros += (int) ($empOtro['minutos'] ?? 0);
+                $horasOrdinariasOtros += (int) ($empOtro['minutos_ordinarios'] ?? 0);
+            }
+        }
+
+        $empleadosUnicos = count(array_unique(array_merge(
+            array_keys($empleados),
+            array_keys($hora),
+            array_keys($empleadosOtros)
+        )));
+
+        return $this->xlsxResumenGeneralDetallado(
+            $compuesta,
+            $empleadosUnicos,
+            $totalPuros + $purosHora + $purosOtros,
+            $totalEstadistico + $estadisticoHora + $estadisticoOtros,
+            round(($totalMinutos + $minutosHora + $minutosOtros) / 60, 2),
+            round(($totalMinutosOrdinarios + $horasOrdinariasHora + $horasOrdinariasOtros) / 60, 2),
+            $tituloResumen.' '.$fechaTexto
+        );
+    }
+
     private function resumenAnilladoExportRows(array $empleados, bool $hasHorasOrdinarias, string $fechaTexto = '', array $otros = [], array $hora = []): array
     {
         uasort($empleados, function (array $a, array $b) {
@@ -1064,7 +1225,8 @@ class VinetaRegistroController extends Controller
                 $hora,
                 'REPORTE DEL ANILLADO '.$fechaTexto.' (AL DIA)',
                 ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
-                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)],
+                false
             )
             : null;
 
@@ -1164,7 +1326,8 @@ class VinetaRegistroController extends Controller
                 $hora,
                 'REPORTE DE '.'REZAGO'.' '.$fechaTexto.' (AL DIA)',
                 ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
-                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)],
+                false
             )
             : null;
 
@@ -1265,7 +1428,8 @@ class VinetaRegistroController extends Controller
                 $hora,
                 'REPORTE DE '.'LLENADO'.' '.$fechaTexto.' (AL DIA)',
                 ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
-                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)],
+                false
             )
             : null;
 
@@ -1366,7 +1530,8 @@ class VinetaRegistroController extends Controller
                 $hora,
                 'REPORTE DE '.'LIMPIEZA'.' '.$fechaTexto.' (AL DIA)',
                 ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
-                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)],
+                false
             )
             : null;
 
@@ -1470,7 +1635,8 @@ class VinetaRegistroController extends Controller
                 $hora,
                 'REPORTE DE '.$titulo.' '.$fechaTexto.' (AL DIA)',
                 ['Etiquetas de fila', 'Suma de Horas Ordinarias'],
-                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)]
+                fn (array $e) => [round(($e['minutos_ordinarios'] ?? 0) / 60, 2)],
+                false
             )
             : null;
 
@@ -3326,7 +3492,7 @@ class VinetaRegistroController extends Controller
      * Arma un bloque (titulo, encabezados, empleados, codigos y total) para
      * pegarlo al lado o abajo del principal. Devuelve filas de N columnas.
      */
-    private function xlsxBloqueEmpleados(array $empleados, string $titulo, array $encabezados, callable $valoresDe): array
+    private function xlsxBloqueEmpleados(array $empleados, string $titulo, array $encabezados, callable $valoresDe, bool $conActividades = true): array
     {
         uasort($empleados, function (array $a, array $b) {
             return [$this->normalizarTextoReporte($a['empleado']), $this->normalizarTextoReporte($b['codigo_empleado'])]
@@ -3349,6 +3515,38 @@ class VinetaRegistroController extends Controller
 
             foreach ($valores as $i => $v) {
                 $totales[$i] += (float) $v;
+            }
+
+            // Filas de ACTIVIDAD (lo que realmente hizo): igual que en la tabla
+            // principal, para que se vea tambien en los bloques A TAREA.
+            // En los bloques AL DIA NO se pone la actividad: solo las horas
+            // (se paga por hora, no por actividad).
+            $actividades = $conActividades ? ($emp['actividades'] ?? []) : [];
+
+            if (is_array($actividades) && $actividades !== []) {
+                uksort($actividades, 'strnatcasecmp');
+                $primera = true;
+
+                foreach ($actividades as $act) {
+                    $filaAct = array_fill(0, $columnas, '');
+                    $filaAct[0] = $act['nombre'] ?? '';
+                    $filaAct[1] = (int) ($act['puros'] ?? 0);
+                    $filaAct[2] = (int) ($act['estadistico'] ?? 0);
+
+                    if ($columnas > 3) {
+                        $filaAct[3] = round(((int) ($act['minutos'] ?? 0)) / 60, 2);
+                    }
+
+                    if ($columnas > 4) {
+                        // Las horas ordinarias van una sola vez, en la primera fila.
+                        $filaAct[4] = $primera
+                            ? round(((int) ($emp['minutos_ordinarios'] ?? 0)) / 60, 2)
+                            : 0;
+                    }
+
+                    $rows[] = $filaAct;
+                    $primera = false;
+                }
             }
         }
 
@@ -3386,7 +3584,7 @@ class VinetaRegistroController extends Controller
         foreach ($principal as $fila) {
             $fila = array_values($fila);
 
-            while (count($fila) < 4) {
+            while (count($fila) < 5) {
                 $fila[] = '';
             }
 
@@ -3394,8 +3592,8 @@ class VinetaRegistroController extends Controller
         }
 
         if ($otros !== []) {
-            $relleno = ['', '', ''];
-            $baseIzquierda = ['', '', '', ''];
+            $relleno = ['', ''];
+            $baseIzquierda = ['', '', '', '', ''];
             $columnaBase = 7; // H (indice 0 = A)
             $derecha = [];
 
@@ -3407,15 +3605,15 @@ class VinetaRegistroController extends Controller
                 foreach ($bloque as $fila) {
                     $fila = array_values($fila);
 
-                    while (count($fila) < 3) {
+                    while (count($fila) < 5) {
                         $fila[] = '';
                     }
 
                     $derecha[] = $this->xlsxResolverSumas($fila, $base, $columnaBase);
                 }
 
-                $derecha[] = ['', '', ''];
-                $derecha[] = ['', '', ''];
+                $derecha[] = ['', '', '', '', ''];
+                $derecha[] = ['', '', '', '', ''];
             }
 
             foreach ($derecha as $i => $fila) {
@@ -3431,7 +3629,7 @@ class VinetaRegistroController extends Controller
             foreach ($hora as $fila) {
                 $fila = array_values($fila);
 
-                while (count($fila) < 4) {
+                while (count($fila) < 5) {
                     $fila[] = '';
                 }
 
@@ -3474,6 +3672,39 @@ class VinetaRegistroController extends Controller
 
         return $rows;
     }
+    private function xlsxResumenGeneralDetallado(
+        array $rows,
+        int $empleados,
+        float $puros,
+        float $estadistico,
+        float $horasTarea,
+        float $horasOrdinarias,
+        string $titulo
+    ): array {
+        $rows[] = [];
+        $rows[] = [];
+        $rows[] = ['RESUMEN GENERAL '.$titulo];
+        $rows[] = [];
+        $rows[] = [
+            'Etiquetas de fila',
+            'Empleados',
+            'Puros',
+            'Estadistico',
+            'Horas de tarea',
+            'Horas ordinarias',
+        ];
+        $rows[] = [
+            'TOTAL',
+            $empleados,
+            round($puros, 2),
+            round($estadistico, 2),
+            round($horasTarea, 2),
+            round($horasOrdinarias, 2),
+        ];
+
+        return $rows;
+    }
+
     private function xlsxResolverSumas(array $fila, int $filaBase, int $columnaBase): array
     {
         foreach ($fila as $i => $celda) {
@@ -3511,6 +3742,38 @@ class VinetaRegistroController extends Controller
             'value' => $total,
         ];
     }
+    private function xlsxEsFilaTotal(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (is_array($value)) {
+                continue;
+            }
+
+            $texto = trim((string) $value);
+
+            if ($texto === 'Total general' || $texto === 'TOTAL') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function xlsxFilaContiene(array $row, string $texto): bool
+    {
+        foreach ($row as $value) {
+            if (is_array($value)) {
+                continue;
+            }
+
+            if (str_contains((string) $value, $texto)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function xlsxWorksheetXml(array $rows, ?string $format = null, ?string $paperSize = null, ?int $employeesPerPage = null): string
     {
         $columnCount = max(1, collect($rows)->map(fn ($row) => count($row))->max() ?? 1);
@@ -3592,26 +3855,66 @@ class VinetaRegistroController extends Controller
                 }
 
                 if (in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado', 'anillado_summary'], true)) {
-                    $primera = trim((string) ($row[0] ?? ''));
+                    $primera = is_array($row[0] ?? null) ? '' : trim((string) ($row[0] ?? ''));
+                    $derecha = is_array($row[7] ?? null) ? '' : trim((string) ($row[7] ?? ''));
+                    $headerStyle = $this->xlsxHeaderStyle($format) ?? 11;
 
-                    if ($primera === '') {
-                        $styleId = null;
-                    } elseif (str_starts_with($primera, 'REPORTE') || $primera === 'Etiquetas de fila') {
-                        $styleId = $this->xlsxHeaderStyle($format) ?? 11;
-                    } elseif ($primera === 'Total general') {
-                        $styleId = $columnIndex === 0 ? 15 : 16;
-                    } elseif (ctype_digit($primera)) {
-                        $styleId = $columnIndex === 0 ? 13 : 14;
+                    // Fila de EMPLEADO = su total por persona (la que trae el
+                    // codigo justo debajo): va en NEGRITA. Las de actividad y
+                    // el codigo quedan normales.
+                    $esFilaTotalEmpleado = function (int $columna) use ($rows, $rowIndex): bool {
+                        $valor = $rows[$rowIndex][$columna] ?? null;
+                        $siguiente = $rows[$rowIndex + 1][$columna] ?? null;
+
+                        if ($valor === null || is_array($valor) || trim((string) $valor) === '') {
+                            return false;
+                        }
+
+                        if ($siguiente === null || is_array($siguiente)) {
+                            return false;
+                        }
+
+                        return (bool) preg_match('/^\d{2,6}$/', trim((string) $siguiente));
+                    };
+
+                    if ($columnIndex >= 7) {
+                        // Bloque "otros" a la derecha (H-L).
+                        if ($derecha === '') {
+                            $styleId = null;
+                        } elseif (str_starts_with($derecha, 'REPORTE')) {
+                            $styleId = 1;
+                        } elseif ($derecha === 'Etiquetas de fila') {
+                            $styleId = $headerStyle;
+                        } elseif ($derecha === 'Total general') {
+                            $styleId = $columnIndex === 7 ? 24 : 25;
+                        } else {
+                            $negrita = $esFilaTotalEmpleado(7);
+
+                            $styleId = $columnIndex === 7 ? ($negrita ? 15 : 13) : ($negrita ? 16 : 14);
+                        }
                     } else {
-                        $styleId = $columnIndex === 0 ? 13 : 14;
+                        // Bloque principal y RESUMEN GENERAL (A-F).
+                        if ($primera === '') {
+                            $styleId = null;
+                        } elseif (str_starts_with($primera, 'REPORTE')) {
+                            $styleId = 1;
+                        } elseif ($primera === 'Etiquetas de fila') {
+                            $styleId = $headerStyle;
+                        } elseif ($primera === 'Total general' || $primera === 'TOTAL') {
+                            $styleId = $columnIndex === 0 ? 24 : 25;
+                        } else {
+                            $negrita = $esFilaTotalEmpleado(0);
+
+                            $styleId = $columnIndex === 0 ? ($negrita ? 15 : 13) : ($negrita ? 16 : 14);
+                        }
                     }
                 }
 
-
-                // Columnas separadoras entre bloques (E y F): sin formato.
+                // Columnas separadoras entre bloques (F y G): sin formato.
                 if (
                     in_array($format, ['pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado', 'anillado_summary'], true)
-                    && in_array($columnIndex, [4, 5, 6], true)
+                    && in_array($columnIndex, [5, 6], true)
+                    && ! is_array($value)
                     && trim((string) $value) === ''
                 ) {
                     $styleId = null;
@@ -3772,8 +4075,12 @@ class VinetaRegistroController extends Controller
     private function xlsxRowStyle(array $row, int $rowIndex, ?string $format, ?string $paperSize = null): ?int
     {
         if ($format === 'grouped_report') {
-            if ($rowIndex === 0 || (string) ($row[3] ?? '') === 'Total empleado') {
+            if ($rowIndex === 0) {
                 return 7;
+            }
+
+            if ((string) ($row[3] ?? '') === 'Total empleado') {
+                return 24;
             }
 
             return (string) ($row[3] ?? '') === 'Subtotal producto' ? 4 : null;
@@ -3800,7 +4107,7 @@ class VinetaRegistroController extends Controller
                 return null;
             }
 
-            return str_starts_with($val, 'Total') ? 4 : 13;
+            return str_starts_with($val, 'Total') ? 24 : 13;
         }
 
         if ($format !== 'weekly_report') {
@@ -3868,16 +4175,9 @@ class VinetaRegistroController extends Controller
             return array_pad(array_slice($base, 0, $columnCount), $columnCount, 12);
         }
 
-        if ($format === 'pivot_rezago' || $format === 'pivot_limpieza' || $format === 'pivot_prensado' || $format === 'pivot_rolado') {
-            return [45, 28, 26, 26, 20, 3, 3, 45, 28, 26, 26];
-        }
-
-        if ($format === 'pivot_llenado') {
-            return [45, 26, 26, 26, 20, 3, 3, 45, 26, 26, 26];
-        }
-
-        if ($format === 'anillado_summary') {
-            return [40, 24, 24, 12, 20, 3, 3, 40, 24, 24, 12];
+        if (in_array($format, ['anillado_summary', 'pivot_rezago', 'pivot_llenado', 'pivot_limpieza', 'pivot_prensado', 'pivot_rolado'], true)) {
+            // A-E principal | F-G separadores | H-L bloque derecho
+            return [45, 16, 16, 14, 14, 14, 14, 45, 16, 16, 14, 14];
         }
 
         if ($format === 'weekly_report') {
@@ -3990,7 +4290,7 @@ class VinetaRegistroController extends Controller
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            .'<fonts count="8">'
+            .'<fonts count="9">'
             .'<font><sz val="11"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="11"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="16"/><name val="Georgia"/></font>'
@@ -3999,8 +4299,10 @@ class VinetaRegistroController extends Controller
             .'<font><b/><sz val="9"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>'
             .'<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>'
+            // Totales: negrita mas grande, en gris
+            .'<font><b/><sz val="12"/><color rgb="FF1F2937"/><name val="Calibri"/></font>'
             .'</fonts>'
-            .'<fills count="11">'
+            .'<fills count="12">'
             .'<fill><patternFill patternType="none"/></fill>'
             .'<fill><patternFill patternType="gray125"/></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFFFF59D"/><bgColor indexed="64"/></patternFill></fill>'
@@ -4013,13 +4315,15 @@ class VinetaRegistroController extends Controller
             .'<fill><patternFill patternType="solid"><fgColor rgb="FF8B5CF6"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FFEF4444"/><bgColor indexed="64"/></patternFill></fill>'
             .'<fill><patternFill patternType="solid"><fgColor rgb="FF0D9488"/><bgColor indexed="64"/></patternFill></fill>'
+            // Gris de los totales
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>'
             .'</fills>'
             .'<borders count="2">'
             .'<border><left/><right/><top/><bottom/><diagonal/></border>'
             .'<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>'
             .'</borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            .'<cellXfs count="24">'
+            .'<cellXfs count="26">'
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
             .'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
             .'<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
@@ -4045,6 +4349,9 @@ class VinetaRegistroController extends Controller
             .'<xf numFmtId="0" fontId="7" fillId="8" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
             .'<xf numFmtId="0" fontId="7" fillId="9" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
             .'<xf numFmtId="0" fontId="7" fillId="10" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            // Totales en gris (izquierda / derecha)
+            .'<xf numFmtId="0" fontId="8" fillId="11" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            .'<xf numFmtId="0" fontId="8" fillId="11" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
             .'</cellXfs>'
             .'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             .'</styleSheet>';

@@ -35,6 +35,22 @@ class ErpApiService
      * Fetch packaging documents for a given date and branch from the ERP API
      * and synchronize them into the local database.
      */
+    /**
+     * Horas "limpias": 9.49 / 9.51 se asientan en 9.5 (y 12.49 en 12.5), asi
+     * al mandarselo al ERP no quedan diferencias de 0.01 con el sistema.
+     */
+    private function normalizarHoras(float $horas): float
+    {
+        $redondeado = round($horas, 2);
+        $unDecimal = round($redondeado, 1);
+
+        if (abs($redondeado - $unDecimal) <= 0.0100001) {
+            return $unDecimal;
+        }
+
+        return $redondeado;
+    }
+
     public function obtenerDocumentosEmpaques(string $fecha, int $sucursal = 2): array
     {
         $url = "{$this->baseUrl}/documentos-empaques";
@@ -225,7 +241,7 @@ class ErpApiService
      * Fija las horas EXACTAS de una fila ya registrada en el ERP.
      * Lo usa el boton "Aplicar ajuste de horas" despues de repartir la jornada.
      */
-    public function fijarHorasVineta(VinetaRegistro $registro, float $horas, ?int $sucursal = null, ?int $puros = null, ?float $precio = null, ?float $salario = null): array
+    public function fijarHorasVineta(VinetaRegistro $registro, float $horas, ?int $sucursal = null, ?int $puros = null, ?float $precio = null, ?float $salario = null, ?bool $dryRun = null): array
     {
         $doc = trim((string) $registro->documento_numero);
 
@@ -234,14 +250,14 @@ class ErpApiService
         }
 
         $payload = [
-            'dry_run' => $this->dryRun,
+            'dry_run' => $dryRun ?? $this->dryRun,
             'sucursal' => (int) ($sucursal ?? $registro->sucursal ?? $this->defaultSucursal),
             'documento' => $doc,
             'codigo_actividad' => (int) $registro->actividad_codigo,
             'numero_de_orden' => (string) $registro->orden_del_sistema,
             'empleado_codigo' => (string) $registro->empleado_codigo,
             'empleado_nombre' => (string) ($registro->empleado_nombre ?? ''),
-            'horas' => round($horas, 2),
+            'horas' => $this->normalizarHoras($horas),
             'motivo' => 'Aplicar ajuste de horas desde app_empaque',
             'item' => (string) ($registro->producto_item ?: ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : '')),
             'codigo_producto' => (string) ($registro->producto_codigo ?: ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : '')),
@@ -347,7 +363,7 @@ class ErpApiService
             'sucursal' => (int) ($sucursal ?? $this->defaultSucursal),
             'documento' => $doc,
             'empleado_codigo' => $emp,
-            'horas' => round($horas, 2),
+            'horas' => $this->normalizarHoras($horas),
             'motivo' => 'Horas ordinarias desde app_empaque',
         ];
 

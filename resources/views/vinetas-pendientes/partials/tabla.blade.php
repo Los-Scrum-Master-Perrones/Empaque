@@ -156,6 +156,10 @@
                              <span class="text-xs">{{ $sortIcon('estado') }}</span>
                         </a>
                     </th>
+
+                    <th class="px-4 py-3 text-center font-bold whitespace-nowrap">
+                        Generar
+                    </th>
                 </tr>
             </thead>
 
@@ -244,10 +248,33 @@
                                 {{ $vineta->estado ?? 'N/A' }}
                             </span>
                         </td>
+
+                        <td class="px-4 py-3 whitespace-nowrap text-center">
+                            <button type="button"
+                                    class="btn-generar-vinetas inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
+                                    style="background:#0f766e"
+                                    title="Generar viñetas de limpieza para este pendiente"
+                                    data-id-pendiente="{{ $vineta->id_pendiente }}"
+                                    data-item="{{ $vineta->item }}"
+                                    data-codigo-producto="{{ $vineta->codigo_producto }}"
+                                    data-marca="{{ $vineta->marca }}"
+                                    data-nombre="{{ $vineta->nombre }}"
+                                    data-vitola="{{ $vineta->vitola }}"
+                                    data-capa="{{ $vineta->capa }}"
+                                    data-tipo-empaque="{{ $vineta->tipo_empaque }}"
+                                    data-orden-sistema="{{ $vineta->orden_del_sistema }}"
+                                    data-orden="{{ $vineta->orden }}"
+                                    data-mes="{{ $vineta->mes }}">
+                                <svg class="w-3.5 h-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Viñetas</span>
+                            </button>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="16" class="px-4 py-12 text-center">
+                        <td colspan="17" class="px-4 py-12 text-center">
                             <p class="theme-title font-bold">
                                 No hay viñetas pendientes para mostrar
                             </p>

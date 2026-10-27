@@ -73,20 +73,25 @@ class VinetaRegistroExportTest extends TestCase
             $rezagoRows = $this->xlsxRows((string) $zip->getFromName('xl/worksheets/sheet4.xml'));
             $limpiezaRows = $this->xlsxRows((string) $zip->getFromName('xl/worksheets/sheet6.xml'));
 
-            $this->assertSame('Empleado', $anilladoRows[0][0] ?? null);
-            $this->assertSame('Horas de tarea', $anilladoRows[0][3] ?? null);
-            $this->assertSame('Total general', $anilladoRows[count($anilladoRows) - 1][0] ?? null);
+            $this->assertStringContainsString('REPORTE DEL ANILLADO', (string) ($anilladoRows[0][0] ?? ''));
+            $this->assertSame('Etiquetas de fila', $anilladoRows[2][0] ?? null);
+            $this->assertSame('Puros', $anilladoRows[2][1] ?? null);
+            $this->assertSame('Estadistico', $anilladoRows[2][2] ?? null);
+            $this->assertSame('Horas de tarea', $anilladoRows[2][3] ?? null);
+            $this->assertSame('Horas ordinarias', $anilladoRows[2][4] ?? null);
+            $this->assertTrue(collect($anilladoRows)->contains(fn (array $row) => ($row[0] ?? null) === 'Total general'));
 
             $this->assertStringContainsString('REPORTE DE REZAGO', (string) ($rezagoRows[0][0] ?? ''));
             $this->assertSame('Etiquetas de fila', $rezagoRows[2][0] ?? null);
-            $this->assertSame('Suma de Cantidad Procesada', $rezagoRows[2][1] ?? null);
-            $this->assertSame('Suma de Horas Trabajadas', $rezagoRows[2][2] ?? null);
-            $this->assertSame('Suma de Horas Ordinarias', $rezagoRows[2][3] ?? null);
-            $this->assertSame('Total general', $rezagoRows[count($rezagoRows) - 1][0] ?? null);
+            $this->assertSame('Puros', $rezagoRows[2][1] ?? null);
+            $this->assertSame('Estadistico', $rezagoRows[2][2] ?? null);
+            $this->assertSame('Horas de tarea', $rezagoRows[2][3] ?? null);
+            $this->assertSame('Horas ordinarias', $rezagoRows[2][4] ?? null);
+            $this->assertTrue(collect($rezagoRows)->contains(fn (array $row) => ($row[0] ?? null) === 'Total general'));
 
             $this->assertStringContainsString('REPORTE DE LIMPIEZA', (string) ($limpiezaRows[0][0] ?? ''));
             $this->assertSame('Etiquetas de fila', $limpiezaRows[2][0] ?? null);
-            $this->assertSame('Total general', $limpiezaRows[count($limpiezaRows) - 1][0] ?? null);
+            $this->assertTrue(collect($limpiezaRows)->contains(fn (array $row) => ($row[0] ?? null) === 'Total general'));
 
             $subtotal = collect($rows)->first(fn (array $row) => ($row[3] ?? null) === 'Subtotal producto'
                 && ($row[1] ?? null) === 'AGUILAR VALLADARES NALLELY MARIBEL'
@@ -221,28 +226,30 @@ class VinetaRegistroExportTest extends TestCase
             $anilladoText = json_encode($anilladoRows);
             $this->assertStringContainsString('ANILLADORA JUANA', $anilladoText);
             $this->assertStringContainsString('2001', $anilladoText);
-            $this->assertSame('Total general', $anilladoRows[count($anilladoRows) - 1][0]);
+            $this->assertSame('TOTAL', $anilladoRows[count($anilladoRows) - 1][0]);
 
-            // 8219 appears in Rezago sheet
+            // 8219 (cargo rezago) hizo actividad de anillado: la actividad manda,
+            // asi que aparece en la hoja de Anillado, no en la de Rezago.
             $rezagoText = json_encode($rezagoRows);
-            $this->assertStringContainsString('SALGADO SAYRA', $rezagoText);
-            $this->assertStringContainsString('8219', $rezagoText);
-            $this->assertStringContainsString('2 Anillo, Celofan, Cello', $rezagoText);
-            $this->assertSame('Total general', $rezagoRows[count($rezagoRows) - 1][0]);
+            $this->assertStringContainsString('SALGADO SAYRA', $anilladoText);
+            $this->assertStringContainsString('8219', $anilladoText);
+            $this->assertStringContainsString('2 Anillo, Celofan, Cello', $anilladoText);
+            $this->assertStringNotContainsString('SALGADO SAYRA', $rezagoText);
+            $this->assertSame('TOTAL', $rezagoRows[count($rezagoRows) - 1][0]);
 
-            // Llenadora appears in Llenado sheet with her Anillado activity
-            $llenadoText = json_encode($llenadoRows);
-            $this->assertStringContainsString('LLENADORA MARIA', $llenadoText);
-            $this->assertStringContainsString('3001', $llenadoText);
-            $this->assertStringContainsString('Anillado especial', $llenadoText);
-            $this->assertSame('Total general', $llenadoRows[count($llenadoRows) - 1][0]);
+            // La llenadora con actividad de anillado aparece en el bloque
+            // "(LLENADO) A TAREA" de la hoja de Anillado.
+            $this->assertStringContainsString('LLENADORA MARIA', $anilladoText);
+            $this->assertStringContainsString('3001', $anilladoText);
+            $this->assertStringContainsString('Anillado especial', $anilladoText);
+            $this->assertSame('TOTAL', $llenadoRows[count($llenadoRows) - 1][0]);
 
             // Limpiadora appears in Limpieza sheet
             $limpiezaText = json_encode($limpiezaRows);
             $this->assertStringContainsString('LIMPIADORA CARMEN', $limpiezaText);
             $this->assertStringContainsString('5001', $limpiezaText);
             $this->assertStringContainsString('Limpieza', $limpiezaText);
-            $this->assertSame('Total general', $limpiezaRows[count($limpiezaRows) - 1][0]);
+            $this->assertSame('TOTAL', $limpiezaRows[count($limpiezaRows) - 1][0]);
         } finally {
             $zip->close();
             @unlink($path);
@@ -296,34 +303,39 @@ class VinetaRegistroExportTest extends TestCase
 
             $this->assertSame([
                 'Etiquetas de fila',
-                'Suma de Cantidad Procesada',
-                'Suma de Horas Trabajadas',
-                'Suma de Horas Ordinarias',
-            ], $rezagoRows[2]);
+                'Puros',
+                'Estadistico',
+                'Horas de tarea',
+                'Horas ordinarias',
+            ], array_slice($rezagoRows[2], 0, 5));
 
             // Employee row:
             $this->assertSame('SALGADO SAYRA', $rezagoRows[3][0]);
             $this->assertSame('120', $rezagoRows[3][1]);
-            $this->assertSame('1.5', $rezagoRows[3][2]);
-            $this->assertSame('1', $rezagoRows[3][3]);
+            $this->assertSame('120', $rezagoRows[3][2]);
+            $this->assertSame('1.5', $rezagoRows[3][3]);
+            $this->assertSame('1', $rezagoRows[3][4]);
 
             // Employee code row:
-            $this->assertSame('   8219', $rezagoRows[4][0]);
+            $this->assertSame('8219', $rezagoRows[4][0]);
             $this->assertSame('120', $rezagoRows[4][1]);
-            $this->assertSame('1.5', $rezagoRows[4][2]);
-            $this->assertSame('1', $rezagoRows[4][3]);
+            $this->assertSame('120', $rezagoRows[4][2]);
+            $this->assertSame('1.5', $rezagoRows[4][3]);
+            $this->assertSame('1', $rezagoRows[4][4]);
 
             // Activity row:
-            $this->assertSame('      Rezagado', $rezagoRows[5][0]);
+            $this->assertSame('Rezagado', $rezagoRows[5][0]);
             $this->assertSame('120', $rezagoRows[5][1]);
-            $this->assertSame('1.5', $rezagoRows[5][2]);
-            $this->assertSame('1', $rezagoRows[5][3]);
+            $this->assertSame('120', $rezagoRows[5][2]);
+            $this->assertSame('1.5', $rezagoRows[5][3]);
+            $this->assertSame('1', $rezagoRows[5][4]);
 
             // Total row:
             $this->assertSame('Total general', $rezagoRows[6][0]);
             $this->assertSame('120', $rezagoRows[6][1]);
-            $this->assertSame('1.5', $rezagoRows[6][2]);
-            $this->assertSame('1', $rezagoRows[6][3]);
+            $this->assertSame('120', $rezagoRows[6][2]);
+            $this->assertSame('1.5', $rezagoRows[6][3]);
+            $this->assertSame('1', $rezagoRows[6][4]);
         } finally {
             $zip->close();
             @unlink($path);
@@ -346,7 +358,7 @@ class VinetaRegistroExportTest extends TestCase
         $this->createRegistro($v1, [
             'empleado_codigo' => '6658',
             'empleado_nombre' => 'ANDRES SANCHEZ GLORIA LETICIA',
-            'actividad_nombre' => 'Anillo,Celofan,Cello',
+            'actividad_nombre' => 'Limpieza de Puros',
             'cantidad_puros' => 260,
             'cantidad_actividades' => 2,
             'total_actividades' => 520,
@@ -357,7 +369,7 @@ class VinetaRegistroExportTest extends TestCase
         $this->createRegistro($v2, [
             'empleado_codigo' => '6658',
             'empleado_nombre' => 'ANDRES SANCHEZ GLORIA LETICIA',
-            'actividad_nombre' => 'Llenado de Bolsas 3 Puros (Kretek)',
+            'actividad_nombre' => 'Limpieza de Puros',
             'cantidad_puros' => 240,
             'cantidad_actividades' => 3,
             'total_actividades' => 720,
@@ -368,7 +380,7 @@ class VinetaRegistroExportTest extends TestCase
         $this->createRegistro($v3, [
             'empleado_codigo' => '6658',
             'empleado_nombre' => 'ANDRES SANCHEZ GLORIA LETICIA',
-            'actividad_nombre' => 'Sellado de bolsas 3 Puros(Kretek)',
+            'actividad_nombre' => 'Limpieza de Puros',
             'cantidad_puros' => 1200,
             'cantidad_actividades' => 3,
             'total_actividades' => 3600,
@@ -391,20 +403,24 @@ class VinetaRegistroExportTest extends TestCase
 
             $this->assertStringContainsString('REPORTE DE LIMPIEZA', (string) ($limpiezaRows[0][0] ?? ''));
             $this->assertSame('Etiquetas de fila', $limpiezaRows[2][0]);
-            $this->assertSame('Suma de Cantidad Procesada', $limpiezaRows[2][1]);
+            $this->assertSame('Puros', $limpiezaRows[2][1]);
+            $this->assertSame('Estadistico', $limpiezaRows[2][2]);
 
             // Employee row:
             $this->assertSame('ANDRES SANCHEZ GLORIA LETICIA', $limpiezaRows[3][0]);
-            $this->assertSame('4840', $limpiezaRows[3][1]);
+            $this->assertSame('1700', $limpiezaRows[3][1]);
+            $this->assertSame('4840', $limpiezaRows[3][2]);
 
             // Code row:
-            $this->assertSame('   6658', $limpiezaRows[4][0]);
-            $this->assertSame('4840', $limpiezaRows[4][1]);
+            $this->assertSame('6658', $limpiezaRows[4][0]);
+            $this->assertSame('1700', $limpiezaRows[4][1]);
+            $this->assertSame('4840', $limpiezaRows[4][2]);
 
             // Total row:
-            $lastRow = $limpiezaRows[count($limpiezaRows) - 1];
-            $this->assertSame('Total general', $lastRow[0]);
-            $this->assertSame('4840', $lastRow[1]);
+            $totalRow = collect($limpiezaRows)->first(fn (array $row) => ($row[0] ?? null) === 'Total general');
+            $this->assertNotNull($totalRow);
+            $this->assertSame('1700', $totalRow[1]);
+            $this->assertSame('4840', $totalRow[2]);
         } finally {
             $zip->close();
             @unlink($path);

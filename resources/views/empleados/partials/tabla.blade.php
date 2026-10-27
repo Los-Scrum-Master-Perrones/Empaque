@@ -29,6 +29,13 @@
         <table class="empleados-table w-full text-sm">
             <thead class="theme-table-head productos-sticky-head bg-[#eff6ff] text-[#0f172a]">
                 <tr>
+                    <th class="px-3 py-3 text-left font-bold w-10">
+                        <input type="checkbox"
+                               id="empleadosQrTodos"
+                               class="w-4 h-4 rounded border-[#cbbba4] accent-[#5b3a1e] cursor-pointer"
+                               title="Seleccionar todos los empleados de esta página">
+                    </th>
+
                     <th class="px-3 py-3 text-left font-bold whitespace-nowrap">
                         <a href="{{ $sortLink('codigo') }}"
                            class="empleados-ajax-table-link inline-flex items-center gap-2 hover:text-[#5b3a1e]">
@@ -82,6 +89,13 @@
             <tbody class="divide-y theme-divide">
                 @forelse ($empleados as $empleado)
                     <tr class="theme-row hover:bg-[#f8fafc] transition">
+                        <td class="px-3 py-3 w-10">
+                            <input type="checkbox"
+                                   class="empleado-qr-check w-4 h-4 rounded border-[#cbbba4] accent-[#5b3a1e] cursor-pointer"
+                                   value="{{ $empleado->codigo }}"
+                                   title="Seleccionar para generar QR">
+                        </td>
+
                         <td class="px-3 py-3 whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#f3efe7] text-[#5b3a1e] text-xs font-bold border border-[#e5d8c7]">
                                 {{ $empleado->codigo }}
@@ -136,7 +150,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-12 text-center">
+                        <td colspan="7" class="px-4 py-12 text-center">
                             <div class="mx-auto w-14 h-14 rounded-2xl bg-[#f3efe7] border border-[#e5d8c7] flex items-center justify-center mb-3">
                                 <svg class="w-7 h-7 text-[#5b3a1e]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

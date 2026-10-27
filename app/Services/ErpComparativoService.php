@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Descarga los datos del dia del ERP (documentos, actividades, detalle y
@@ -30,22 +31,55 @@ class ErpComparativoService
      */
     public function descargar(string $fecha, int $sucursal = 2): array
     {
-        try {
-            $response = Http::timeout(120)
-                ->connectTimeout(10)
-                ->withHeaders([
-                    'X-Api-Key' => $this->apiKey,
-                    'Accept' => 'application/json',
-                ])
-                ->get($this->baseUrl.'/empaque-erp/todo', [
-                    'fecha' => $fecha,
-                    'sucursal' => $sucursal,
-                ]);
-        } catch (\Throwable $e) {
-            Log::error('Comparativo ERP descarga: '.$e->getMessage());
+        $respuesta = null;
+        $ultimoError = '';
 
-            return ['success' => false, 'message' => 'No se pudo conectar con el ERP: '.$e->getMessage()];
+        // Reintento: a veces la API del ERP falla (timeout/rede) y la fecha
+        // se queda "sin datos" aunque existan documentos.
+        for ($intento = 1; $intento <= 2; $intento++) {
+            try {
+                $respuesta = Http::timeout(120)
+                    ->connectTimeout(10)
+                    ->withHeaders([
+                        'X-Api-Key' => $this->apiKey,
+                        'Accept' => 'application/json',
+                    ])
+                    ->get($this->baseUrl.'/empaque-erp/todo', [
+                        'fecha' => $fecha,
+                        'sucursal' => $sucursal,
+                    ]);
+            } catch (\Throwable $e) {
+                $respuesta = null;
+                $ultimoError = $e->getMessage();
+                Log::warning("Comparativo ERP descarga (intento $intento): ".$ultimoError);
+
+                if ($intento < 2) {
+                    sleep(2);
+                }
+
+                continue;
+            }
+
+            if (! $respuesta->failed()) {
+                break;
+            }
+
+            $ultimoError = 'HTTP '.$respuesta->status();
+
+            if ($intento < 2) {
+                sleep(2);
+            }
         }
+
+        if ($respuesta === null) {
+            Log::error('Comparativo ERP descarga: '.$ultimoError);
+
+            $this->registrarDescarga($fecha, $sucursal, null, false, 'No se pudo conectar con el ERP: '.$ultimoError);
+
+            return ['success' => false, 'message' => 'No se pudo conectar con el ERP: '.$ultimoError];
+        }
+
+        $response = $respuesta;
 
         $data = $response->json();
 
@@ -60,6 +94,14 @@ class ErpComparativoService
             } elseif ($response->status() === 401) {
                 $mensaje = 'El ERP rechazo la clave (HTTP 401). Revisa ERP_API_KEY en el .env de Empaque.';
             }
+
+            $this->registrarDescarga(
+                $fecha,
+                $sucursal,
+                null,
+                false,
+                'El ERP respondio: '.$mensaje.' (HTTP '.$response->status().')'
+            );
 
             return [
                 'success' => false,
@@ -167,14 +209,77 @@ class ErpComparativoService
             }
         });
 
-        return [
-            'success' => true,
-            'message' => 'Descargado del ERP.',
+        $conteos = [
             'documentos' => count($documentos),
-            'actividades' => count($actividades),
             'detalles' => count($detalles),
             'planificacion' => count($planificacion),
         ];
+
+        $this->registrarDescarga($fecha, $sucursal, $conteos, true, 'Descargado del ERP.');
+
+        return [
+            'success' => true,
+            'message' => 'Descargado del ERP.',
+            'documentos' => $conteos['documentos'],
+            'actividades' => count($actividades),
+            'detalles' => $conteos['detalles'],
+            'planificacion' => $conteos['planificacion'],
+        ];
+    }
+
+    /**
+     * Ya se intento descargar esta fecha/sucursal y salio bien?
+     * (incluso si el ERP no tiene documentos ese dia).
+     */
+    public function yaDescargada(string $fecha, int $sucursal): bool
+    {
+        try {
+            if (Schema::hasTable('erp_empaques_descargas')) {
+                return DB::table('erp_empaques_descargas')
+                    ->where('sucursal', $sucursal)
+                    ->whereDate('fecha', $fecha)
+                    ->where('ok', true)
+                    ->exists();
+            }
+
+            return DB::table('erp_empaques_documentos')
+                ->where('sucursal', $sucursal)
+                ->whereDate('fecha', $fecha)
+                ->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Deja constancia de la descarga (con exito o no) para que la pantalla
+     * sepa si falta bajar esa fecha.
+     *
+     * @param  array{documentos?:int, detalles?:int, planificacion?:int}|null  $conteos
+     */
+    public function registrarDescarga(string $fecha, int $sucursal, ?array $conteos, bool $ok, string $mensaje): void
+    {
+        if (! Schema::hasTable('erp_empaques_descargas')) {
+            return;
+        }
+
+        try {
+            DB::table('erp_empaques_descargas')->updateOrInsert(
+                ['sucursal' => $sucursal, 'fecha' => $fecha],
+                [
+                    'documentos' => (int) ($conteos['documentos'] ?? 0),
+                    'detalles' => (int) ($conteos['detalles'] ?? 0),
+                    'planificacion' => (int) ($conteos['planificacion'] ?? 0),
+                    'ok' => $ok,
+                    'mensaje' => mb_substr($mensaje, 0, 250),
+                    'descargado_en' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Comparativo ERP: no se pudo registrar la descarga: '.$e->getMessage());
+        }
     }
 
     /**
@@ -334,8 +439,85 @@ class ErpComparativoService
         }
 
         $mapaSistema = [];
+        $porEmpleado = [];
+
         foreach ($sistema as $r) {
-            $mapaSistema[$llave($r->numero, $r->actividad, $r->orden, $r->empleado, $r->producto)] = $r;
+            $k = $llave($r->numero, $r->actividad, $r->orden, $r->empleado, $r->producto);
+            $mapaSistema[$k] = $r;
+            $llaveEmpleado = trim((string) $r->numero).'|'.trim((string) $r->empleado);
+            $porEmpleado[$llaveEmpleado][] = $k;
+        }
+
+        // Horas ordinarias (gente "al dia"): sus viñetas llegan POR HORA, o sea
+        // sin minutos_trabajados. Sin esto, el sistema se ve en 0 h aunque la
+        // persona si trabajo. Se suman al empleado en ese documento (a la fila
+        // con mas puros) para que el comparativo y los totales los muestren.
+        $ordinarias = DB::table('empleado_horas_ordinarias')
+            ->where('sucursal', $sucursal)
+            ->whereDate('fecha', $fecha)
+            ->whereNotNull('documento_numero')
+            ->where('documento_numero', '<>', '')
+            ->selectRaw('TRIM(documento_numero) AS numero, TRIM(empleado_codigo) AS empleado, SUM(minutos) AS minutos')
+            ->groupBy('documento_numero', 'empleado_codigo')
+            ->get();
+
+        foreach ($ordinarias as $o) {
+            $minutosOrd = (float) $o->minutos;
+
+            if ($minutosOrd <= 0) {
+                continue;
+            }
+
+            $candidatos = $porEmpleado[trim((string) $o->numero).'|'.trim((string) $o->empleado)] ?? [];
+
+            if ($candidatos === []) {
+                continue;
+            }
+
+            // Se reparte COMO LO HACE EL ERP: en centesimas de hora,
+            // proporcional a los puros de cada fila, y el resto (por el
+            // redondeo hacia abajo) va de 1 en 1 a la fila con mas puros.
+            // Así las horas por fila del sistema quedan iguales a las del ERP.
+            $totalCentesimas = (int) round(($minutosOrd / 60) * 100);
+            $purosTotal = 0.0;
+
+            foreach ($candidatos as $k) {
+                $purosTotal += max((float) ($mapaSistema[$k]->puros ?? 0), 0);
+            }
+
+            $reparto = [];
+            $asignado = 0;
+
+            foreach ($candidatos as $i => $k) {
+                $puros = max((float) ($mapaSistema[$k]->puros ?? 0), 0);
+                $parte = ($purosTotal > 0)
+                    ? (int) floor($totalCentesimas * ($puros / $purosTotal))
+                    : (int) floor($totalCentesimas / count($candidatos));
+
+                $reparto[$i] = $parte;
+                $asignado += $parte;
+            }
+
+            $resto = $totalCentesimas - $asignado;
+
+            if ($resto > 0) {
+                $orden = array_keys($candidatos);
+                usort($orden, fn ($a, $b) => ((float) ($mapaSistema[$candidatos[$b]]->puros ?? 0)) <=> ((float) ($mapaSistema[$candidatos[$a]]->puros ?? 0)));
+                $pos = 0;
+
+                while ($resto > 0) {
+                    $reparto[$orden[$pos % count($orden)]]++;
+                    $resto--;
+                    $pos++;
+                }
+            }
+
+            foreach ($candidatos as $i => $k) {
+                // 1 centesima de hora = 0.6 minuto (sin redondear, para que
+                // horas de la fila y horas del empleado calen exacto).
+                $mapaSistema[$k]->minutos = ((float) ($mapaSistema[$k]->minutos ?? 0))
+                    + ($reparto[$i] * 0.6);
+            }
         }
 
         $filas = [];
@@ -343,7 +525,7 @@ class ErpComparativoService
         foreach ($mapaSistema as $k => $s) {
             $e = $mapaErp[$k] ?? null;
             $purosS = (int) $s->puros;
-            $horasS = round(((int) $s->minutos) / 60, 2);
+            $horasS = round(((float) $s->minutos) / 60, 2);
             $purosE = $e ? (int) round((float) $e->puros) : 0;
             $horasE = $e ? round((float) $e->horas, 2) : 0;
 
@@ -363,6 +545,7 @@ class ErpComparativoService
                 'producto' => trim((string) $s->producto),
                 'sistema_puros' => $purosS,
                 'sistema_horas' => $horasS,
+                'sistema_minutos' => (float) $s->minutos,
                 'erp_puros' => $purosE,
                 'erp_horas' => $horasE,
                 'erp_precio' => $e ? (float) $e->precio : null,
@@ -385,6 +568,7 @@ class ErpComparativoService
                 'producto' => trim((string) $e->producto),
                 'sistema_puros' => 0,
                 'sistema_horas' => 0,
+                'sistema_minutos' => 0,
                 'erp_puros' => (int) round((float) $e->puros),
                 'erp_horas' => round((float) $e->horas, 2),
                 'erp_precio' => (float) $e->precio,

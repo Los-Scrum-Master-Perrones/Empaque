@@ -13,6 +13,7 @@ use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\VinetaController;
 use App\Http\Controllers\VinetaPorOrdenController;
 use App\Http\Controllers\VinetaPendienteController;
+use App\Http\Controllers\VinetaAreaController;
 use App\Http\Controllers\VinetaRegistroController;
 
 /*
@@ -170,6 +171,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/empleados', [EmpleadoController::class, 'index'])
         ->name('empleados.index');
 
+    Route::get('/empleados/qr', [EmpleadoController::class, 'qr'])
+        ->name('empleados.qr');
+
     Route::post('/empleados/sincronizar', [EmpleadoController::class, 'sincronizar'])
         ->middleware($blockSupervisor)
         ->name('empleados.sincronizar');
@@ -189,6 +193,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/vinetas-pendientes', [VinetaPendienteController::class, 'index'])
         ->name('vinetas-pendientes.index');
+
+    Route::post('/vinetas-pendientes/generar', [VinetaAreaController::class, 'store'])
+        ->name('vinetas-pendientes.generar');
+
+    Route::get('/vinetas-pendientes/imprimir', [VinetaAreaController::class, 'imprimir'])
+        ->name('vinetas-pendientes.imprimir');
 
     Route::get('/vinetas-registradas', [VinetaRegistroController::class, 'index'])
         ->name('vineta-registros.index');
