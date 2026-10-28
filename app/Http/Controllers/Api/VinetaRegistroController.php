@@ -1231,6 +1231,17 @@ class VinetaRegistroController extends Controller
         $isRolado = Str::contains($nombreNormalizado, 'rola') || $codigoActividadStr === '171';
         $isEspecial = $isLimpieza || $isPrensado || $isRolado;
 
+        // El cambio de actividad se calcula ANTES de validar: el movimiento
+        // en el ERP se hace despues de que todo valga.
+        $codigoAnterior = trim((string) $vinetaRegistro->actividad_codigo);
+        $nombreAnterior = trim((string) $vinetaRegistro->actividad_nombre);
+        $cambiaActividad = $actualizaActividad
+            && $codigoAnterior !== ''
+            && (
+                $codigoAnterior !== trim((string) $actividadCodigo)
+                || $nombreAnterior !== trim((string) $actividadNombre)
+            );
+
         if (! $isVinetaPorOrden && ! $isEspecial) {
             $duplicado = $this->registroActivoExistente(
                 $vinetaRegistro->vineta,
@@ -1263,29 +1274,6 @@ class VinetaRegistroController extends Controller
                         || $nombreAnterior !== trim((string) $actividadNombre)
                     );
 
-                if ($cambiaActividad) {
-                    if (
-                        $vinetaRegistro->erp_enviado
-                        && trim((string) $vinetaRegistro->documento_numero) !== ''
-                    ) {
-                        $movimiento = app(\App\Services\ErpApiService::class)->moverActividadVineta(
-                            $vinetaRegistro,
-                            (int) $codigoAnterior,
-                            (int) $actividadCodigo,
-                            $vinetaRegistro->sucursal
-                        );
-
-                        if (empty($movimiento['success'])) {
-                            $mensajeMovimiento = $movimiento['message']
-                                ?? 'No se pudo mover la actividad en el ERP; no se cambió nada.';
-
-                            return response()->json([
-                                'message' => $mensajeMovimiento,
-                                'errors' => ['actividad_nombre' => [$mensajeMovimiento]],
-                            ], 422);
-                        }
-                    }
-                }
 
                 $grupoActividad = $this->grupoActividadProceso(
                     $actividadNombre,
@@ -1315,6 +1303,28 @@ class VinetaRegistroController extends Controller
                         'actividad_nombre' => 'Esta viñeta ya tiene la actividad '.$actividadNombre.' registrada.',
                     ]);
                 }
+            }
+        }
+
+        // Mueve la vineta de actividad en el ERP DESPUES de validar todo:
+        // tambien para actividades especiales (limpieza, prensado, rolado);
+        // antes se saltaba y el ERP se quedaba con la actividad vieja.
+        if ($cambiaActividad && $vinetaRegistro->erp_enviado && trim((string) $vinetaRegistro->documento_numero) !== '') {
+            $movimiento = app(\App\Services\ErpApiService::class)->moverActividadVineta(
+                $vinetaRegistro,
+                (int) $codigoAnterior,
+                (int) $actividadCodigo,
+                $vinetaRegistro->sucursal
+            );
+
+            if (empty($movimiento['success'])) {
+                $mensajeMovimiento = $movimiento['message']
+                    ?? 'No se pudo mover la actividad en el ERP; no se cambio nada.';
+
+                return response()->json([
+                    'message' => $mensajeMovimiento,
+                    'errors' => ['actividad_nombre' => [$mensajeMovimiento]],
+                ], 422);
             }
         }
 
