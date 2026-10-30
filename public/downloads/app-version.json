@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.16",
-    "version_code": 2070,
-    "release_notes": " Viñetas del empleado: la tarjeta de cada marca ahora muestra en negrita la descripción completa del producto (código, marca, nombre, vitola, capa), abajo el item con el tipo de empaque y mas abajo la orden del sistema y la orden del cliente. Se ve todo el texto, sin recortar.",
-    "apk_filename": "app-empaque-2.1.16-2070.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.16-2070.apk",
-    "apk_filename_universal": "app-empaque-2.1.16-2070.apk",
+    "version_name": "2.1.17",
+    "version_code": 2071,
+    "release_notes": " Escaneo individual: ahora pide el DOCUMENTO del ERP antes de guardar (QR o codigo) y lo manda con el registro, para que no queden viñetas sin documento. Escaneo multiple: si el QR no se lee, se escribe el codigo de la viñeta a mano y se agrega igual. Viñetas del empleado: chip de area (LIMPIEZA/BROCHA) y descripcion completa del producto en negrita.",
+    "apk_filename": "app-empaque-2.1.17-2071.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.17-2071.apk",
+    "apk_filename_universal": "app-empaque-2.1.17-2071.apk",
     "force_update": false,
-    "published_at": "2026-10-26 14:30:00"
+    "published_at": "2026-10-30 18:00:00"
 }
