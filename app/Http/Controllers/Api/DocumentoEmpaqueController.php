@@ -177,7 +177,8 @@ class DocumentoEmpaqueController extends Controller
             $minutosTotales = $minutos + ((int) ($repartoOrdinarias[$claveGrupo] ?? 0) * 0.6);
             $horas = round($minutosTotales / 60, 2);
 
-            $resultado = $this->erpService->fijarHorasVineta($primero, $horas, $data['sucursal'] ?? null, $puros, null, null, $data['dry_run'] ?? null);
+            $precioActividad = (float) $items->max(fn (VinetaRegistro $r) => (float) ($r->precio_mo ?? 0));
+            $resultado = $this->erpService->fijarHorasVineta($primero, $horas, $data['sucursal'] ?? null, $puros, $precioActividad > 0 ? $precioActividad : null, null, $data['dry_run'] ?? null);
 
             $estado = 'error';
             if (! empty($resultado['success'])) {

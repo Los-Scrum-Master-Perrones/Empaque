@@ -986,7 +986,8 @@ class EmpleadoHoraOrdinariaController extends Controller
             $minutosTotales = $minutos + ((int) ($repartoOrdinarias[$claveGrupo] ?? 0) * 0.6);
             $horas = round($minutosTotales / 60, 2);
 
-            $resultado = $servicio->fijarHorasVineta($primero, $horas, $sucursal, $puros, null, null, $dryRun);
+            $precioActividad = (float) $items->max(fn (VinetaRegistro $r) => (float) ($r->precio_mo ?? 0));
+            $resultado = $servicio->fijarHorasVineta($primero, $horas, $sucursal, $puros, $precioActividad > 0 ? $precioActividad : null, null, $dryRun);
 
             $estado = 'error';
             if (! empty($resultado['success'])) {

@@ -215,6 +215,9 @@ class ErpApiService
                 'empleado_nombre' => (string) $registro->empleado_nombre,
                 'cantidad_puros' => (int) $registro->cantidad_puros,
                 'minutos_por_vineta' => (float) $minutosPorVineta,
+                // Precio de mano de obra de la actividad: si el registro lo
+                // tiene, se manda; si no, el ERP usa el del catalogo.
+                'precio_unitario' => round((float) ($registro->precio_mo ?? 0), 7),
             ],
         ];
 
