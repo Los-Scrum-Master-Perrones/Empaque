@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.18",
-    "version_code": 2072,
-    "release_notes": " Aviso de ficha de empaque: si el producto/actividad no tiene ficha en el ERP, se muestra la descripcion del producto, el tipo de empaque y la actividad. Al escanear se bloquea el registro sin ficha y se muestra el motivo tal cual lo manda el servidor.",
-    "apk_filename": "app-empaque-2.1.18-2072.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.18-2072.apk",
-    "apk_filename_universal": "app-empaque-2.1.18-2072.apk",
+    "version_name": "2.1.19",
+    "version_code": 2073,
+    "release_notes": "Campanita de fichas de empaque en la app: muestra cuantos registros quedaron sin ficha desde el 01/10 hasta hoy, con producto, actividad, empaque, la fecha del registro y NO EXISTE FICHA. Al escanear no se muestra ni se bloquea nada.",
+    "apk_filename": "app-empaque-2.1.19-2073.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.19-2073.apk",
+    "apk_filename_universal": "app-empaque-2.1.19-2073.apk",
     "force_update": false,
-    "published_at": "2026-11-04 22:30:00"
+    "published_at": "2026-11-04 23:10:00"
 }

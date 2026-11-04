@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DocumentoEmpaqueController;
 use App\Http\Controllers\Api\EmpleadoController as ApiEmpleadoController;
 use App\Http\Controllers\Api\EmpleadoHoraOrdinariaController as ApiEmpleadoHoraOrdinariaController;
+use App\Http\Controllers\Api\FichaFaltanteController as ApiFichaFaltanteController;
 use App\Http\Controllers\Api\ReporteOrdenController as ApiReporteOrdenController;
 use App\Http\Controllers\Api\VinetaController as ApiVinetaController;
 use App\Http\Controllers\Api\VinetaRegistroController as ApiVinetaRegistroController;
@@ -44,6 +45,8 @@ Route::get('/app/download/{file?}', [AppUpdateController::class, 'download'])->n
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']);
+    Route::get('/ficha-faltante', [ApiFichaFaltanteController::class, 'index'])
+        ->name('api.ficha-faltante');
     Route::post('/user/photo', [AuthController::class, 'updatePhoto']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/vinetas/scan', [ApiVinetaController::class, 'scan']);
