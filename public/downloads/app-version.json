@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.17",
-    "version_code": 2071,
-    "release_notes": " Escaneo individual: ahora pide el DOCUMENTO del ERP antes de guardar (QR o codigo) y lo manda con el registro, para que no queden viñetas sin documento. Escaneo multiple: si el QR no se lee, se escribe el codigo de la viñeta a mano y se agrega igual. Viñetas del empleado: chip de area (LIMPIEZA/BROCHA) y descripcion completa del producto en negrita.",
-    "apk_filename": "app-empaque-2.1.17-2071.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.17-2071.apk",
-    "apk_filename_universal": "app-empaque-2.1.17-2071.apk",
+    "version_name": "2.1.18",
+    "version_code": 2072,
+    "release_notes": " Aviso de ficha de empaque: si el producto/actividad no tiene ficha en el ERP, se muestra la descripcion del producto, el tipo de empaque y la actividad. Al escanear se bloquea el registro sin ficha y se muestra el motivo tal cual lo manda el servidor.",
+    "apk_filename": "app-empaque-2.1.18-2072.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.18-2072.apk",
+    "apk_filename_universal": "app-empaque-2.1.18-2072.apk",
     "force_update": false,
-    "published_at": "2026-10-30 18:00:00"
+    "published_at": "2026-11-04 22:30:00"
 }
