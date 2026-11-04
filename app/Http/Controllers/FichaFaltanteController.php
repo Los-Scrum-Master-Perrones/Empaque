@@ -118,6 +118,8 @@ class FichaFaltanteController extends Controller
             // Primeras 10 para el desplegable de la campanita.
             'items' => $faltantes->take(10)->map(fn ($f) => [
                 'producto' => $f->producto,
+                'producto_nombre' => (string) ($f->producto_nombre ?? ''),
+                'sku' => (string) $f->sku,
                 'actividad' => $f->actividad.' '.$f->actividad_nombre,
                 'empaque' => $f->tipo_empaque.' '.$f->tipo_empaque_nombre,
                 'puros' => (int) $f->puros,

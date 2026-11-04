@@ -49,6 +49,7 @@ class FichaFaltanteController extends Controller
             'error' => $this->service->ultimoError($fecha),
             'items' => $faltantes->take($limite)->map(fn ($f) => [
                 'producto' => (string) $f->producto,
+                'producto_nombre' => (string) ($f->producto_nombre ?? ''),
                 'sku' => (string) $f->sku,
                 'actividad' => (int) $f->actividad,
                 'actividad_nombre' => (string) $f->actividad_nombre,

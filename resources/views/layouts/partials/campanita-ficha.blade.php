@@ -78,6 +78,12 @@
                     lista.innerHTML = items.map(function (it) {
                         return '<div style="padding:8px 12px;border-left:3px solid #ef4444">'
                             + '<p style="font-size:12px;font-weight:800;color:#0f172a;margin:0">' + (it.producto || '') + '</p>'
+                            + (it.producto_nombre
+                                ? '<p style="font-size:11px;color:#0f172a;margin:2px 0 0;font-weight:600">' + it.producto_nombre + '</p>'
+                                : '')
+                            + (it.sku
+                                ? '<p style="font-size:10.5px;color:#475569;margin:1px 0 0">SKU ' + it.sku + '</p>'
+                                : '')
                             + '<p style="font-size:11px;color:#475569;margin:2px 0 0">' + (it.actividad || '') + '</p>'
                             + '<p style="font-size:11px;color:#475569;margin:0">Empaque ' + (it.empaque || '') + '</p>'
                             + '<p style="font-size:11px;color:#b91c1c;margin:3px 0 0;font-weight:800">'

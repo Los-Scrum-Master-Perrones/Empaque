@@ -128,6 +128,7 @@ class FichaFaltanteService
         return collect($raw)->map(function ($item) {
             return (object) [
                 'producto' => trim((string) ($item['producto'] ?? '')),
+                'producto_nombre' => trim((string) ($item['producto_nombre'] ?? '')),
                 'sku' => trim((string) ($item['sku'] ?? '')),
                 'actividad' => (int) ($item['actividad'] ?? 0),
                 'actividad_nombre' => trim((string) ($item['actividad_nombre'] ?? '')),

@@ -130,6 +130,7 @@
                                         <tr>
                                             <th class="px-4 py-3 text-left font-bold whitespace-nowrap">Fecha</th>
                                             <th class="px-4 py-3 text-left font-bold whitespace-nowrap">Código producto</th>
+                                            <th class="px-4 py-3 text-left font-bold whitespace-nowrap">Descripción</th>
                                             <th class="px-4 py-3 text-left font-bold whitespace-nowrap">SKU / Item</th>
                                             <th class="px-4 py-3 text-left font-bold whitespace-nowrap">Actividad</th>
                                             <th class="px-4 py-3 text-left font-bold whitespace-nowrap">Tipo empaque</th>
@@ -143,6 +144,7 @@
                                             <tr class="vinetas-table-row theme-row transition">
                                                 <td class="px-4 py-3 whitespace-nowrap theme-text">{{ $fila->ultima !== '' ? $fila->ultima : '—' }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap theme-title font-semibold">{{ $fila->producto }}</td>
+                                                <td class="px-4 py-3 theme-text">{{ $fila->producto_nombre !== '' ? $fila->producto_nombre : '—' }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap theme-text">{{ $fila->sku !== '' ? $fila->sku : 'N/A' }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap theme-text">
                                                     <span class="font-semibold theme-title">{{ $fila->actividad }}</span>
@@ -157,7 +159,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="7" class="px-4 py-12 text-center">
+                                                <td colspan="8" class="px-4 py-12 text-center">
                                                     <p class="theme-title font-bold">Todo bien: no falta ninguna ficha</p>
                                                     <p class="theme-text text-sm mt-1">
                                                         Todas las combinaciones de producto, actividad y tipo de empaque tienen materiales capturados.
