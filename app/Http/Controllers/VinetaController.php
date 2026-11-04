@@ -64,6 +64,8 @@ class VinetaController extends Controller
             })
             ->select([
                 'vinetas.api_id',
+                'vinetas.id_pendiente_empaque',
+                'vinetas.area',
                 'vinetas.fecha',
                 'presentaciones_producto.presentacion',
                 'vinetas.marca',
@@ -81,7 +83,14 @@ class VinetaController extends Controller
                 'vinetas.impreso',
             ])
             ->when($buscar !== '', function ($query) use ($buscar) {
-                $query->where('vinetas.api_id', ltrim($buscar, '#'));
+                $limpio = ltrim($buscar, '#');
+
+                // Busca por id de facturacion o por el CODIGO de las viñetas
+                // generadas en Empaque (li-1, br-1, pr-1...).
+                $query->where(function ($q) use ($buscar, $limpio) {
+                    $q->where('vinetas.api_id', $limpio)
+                        ->orWhere('vinetas.id_pendiente_empaque', 'like', "%{$buscar}%");
+                });
             })
             ->when($marca !== '', function ($query) use ($marca) {
                 $query->where('vinetas.marca', 'like', "%{$marca}%");

@@ -22,6 +22,8 @@
     </div>
 
     <div class="flex items-center gap-2">
+        @include('layouts.partials.campanita-ficha')
+
         <label class="theme-switch" title="Cambiar tema">
             <input id="themeToggle" class="theme-switch__input" type="checkbox" role="switch" aria-label="Dark Mode">
 

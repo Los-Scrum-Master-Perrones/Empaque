@@ -86,6 +86,9 @@ class DocumentoEmpaqueController extends Controller
             ], 200);
         }
 
+        // La ORDEN DEL CLIENTE va en la llave: si se agrupa sin ella, dos
+        // ordenes del cliente con el mismo producto se suman y el ERP queda
+        // con una sola linea (520 en vez de 260 + 260).
         $grupos = $registros->groupBy(fn (VinetaRegistro $r) => implode('|', [
             trim((string) $r->documento_numero),
             (int) $r->actividad_codigo,
@@ -93,6 +96,7 @@ class DocumentoEmpaqueController extends Controller
             trim((string) $r->empleado_codigo),
             trim((string) $r->producto_item),
             trim((string) $r->producto_codigo),
+            trim((string) ($r->ordenReporte() !== 'N/A' ? $r->ordenReporte() : $r->orden)),
         ]));
 
         $aplicados = 0;
@@ -213,8 +217,56 @@ class DocumentoEmpaqueController extends Controller
             ];
         }
 
+        // SEGUNDA PASADA: las HORAS por empleado.
+        // Los puros ya quedaron separados por orden del cliente (linea), pero
+        // al partir el grupo en varias lineas el reparto de horas puede quedar
+        // corto. Se deja el total de horas del empleado igual al del sistema,
+        // repartido entre SUS lineas (las que ya tienen los puros correctos).
+        $horasAjustadas = 0;
+
+        try {
+            $porEmpleado = $registros->groupBy(fn (VinetaRegistro $r) => trim((string) $r->empleado_codigo));
+
+            foreach ($porEmpleado as $empleado => $items) {
+                if ($empleado === '') {
+                    continue;
+                }
+
+                $minutos = (int) $items->sum(fn (VinetaRegistro $r) => (int) ($r->minutos_trabajados ?? 0));
+                $minutosOrdinarias = 0;
+
+                if (Schema::hasTable('empleado_horas_ordinarias')) {
+                    $minutosOrdinarias = (int) EmpleadoHoraOrdinaria::query()
+                        ->where('documento_numero', $documento)
+                        ->whereRaw('TRIM(empleado_codigo) = ?', [$empleado])
+                        ->sum('minutos');
+                }
+
+                $horasEmpleado = round(($minutos + $minutosOrdinarias) / 60, 2);
+
+                if ($horasEmpleado <= 0) {
+                    continue;
+                }
+
+                $r = $this->erpService->fijarHorasEmpleadoDocumento(
+                    (string) $empleado,
+                    $documento,
+                    $horasEmpleado,
+                    $data['sucursal'] ?? null,
+                    $data['dry_run'] ?? null
+                );
+
+                if (! empty($r['success'])) {
+                    $horasAjustadas++;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Aplicar: horas por empleado: '.$e->getMessage());
+        }
+
         return response()->json([
             'message' => "Documento $documento: $aplicados actualizados, $yaIguales ya estaban igual, $rechazados rechazados, $errores con error.",
+            'horas_empleados' => $horasAjustadas,
             'documento' => $documento,
             'total' => $grupos->count(),
             'registros' => $registros->count(),

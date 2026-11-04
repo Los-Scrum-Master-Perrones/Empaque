@@ -220,8 +220,9 @@
                     <label for="generar_area" class="theme-text block text-xs font-semibold mb-1">Area de la viñeta</label>
                     <select name="area" id="generar_area"
                             class="w-full rounded-xl border theme-border bg-white px-3 py-2 text-sm theme-title focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] outline-none transition">
-                        <option value="LIMPIEZA">LIMPIEZA</option>
-                        <option value="BROCHA">BROCHA</option>
+                        @foreach (config('empaque_areas', []) as $claveArea => $configArea)
+                            <option value="{{ $claveArea }}">{{ $configArea['titulo'] ?? $claveArea }}</option>
+                        @endforeach
                     </select>
                 </div>
 

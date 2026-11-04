@@ -14,7 +14,10 @@ use Illuminate\Http\Request;
  * La usa la campanita de la app de Android: barre todos los dias desde
  * el 1 de octubre hasta hoy (sin fecha) o solo el dia que se mande.
  *
- * Solo lectura.
+ * Trae tambien las actividades que salen en la lista para poder IGNORAR
+ * las que no interesan (ej. Rezagado); lo ignorado ya no se muestra.
+ *
+ * Solo lectura, excepto el toggle de actividades ignoradas.
  */
 class FichaFaltanteController extends Controller
 {
@@ -36,6 +39,7 @@ class FichaFaltanteController extends Controller
         $limite = (int) ($data['limit'] ?? 200);
 
         $faltantes = $this->service->listar($fecha);
+        $actividades = $this->service->actividadesDisponibles($fecha);
 
         return response()->json([
             'success' => true,
@@ -53,6 +57,47 @@ class FichaFaltanteController extends Controller
                 'puros' => (int) $f->puros,
                 'ultima' => (string) ($f->ultima ?? ''),
             ])->values(),
+            // Actividades que salen en la lista (incluye las ignoradas).
+            'actividades' => $actividades->map(fn ($a) => [
+                'codigo' => (int) $a->codigo,
+                'nombre' => (string) $a->nombre,
+                'registros' => (int) $a->registros,
+                'ignorada' => (bool) $a->ignorada,
+            ])->values(),
+            'ignoradas' => $actividades
+                ->where('ignorada', true)
+                ->pluck('codigo')
+                ->map(fn ($c) => (int) $c)
+                ->values(),
+        ])->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * POST /api/ficha-faltante/actividades/ignorar
+     * { "codigo": 2, "ignorar": true, "nombre": "Rezagado" }
+     *
+     * ignorar=false la vuelve a mostrar.
+     */
+    public function ignorarActividad(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'codigo' => ['required', 'integer', 'min:1'],
+            'ignorar' => ['required', 'boolean'],
+            'nombre' => ['nullable', 'string', 'max:190'],
+        ]);
+
+        $this->service->ignorar(
+            (int) $data['codigo'],
+            (bool) $data['ignorar'],
+            $data['nombre'] ?? null,
+            optional($request->user())->id
+        );
+
+        return response()->json([
+            'success' => true,
+            'codigo' => (int) $data['codigo'],
+            'ignorar' => (bool) $data['ignorar'],
+            'ignoradas' => FichaFaltanteService::codigosIgnorados(),
         ])->header('Cache-Control', 'no-store');
     }
 }

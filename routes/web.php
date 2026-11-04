@@ -14,6 +14,7 @@ use App\Http\Controllers\VinetaController;
 use App\Http\Controllers\VinetaPorOrdenController;
 use App\Http\Controllers\VinetaPendienteController;
 use App\Http\Controllers\VinetaAreaController;
+use App\Http\Controllers\OrdenEmpaqueController;
 use App\Http\Controllers\VinetaRegistroController;
 
 /*
@@ -199,6 +200,36 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/vinetas-pendientes/imprimir', [VinetaAreaController::class, 'imprimir'])
         ->name('vinetas-pendientes.imprimir');
+
+    // Ordenes: todas las ordenes de empaque (incluidas las que estan en cero)
+    // para generar viñetas por area (limpieza, brocha, prensado, sellado, ...).
+    Route::get('/ordenes', [OrdenEmpaqueController::class, 'index'])
+        ->name('ordenes.index');
+
+    Route::post('/ordenes/generar', [OrdenEmpaqueController::class, 'generar'])
+        ->name('ordenes.generar');
+
+    // Imprime TODAS las viñetas pendientes (de cualquier orden) en una hoja.
+    Route::get('/ordenes/impresion', [OrdenEmpaqueController::class, 'impresion'])
+        ->name('ordenes.impresion');
+
+    // Vuelve a mostrar la ultima hoja impresa (sin marcar ni generar nada).
+    Route::get('/ordenes/impresion/ultima', [OrdenEmpaqueController::class, 'reimprimir'])
+        ->name('ordenes.impresion.ultima');
+
+    // Avisos de ficha de empaque (campanita).
+    Route::get('/ficha-faltante', [\App\Http\Controllers\FichaFaltanteController::class, 'index'])
+        ->name('ficha-faltante.index');
+
+    Route::get('/ficha-faltante/count', [\App\Http\Controllers\FichaFaltanteController::class, 'contar'])
+        ->name('ficha-faltante.count');
+
+    Route::get('/ficha-faltante/estado', [\App\Http\Controllers\FichaFaltanteController::class, 'estado'])
+        ->name('ficha-faltante.estado');
+
+    // Ignorar / restaurar una actividad en la campanita (ej. Rezagado).
+    Route::post('/ficha-faltante/ignorar', [\App\Http\Controllers\FichaFaltanteController::class, 'ignorar'])
+        ->name('ficha-faltante.ignorar');
 
     Route::get('/vinetas-registradas', [VinetaRegistroController::class, 'index'])
         ->name('vineta-registros.index');

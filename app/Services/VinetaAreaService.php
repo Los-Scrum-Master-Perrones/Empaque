@@ -83,6 +83,9 @@ class VinetaAreaService
                         'fecha' => $fecha,
                         'cantidad_puros' => $purosPorVineta,
                         'estado' => 'activo',
+                        // Nace pendiente de imprimir (como facturación):
+                        // despues un solo boton imprime todas las pendientes.
+                        'impreso' => false,
                         'item' => $this->texto($pendiente['item'] ?? null),
                         'orden_del_sistema' => $this->texto($pendiente['orden_del_sistema'] ?? null),
                         'mes' => $this->texto($pendiente['mes'] ?? null),
@@ -153,6 +156,7 @@ class VinetaAreaService
             return collect();
         }
 
+        // La viñeta es EXCLUSIVA de su area: solo estas actividades.
         $codigos = (array) ($this->areas()[$area]['actividades'] ?? []);
 
         if ($codigos === []) {

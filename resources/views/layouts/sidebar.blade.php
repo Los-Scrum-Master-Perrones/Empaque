@@ -310,6 +310,21 @@
             </a>
         </div>
 
+        {{-- Ordenes --}}
+        <a href="{{ route('ordenes.index') }}"
+           data-sidebar-tooltip="Órdenes"
+           class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-l-2xl transition
+           {{ request()->routeIs('ordenes.*') ? 'sidebar-active' : 'sidebar-link' }}">
+
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 min-w-5" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9h6m-6 4h4" />
+            </svg>
+
+            <span class="sidebar-label">Órdenes</span>
+        </a>
+
         {{-- Estadístico --}}
         <a href="{{ route('estadistico.index') }}"
            data-sidebar-tooltip="Estadístico"

@@ -147,7 +147,12 @@ try {
     $e = $crear('0000011105', true); $ids[] = $e->id;
     $antesLog = count(leerLog());
     [$st, $body] = $edicion($e, '0000011105');
-    chk('sin llamadas al ERP si no cambia', count(leerLog()) === $antesLog, 'HTTP '.$st.' '.substr($body,0,80));
+    // La unica llamada permitida es el chequeo de linea (mover-linea-vineta),
+    // que no modifica nada si la viñeta ya esta en su linea.
+    $llamadasNuevas = array_slice(leerLog(), $antesLog);
+    $rutasNuevas = array_map(fn ($l) => (string) ($l['ruta'] ?? ''), $llamadasNuevas);
+    $soloChequeoLinea = array_diff($rutasNuevas, ['mover-linea-vineta']) === [];
+    chk('sin ajustes al ERP si no cambia', $soloChequeoLinea, 'HTTP '.$st.' '.implode(',', $rutasNuevas));
 } finally {
     VinetaRegistro::whereIn('id', $ids)->forceDelete();
     Vineta::whereIn('id', $idsVineta)->forceDelete();

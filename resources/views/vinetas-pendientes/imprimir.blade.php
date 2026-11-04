@@ -6,6 +6,9 @@
     <title>Viñetas {{ $titulo ?? '' }} | Sistema de Empaque</title>
 
     <style>
+        /* Mismo formato de viñeta que facturación_plasencia
+           (Exports/vinetas-empaque-export-pdf.blade.php):
+           3 por fila, 18 por página, 204px de alto, QR arriba a la derecha. */
         * { box-sizing: border-box; }
 
         body {
@@ -13,6 +16,7 @@
             font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
             color: #111;
             background: #f3f4f6;
+            font-size: 10px;
         }
 
         .barra {
@@ -58,59 +62,64 @@
             max-width: 21.59cm;
         }
 
-        .ticket {
+        .container {
             position: relative;
-            float: left;
             width: 32%;
             height: 204px;
+            float: left;
             margin: 4px;
-            padding: 5px 6px;
+            padding: 5px 4px;
             border: 1px solid #ccc;
             border-radius: 10px;
-            font-size: 10px;
-            line-height: 1.35;
             page-break-inside: avoid;
             break-inside: avoid;
+            line-height: 1.35;
         }
 
-        .ticket .codigo {
+        .container .codigo {
             display: block;
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 700;
-            text-decoration: underline;
-            letter-spacing: 0.4px;
-            padding-right: 74px;
+            letter-spacing: 0.3px;
+            padding-right: 78px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
-        .ticket .area {
+        .container .area {
             display: inline-block;
-            margin-top: 2px;
-            font-size: 10px;
+            margin: 1px 0 2px;
+            font-size: 8.5px;
             font-weight: 900;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
-            color: #0f172a;
         }
 
-        .ticket .qr {
+        .container .qr {
             position: absolute;
-            top: 22px;
+            top: 24px;
             right: 5px;
-            width: 70px;
-            height: 70px;
+            width: 72px;
+            height: 72px;
             background: #fff;
             line-height: 0;
         }
 
-        .ticket .qr canvas { width: 70px !important; height: 70px !important; }
+        .container .qr svg,
+        .container .qr img {
+            width: 72px !important;
+            height: 72px !important;
+            display: block;
+        }
 
-        .ticket p { margin: 1px 0; }
+        .container p { margin: 1px 0; }
 
-        .ticket .etiqueta { font-size: 8px; color: #444; }
+        .container .etiqueta { font-size: 0.8em; }
 
-        .ticket b, .ticket u { font-size: 10px; }
+        .container b, .container u { font-size: 1em; }
 
-        .linea { clear: both; }
+        .clear { clear: both; }
 
         .salto { page-break-before: always; break-before: page; }
 
@@ -128,7 +137,7 @@
 
         @media print {
             body { background: #fff; }
-            .barra { display: none; }
+            .barra { display: none !important; }
             .hoja { margin: 0; padding: 0; max-width: none; }
         }
     </style>
@@ -138,7 +147,7 @@
         <h1>Viñetas {{ $titulo ?? '' }} — {{ $vinetas->count() }} en total</h1>
 
         <div class="acciones">
-            <a class="secundario" href="{{ route('vinetas-pendientes.index') }}">Volver</a>
+            <a class="secundario" href="{{ route('ordenes.index') }}">Volver a Órdenes</a>
             <button type="button" onclick="window.print()">Imprimir</button>
         </div>
     </div>
@@ -148,11 +157,14 @@
     @else
         <div class="hoja">
             @foreach ($vinetas as $key => $vineta)
-                <div class="ticket">
-                    <span class="codigo">{{ $vineta->codigo_qr }}</span>
-                    <span class="area">{{ strtoupper((string) ($vineta->area ?: $titulo)) }}</span>
+                <div class="container">
+                    <span class="codigo"><u>{{ $vineta->codigo_qr }}____________________</u></span>
 
-                    <div class="qr" data-qr="{{ $vineta->codigo_qr }}"></div>
+                    @if (filled($vineta->area))
+                        <span class="area">{{ strtoupper((string) $vineta->area) }}</span>
+                    @endif
+
+                    <span class="qr" data-qr="{{ $vineta->codigo_qr }}"></span>
 
                     <p><span class="etiqueta">Item:</span> <b><u>{{ $vineta->item }}</u></b></p>
                     <p><span class="etiqueta">Fecha:</span> ______________</p>
@@ -161,7 +173,7 @@
                         <span class="etiqueta">OS:</span> <b>{{ $vineta->orden_del_sistema }}</b>
                         <span class="etiqueta">OC:</span> <b>{{ $vineta->orden }}</b>
                     </p>
-                    <p><span class="etiqueta">Marca:</span> <b>{{ $vineta->marca }}</b></p>
+                    <p><span class="etiqueta">Marca:</span> <b style="font-size: 0.95em">{{ $vineta->marca }}</b></p>
                     <p><span class="etiqueta">Vitola:</span> <b>{{ $vineta->vitola }}</b> <u>{{ $vineta->nombre }}</u></p>
                     <p><span class="etiqueta">Capa:</span> <b>{{ $vineta->capa }}</b></p>
                     <p><span class="etiqueta">Empaque:</span> <b>{{ $vineta->tipo_empaque }}</b></p>
@@ -169,49 +181,44 @@
                 </div>
 
                 @if ((($key + 1) % 3) === 0)
-                    <div class="linea"></div>
+                    <div class="clear"></div>
                 @endif
 
                 @if ((($key + 1) % 18) === 0 && ($key + 1) !== $vinetas->count())
-                    <div class="linea"></div>
+                    <div class="clear"></div>
                     <div class="salto"></div>
                 @endif
             @endforeach
 
-            <div class="linea"></div>
+            <div class="clear"></div>
         </div>
     @endif
 
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    {{-- Libreria LOCAL (public/js/qrcode-generator.js): no depende de internet. --}}
+    <script src="{{ asset('js/qrcode-generator.js') }}"></script>
     <script>
+        // El QR lleva el CODIGO de la viñeta (li-1, br-1, pr-1...), que es lo
+        // que reconoce el escaner (API de Empaque y la app).
         document.addEventListener('DOMContentLoaded', function () {
             var destinos = document.querySelectorAll('.qr[data-qr]');
 
-            if (!window.QRCode) {
+            if (typeof qrcode !== 'function') {
                 return;
             }
 
             destinos.forEach(function (destino) {
-                var canvas = document.createElement('canvas');
-
-                window.QRCode.toCanvas(canvas, String(destino.dataset.qr), {
-                    width: 140,
-                    margin: 0,
-                    color: { dark: '#000000', light: '#ffffff' }
-                }, function (error) {
-                    if (error) {
-                        console.error(error);
-                        return;
-                    }
-
-                    destino.appendChild(canvas);
-                });
+                try {
+                    var qr = qrcode(0, 'M');
+                    qr.addData(String(destino.dataset.qr));
+                    qr.make();
+                    destino.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+                } catch (e) {
+                    console.error('QR', e);
+                }
             });
 
-            // Deja que se pinten los QR antes de abrir el dialogo de impresion.
-            window.setTimeout(function () {
-                window.print();
-            }, 600);
+            // NO se abre el dialogo solo: se acumulan viñetas de varias ordenes
+            // y se imprimen todas juntas al pulsar "Imprimir".
         });
     </script>
 </body>

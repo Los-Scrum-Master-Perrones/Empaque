@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.19",
-    "version_code": 2073,
-    "release_notes": "Campanita de fichas de empaque en la app: muestra cuantos registros quedaron sin ficha desde el 01/10 hasta hoy, con producto, actividad, empaque, la fecha del registro y NO EXISTE FICHA. Al escanear no se muestra ni se bloquea nada.",
-    "apk_filename": "app-empaque-2.1.19-2073.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.19-2073.apk",
-    "apk_filename_universal": "app-empaque-2.1.19-2073.apk",
+    "version_name": "2.1.20",
+    "version_code": 2074,
+    "release_notes": "Campanita de fichas de empaque: ahora trae un boton Actividades con las actividades que salen en la lista para ignorar las que no interesan (ej. Rezagado); lo ignorado ya no se muestra ni se cuenta. Muestra la fecha del registro y NO EXISTE FICHA. Al escanear no se bloquea nada.",
+    "apk_filename": "app-empaque-2.1.20-2074.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.20-2074.apk",
+    "apk_filename_universal": "app-empaque-2.1.20-2074.apk",
     "force_update": false,
-    "published_at": "2026-11-04 23:10:00"
+    "published_at": "2026-11-04 23:40:00"
 }

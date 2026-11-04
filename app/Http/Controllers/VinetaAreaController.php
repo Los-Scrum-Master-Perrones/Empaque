@@ -79,6 +79,15 @@ class VinetaAreaController extends Controller
             ->orderBy('id')
             ->get();
 
+        // Al generar la hoja quedan marcadas como impresas (igual que
+        // facturación), asi no vuelven a salir en "Imprimir pendientes".
+        if ($vinetas->isNotEmpty()) {
+            \App\Models\VinetaPorOrden::query()
+                ->whereIn('id', $vinetas->pluck('id'))
+                ->where('impreso', false)
+                ->update(['impreso' => true, 'impreso_en' => now()]);
+        }
+
         return view('vinetas-pendientes.imprimir', [
             'vinetas' => $vinetas,
             'titulo' => $this->areas->titulo($vinetas->first()?->area),

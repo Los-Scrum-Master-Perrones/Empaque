@@ -1410,10 +1410,13 @@ class VinetaRegistroController extends Controller
         $documentoAsignado = $this->inputString($data, 'documento_numero');
         $erpRegistro = null;
 
+        $cambioDocumento = false;
+
         if ($documentoAsignado !== null && $documentoAsignado !== '') {
             $documentoPrevio = trim((string) $vinetaRegistro->documento_numero);
 
             if ($documentoPrevio !== $documentoAsignado) {
+                $cambioDocumento = true;
                 $sucursalDoc = $this->inputInt($data, 'sucursal')
                     ?? $vinetaRegistro->sucursal
                     ?? (int) config('services.erp.default_sucursal', 2);
@@ -1469,6 +1472,39 @@ class VinetaRegistroController extends Controller
             }
         }
 
+        // PRIMERO se reubica la viñeta en la LINEA de su orden del cliente
+        // (con los puros/horas que ya estaban en el ERP). Si quedo en la
+        // linea de otra OC, se resta de ahi y se suma en la correcta.
+        // Despues se aplica el ajuste por diferencia sobre la linea buena.
+        $moverLineaErp = null;
+
+        if ($estabaEnviadoAlErp && ! $porHora && ! $cambiaActividad && ! $cambioDocumento) {
+            $lineaOrigen = null;
+            $respuesta = $vinetaRegistro->erp_respuesta;
+
+            if (is_array($respuesta) && isset($respuesta['numero'])) {
+                $lineaOrigen = (int) $respuesta['numero'];
+            }
+
+            $moverLineaErp = app(\App\Services\ErpApiService::class)->moverLineaVineta(
+                $vinetaRegistro->refresh(),
+                $vinetaRegistro->sucursal,
+                $lineaOrigen,
+                $purosPrevios,
+                round(((int) ($minutosPrevios ?? 0)) / 60, 2)
+            );
+
+            // La linea nueva (si se movio) se guarda para las proximas veces.
+            $nuevaLinea = $moverLineaErp['resultado']['destino'] ?? ($moverLineaErp['linea'] ?? null);
+
+            if ($nuevaLinea !== null) {
+                $actual = is_array($respuesta) ? $respuesta : [];
+                $actual['numero'] = (int) $nuevaLinea;
+                $vinetaRegistro->erp_respuesta = $actual;
+                $vinetaRegistro->save();
+            }
+        }
+
         // Ajuste en el ERP: horas y puros por DIFERENCIA (sin tocar lo demas).
         // Si el documento ya está aplicado/contabilizado, el ERP lo rechaza
         // y se devuelve el motivo en 'erp_ajuste_horas'.
@@ -1492,6 +1528,7 @@ class VinetaRegistroController extends Controller
             'registro' => $this->registroPayload($vinetaRegistro),
             'resumen_diario' => $this->resumenDiarioPayload($vinetaRegistro),
             'erp_ajuste_horas' => $ajusteErp,
+            'erp_mover_linea' => $moverLineaErp,
             'erp_registro' => $erpRegistro,
         ]);
     }

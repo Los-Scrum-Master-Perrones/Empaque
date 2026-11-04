@@ -47,6 +47,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/ficha-faltante', [ApiFichaFaltanteController::class, 'index'])
         ->name('api.ficha-faltante');
+    Route::post('/ficha-faltante/actividades/ignorar', [ApiFichaFaltanteController::class, 'ignorarActividad'])
+        ->name('api.ficha-faltante.ignorar');
     Route::post('/user/photo', [AuthController::class, 'updatePhoto']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/vinetas/scan', [ApiVinetaController::class, 'scan']);

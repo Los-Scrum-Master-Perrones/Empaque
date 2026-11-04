@@ -240,8 +240,15 @@ class ReporteOrdenController extends Controller
             throw new \RuntimeException('La API de programaciones respondio HTTP '.$response->status().'.');
         }
 
-        $data = $response->json();
-        $registros = $data['registros'] ?? null;
+        // Tolerante al BOM del servidor.
+        $cuerpoJson = ltrim((string) $response->body(), "\xEF\xBB\xBF \t\n\r\0\x0B");
+        $data = json_decode($cuerpoJson, true);
+
+        if (! is_array($data)) {
+            $data = $response->json();
+        }
+
+        $registros = is_array($data) ? ($data['registros'] ?? null) : null;
 
         if (! is_array($registros)) {
             throw new \RuntimeException('La API de programaciones devolvio una respuesta no valida.');

@@ -29,6 +29,30 @@ config([
     'services.erp.dry_run' => false,
 ]);
 
+// Ficha de empaque del producto de prueba (la API la exige al registrar).
+config(['database.connections.erp_mock_test' => [
+    'driver' => 'mysql', 'host' => '127.0.0.1', 'port' => '3308',
+    'database' => 'erp_taosa_mock', 'username' => 'root', 'password' => '',
+    'charset' => 'utf8mb4', 'collation' => 'utf8mb4_unicode_ci', 'prefix' => '',
+]]);
+$fichaMock = DB::connection('erp_mock_test');
+Cache::flush();
+$fichaProducto = 'P-0001';
+$fichaActividades = [2, 103];
+
+foreach ($fichaActividades as $act) {
+    $fichaMock->table('Produccion_FichaEmpaqueAct')->updateOrInsert(
+        [
+            'CodigoSucursal' => 2,
+            'Codigo_Producto' => $fichaProducto,
+            'CodigoActividad' => $act,
+            'CodigoTipoEmpaque' => 4,
+            'Codigo_ProductoEmp' => 'ME-TEST',
+        ],
+        ['Cantidad' => 100, 'Lote' => 'MATERIAL_EMPAQUE', 'isUnidadxEmpaque' => 0]
+    );
+}
+
 $LOG = storage_path('app/mock_erp/erp_mock_log.jsonl');
 if (! is_file(dirname($LOG))) { @mkdir(dirname($LOG), 0775, true); }
 if (is_file($LOG)) unlink($LOG);

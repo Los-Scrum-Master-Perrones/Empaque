@@ -68,7 +68,7 @@ class ErpApiService
                 ]);
 
             if ($response->successful()) {
-                $data = $response->json();
+                $data = $this->jsonTolerante($response);
                 $documentosRaw = $data['documentos'] ?? [];
 
                 $documentosSincronizados = [];
@@ -158,7 +158,7 @@ class ErpApiService
                 ])
                 ->post($url, $payload);
 
-            $data = $response->json();
+            $data = $this->jsonTolerante($response);
 
             if (!is_array($data)) {
                 return [
@@ -289,7 +289,7 @@ class ErpApiService
                 ])
                 ->post("{$this->baseUrl}/fijar-horas-vineta", $payload);
 
-            $data = $response->json();
+            $data = $this->jsonTolerante($response);
 
             if (! is_array($data)) {
                 return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
@@ -334,7 +334,7 @@ class ErpApiService
                 ])
                 ->post("{$this->baseUrl}/documento-empaque-forma-pago", $payload);
 
-            $data = $response->json();
+            $data = $this->jsonTolerante($response);
 
             if (! is_array($data)) {
                 return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
@@ -380,7 +380,7 @@ class ErpApiService
                 ])
                 ->post("{$this->baseUrl}/fijar-horas-empleado-documento", $payload);
 
-            $data = $response->json();
+            $data = $this->jsonTolerante($response);
 
             if (! is_array($data)) {
                 return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
@@ -419,6 +419,7 @@ class ErpApiService
             'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
             'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
             'orden_del_cliente' => (string) ($registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : ($registro->orden ?? '')),
+            'empleado_nombre' => (string) ($registro->empleado_nombre ?? ''),
         ];
 
         try {
@@ -431,7 +432,7 @@ class ErpApiService
                 ])
                 ->post("{$this->baseUrl}/mover-actividad-vineta", $payload);
 
-            $data = $response->json();
+            $data = $this->jsonTolerante($response);
 
             if (! is_array($data)) {
                 return ['success' => false, 'message' => 'Respuesta no válida del ERP: '.$response->body()];
@@ -496,7 +497,7 @@ class ErpApiService
                 ])
                 ->post("{$this->baseUrl}/ajustar-horas-vineta", $payload);
 
-            $data = $response->json();
+            $data = $this->jsonTolerante($response);
 
             if (! is_array($data)) {
                 return [
@@ -525,5 +526,96 @@ class ErpApiService
                 'message' => 'Error al comunicar con ERP: '.$e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Reubica UNA viñeta en la linea que le toca por su ORDEN DEL CLIENTE
+     * (cuando quedo mezclada en la linea de otra orden).
+     */
+    public function moverLineaVineta(
+        VinetaRegistro $registro,
+        ?int $sucursal = null,
+        ?int $lineaOrigen = null,
+        ?int $purosEnviados = null,
+        ?float $horasEnviadas = null
+    ): array {
+        $doc = trim((string) $registro->documento_numero);
+
+        if ($doc === '') {
+            return ['success' => false, 'message' => 'El registro no tiene documento.'];
+        }
+
+        $horas = $horasEnviadas !== null
+            ? round($horasEnviadas, 2)
+            : round(((int) ($registro->minutos_trabajados ?? 0)) / 60, 2);
+        $puros = $purosEnviados !== null
+            ? (int) $purosEnviados
+            : (int) $registro->cantidad_puros;
+
+        if ($horas <= 0 && $puros <= 0) {
+            return ['success' => false, 'message' => 'El registro no tiene puros ni horas.'];
+        }
+
+        $payload = [
+            'dry_run' => $this->dryRun,
+            'sucursal' => (int) ($sucursal ?? $registro->sucursal ?? $this->defaultSucursal),
+            'documento' => $doc,
+            'codigo_actividad' => (int) $registro->actividad_codigo,
+            'numero_de_orden' => (string) $registro->orden_del_sistema,
+            'empleado_codigo' => (string) $registro->empleado_codigo,
+            'cantidad_puros' => $puros,
+            'horas' => $horas,
+            'item' => (string) ($registro->productoItemReporte() !== 'N/A' ? $registro->productoItemReporte() : ($registro->producto_item ?? '')),
+            'codigo_producto' => (string) ($registro->productoCodigoReporte() !== 'N/A' ? $registro->productoCodigoReporte() : ($registro->producto_codigo ?? '')),
+            'orden_del_cliente' => (string) ($registro->ordenReporte() !== 'N/A' ? $registro->ordenReporte() : ($registro->orden ?? '')),
+            'empleado_nombre' => (string) ($registro->empleado_nombre ?? ''),
+        ];
+
+        if ($lineaOrigen !== null && $lineaOrigen > 0) {
+            $payload['linea_origen'] = (int) $lineaOrigen;
+        }
+
+        try {
+            $response = Http::timeout(20)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/mover-linea-vineta", $payload);
+
+            $data = $this->jsonTolerante($response);
+
+            if (! is_array($data)) {
+                return ['success' => false, 'message' => 'Respuesta no valida del ERP: '.$response->body()];
+            }
+
+            return $data;
+        } catch (Throwable $e) {
+            Log::error('ERP mover-linea-vineta exception: '.$e->getMessage());
+
+            return ['success' => false, 'message' => 'Error al comunicar con ERP: '.$e->getMessage()];
+        }
+    }
+
+    /**
+     * Lee el JSON de la respuesta quitando el BOM (\xEF\xBB\xBF).
+     *
+     * Si el servidor manda BOM al inicio, json_decode devuelve null y se
+     * pierde la respuesta (documentos vacios, "respuesta no valida", etc.).
+     */
+    private function jsonTolerante($response): ?array
+    {
+        $cuerpo = ltrim((string) $response->body(), "\xEF\xBB\xBF \t\n\r\0\x0B");
+        $data = json_decode($cuerpo, true);
+
+        if (is_array($data)) {
+            return $data;
+        }
+
+        $data = $response->json();
+
+        return is_array($data) ? $data : null;
     }
 }

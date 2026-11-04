@@ -82,7 +82,14 @@ class VinetaPendienteService
                 ->get(self::API_URL);
 
             if ($response->successful()) {
-                $json = $response->json();
+                // El servidor puede mandar BOM: se quita antes de decodificar.
+                $cuerpo = ltrim((string) $response->body(), "\xEF\xBB\xBF \t\n\r\0\x0B");
+                $json = json_decode($cuerpo, true);
+
+                if (! is_array($json)) {
+                    $json = $response->json();
+                }
+
                 $data = $json['data'] ?? $json;
                 if (is_array($data)) {
                     return $data;
