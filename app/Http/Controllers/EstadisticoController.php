@@ -117,7 +117,9 @@ class EstadisticoController extends Controller
             return $t;
         };
 
-        // Agrupación en memoria de las filas agregadas (ultra rápido)
+        // Agrupación en memoria de las filas agregadas (ultra rápido).
+        // La tarjeta es por OS + orden del cliente + item + código de producto
+        // (el tipo de empaque se conserva como candado porque es único por esa combinación).
         $grupos = $rows->groupBy(function ($item) {
             return implode('||', [
                 $item->orden_del_sistema ?? '',
@@ -155,9 +157,11 @@ class EstadisticoController extends Controller
                 'detalles' => $detalles,
                 'descripcion' => $descripcion,
                 'tipo_empaque' => $first->tipo_empaque ?: 'N/A',
-                'actividades' => $items->map(fn ($i) => (object) [
-                    'actividad_nombre' => $i->actividad_nombre,
-                    'cantidad' => (int) $i->cantidad_procesada,
+                // Una sola linea por actividad: si la misma actividad viene en varias
+                // filas (p. ej. distinta marca/nombre en algun registro) se suman.
+                'actividades' => $items->groupBy('actividad_nombre')->map(fn ($filas) => (object) [
+                    'actividad_nombre' => $filas->first()->actividad_nombre,
+                    'cantidad' => (int) $filas->sum('cantidad_procesada'),
                 ])->values(),
                 'subtotal' => $subtotal,
             ];
