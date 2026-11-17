@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.21",
-    "version_code": 2075,
-    "release_notes": "Campanita de fichas de empaque: cada registro muestra codigo de producto, descripcion (marca, nombre y vitola), SKU, actividad, empaque, la fecha del registro y NO EXISTE FICHA. Boton Actividades para ignorar las que no interesan (ej. Rezagado); lo ignorado no se muestra ni se cuenta. Al escanear no se bloquea nada.",
-    "apk_filename": "app-empaque-2.1.21-2075.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.21-2075.apk",
-    "apk_filename_universal": "app-empaque-2.1.21-2075.apk",
+    "version_name": "2.1.22",
+    "version_code": 2076,
+    "release_notes": "Jornada laboral hasta 12 h (antes 9 h 30): los campos de jornada y horas ordinarias aceptan hasta 720 minutos y los mensajes muestran el tope real. IMPORTANTE: esta version cambia la firma de la app, por lo que hay que DESINSTALAR la version anterior antes de instalar esta (Android no permite actualizar entre firmas distintas). Se conserva todo lo de 2.1.21: campanita de fichas de empaque con codigo, descripcion, SKU y NO EXISTE FICHA, boton Actividades para ignorar actividades, y paso a AL DIA (por hora).",
+    "apk_filename": "app-empaque-2.1.22-2076.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.22-2076.apk",
+    "apk_filename_universal": "app-empaque-2.1.22-2076.apk",
     "force_update": false,
-    "published_at": "2026-11-05 00:05:00"
+    "published_at": "2026-11-17 14:20:00"
 }

@@ -26,7 +26,8 @@
         /* Colores de botones/overlay que no estan en el CSS compilado
            (se arma con la vista, sin necesidad de correr npm run build). */
         button[name="refrescar"],
-        form[action*="comparativo.descargar"] button[type="submit"] {
+        form[action*="comparativo.descargar"] button[type="submit"],
+        form[action*="sincronizar-planificacion"] button[type="submit"] {
             background: #0e7490;
             color: #fff;
             display: inline-flex;
@@ -156,7 +157,7 @@
 
                         @if($sinDocumentos ?? false)
                             <div class="theme-card bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-sm">
-                                El ERP se consult� correctamente pero <strong>no tiene documentos para {{ $fecha }}</strong>
+                                El ERP se consultó correctamente pero <strong>no tiene documentos para {{ $fecha }}</strong>
                                 (sucursal {{ $sucursal }}).
                             </div>
                         @endif
@@ -523,6 +524,22 @@
                                     <input type="text" id="filtroPlan" placeholder="Filtrar..."
                                            oninput="filtrarTabla('tablaPlan', this.value)"
                                            class="mt-1 rounded-lg border theme-border bg-white px-2 py-1 text-xs theme-title w-52">
+
+                                    <form method="POST"
+                                          action="{{ route('costos-empaque.comparativo.sincronizar-planificacion') }}"
+                                          class="mt-2"
+                                          onsubmit="return confirm('Se agregarán al ERP las filas de planificación que faltan para {{ $fecha }} (solo agrega, no borra ni modifica). ¿Continuar?')">
+                                        @csrf
+                                        <input type="hidden" name="fecha" value="{{ $fecha }}">
+                                        <input type="hidden" name="sucursal" value="{{ $sucursal }}">
+                                        <input type="hidden" name="dry_run" value="0">
+                                        <button type="submit"
+                                                style="background:#1d4ed8"
+                                                class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-white text-xs font-semibold hover:opacity-90 transition">
+                                            Sincronizar planificación al ERP ({{ $resumen['ignorados_erp'] ?? 0 }})
+                                        </button>
+                                    </form>
+                                    <p class="theme-text text-[10px] mt-1">Solo agrega las filas que faltan; no borra ni modifica las existentes.</p>
                                     <p class="theme-text text-[11px]">Azul = esa actividad/orden/línea no está planificada para ese día</p>
                                 </div>
                                 <div class="overflow-x-auto max-h-96">

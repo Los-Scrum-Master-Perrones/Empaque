@@ -19,6 +19,11 @@ class EmpleadoHoraOrdinariaController extends Controller
 {
     private int $metaDiariaMinutos = 570;
 
+    public function __construct()
+    {
+        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 720);
+    }
+
     public function resumenEmpleados(Request $request): JsonResponse
     {
         try {
@@ -1499,8 +1504,8 @@ class EmpleadoHoraOrdinariaController extends Controller
     {
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'horas' => ['nullable', 'integer', 'min:0', 'max:9'],
-            'minutos' => ['nullable', 'integer', 'min:0', 'max:570'],
+            'horas' => ['nullable', 'integer', 'min:0', 'max:'.intdiv($this->metaDiariaMinutos, 60)],
+            'minutos' => ['nullable', 'integer', 'min:0', 'max:'.$this->metaDiariaMinutos],
             'observacion' => ['required', 'string', 'max:1000'],
         ]);
 
@@ -1520,7 +1525,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         if ($minutosTotal <= 0 || $minutosTotal > $this->metaDiariaMinutos) {
             throw ValidationException::withMessages([
-                'minutos' => 'Ingresa un tiempo entre 1 minuto y 9 h 30 min.',
+                'minutos' => 'Ingresa un tiempo entre 1 minuto y '.VinetaRegistro::minutosATiempoTexto($this->metaDiariaMinutos).'.',
             ]);
         }
 
@@ -1534,8 +1539,8 @@ class EmpleadoHoraOrdinariaController extends Controller
         $data = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
             'grupo' => ['nullable', 'string', 'max:50'],
-            'horas' => ['nullable', 'integer', 'min:0', 'max:9'],
-            'minutos' => ['nullable', 'integer', 'min:0', 'max:570'],
+            'horas' => ['nullable', 'integer', 'min:0', 'max:'.intdiv($this->metaDiariaMinutos, 60)],
+            'minutos' => ['nullable', 'integer', 'min:0', 'max:'.$this->metaDiariaMinutos],
         ]);
 
         $hasHoras = $request->has('horas') && $request->input('horas') !== null && $request->input('horas') !== '';
@@ -1554,7 +1559,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
         if ($minutosTotal <= 0 || $minutosTotal > $this->metaDiariaMinutos) {
             throw ValidationException::withMessages([
-                'minutos' => 'Ingresa una jornada entre 1 minuto y 9 h 30 min.',
+                'minutos' => 'Ingresa una jornada entre 1 minuto y '.VinetaRegistro::minutosATiempoTexto($this->metaDiariaMinutos).'.',
             ]);
         }
 

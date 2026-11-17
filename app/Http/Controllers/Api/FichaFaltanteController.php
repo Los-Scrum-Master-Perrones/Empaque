@@ -51,6 +51,7 @@ class FichaFaltanteController extends Controller
                 'producto' => (string) $f->producto,
                 'producto_nombre' => (string) ($f->producto_nombre ?? ''),
                 'sku' => (string) $f->sku,
+                'capa' => (string) ($f->capa ?? ''),
                 'actividad' => (int) $f->actividad,
                 'actividad_nombre' => (string) $f->actividad_nombre,
                 'tipo_empaque' => (int) $f->tipo_empaque,

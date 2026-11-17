@@ -20,6 +20,12 @@ use ZipArchive;
 class VinetaRegistroController extends Controller
 {
     private int $metaDiariaMinutos = 570;
+
+    public function __construct()
+    {
+        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 720);
+    }
+
     public function index(Request $request)
     {
         $perPageInput = $request->get('per_page', 25);
@@ -302,7 +308,7 @@ class VinetaRegistroController extends Controller
         $data = $request->validate([
             'empleado_codigo' => ['required', 'string', 'max:120'],
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'horas' => ['nullable', 'integer', 'min:0', 'max:9'],
+            'horas' => ['nullable', 'integer', 'min:0', 'max:'.intdiv($this->metaDiariaMinutos, 60)],
             'minutos' => ['nullable', 'integer', 'min:0', 'max:59'],
             'observacion' => ['required', 'string', 'max:1000'],
         ]);
@@ -312,7 +318,7 @@ class VinetaRegistroController extends Controller
         if ($minutos <= 0 || $minutos > $this->metaDiariaMinutos) {
             return back()
                 ->withInput()
-                ->withErrors(['minutos' => 'Ingresa un tiempo entre 1 minuto y 9 h 30 min.']);
+                ->withErrors(['minutos' => 'Ingresa un tiempo entre 1 minuto y '.VinetaRegistro::minutosATiempoTexto($this->metaDiariaMinutos).'.']);
         }
 
         $empleado = Empleado::where('codigo', trim($data['empleado_codigo']))->first();
@@ -348,7 +354,7 @@ class VinetaRegistroController extends Controller
         $data = $request->validate([
             'empleado_codigo' => ['required', 'string', 'max:120'],
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'horas' => ['nullable', 'integer', 'min:0', 'max:9'],
+            'horas' => ['nullable', 'integer', 'min:0', 'max:'.intdiv($this->metaDiariaMinutos, 60)],
             'minutos' => ['nullable', 'integer', 'min:0', 'max:59'],
             'observacion' => ['required', 'string', 'max:1000'],
         ]);
@@ -358,7 +364,7 @@ class VinetaRegistroController extends Controller
         if ($minutos <= 0 || $minutos > $this->metaDiariaMinutos) {
             return back()
                 ->withInput()
-                ->withErrors(['minutos' => 'Ingresa un tiempo entre 1 minuto y 9 h 30 min.']);
+                ->withErrors(['minutos' => 'Ingresa un tiempo entre 1 minuto y '.VinetaRegistro::minutosATiempoTexto($this->metaDiariaMinutos).'.']);
         }
 
         $empleado = Empleado::where('codigo', trim($data['empleado_codigo']))->first();

@@ -333,6 +333,52 @@ class EmpaqueComparativoErpController extends Controller
     }
 
     /**
+     * Agrega al ERP las filas de planificacion que faltan para el dia,
+     * tomando las combinaciones (orden + linea + actividad) del detalle.
+     * Solo inserta: nunca actualiza ni borra.
+     */
+    public function sincronizarPlanificacion(Request $request, ErpComparativoService $servicio)
+    {
+        $data = $request->validate([
+            'fecha' => ['required', 'date_format:Y-m-d'],
+            'sucursal' => ['nullable', 'integer'],
+            'dry_run' => ['nullable', 'boolean'],
+        ]);
+
+        $fecha = (string) $data['fecha'];
+        $sucursal = (int) ($data['sucursal'] ?: config('services.erp.default_sucursal', 2));
+        if ($sucursal <= 0) {
+            $sucursal = 2;
+        }
+
+        $dryRun = (bool) ($data['dry_run'] ?? true);
+
+        $resultado = $servicio->sincronizarPlanificacion($fecha, $sucursal, $dryRun);
+
+        if (! ($resultado['success'] ?? false)) {
+            return redirect()
+                ->route('costos-empaque.comparativo', ['fecha' => $fecha, 'sucursal' => $sucursal])
+                ->with('error', $resultado['message'] ?? 'No se pudo sincronizar la planificacion.');
+        }
+
+        $faltantes = (int) ($resultado['faltantes'] ?? 0);
+        $insertadas = (int) ($resultado['insertadas'] ?? 0);
+
+        if (! $dryRun) {
+            // Refrescar el espejo para que el comparativo ya muestre las filas nuevas.
+            $servicio->descargar($fecha, $sucursal);
+
+            return redirect()
+                ->route('costos-empaque.comparativo', ['fecha' => $fecha, 'sucursal' => $sucursal])
+                ->with('success', "Se agregaron {$insertadas} filas de planificacion al ERP para {$fecha} (faltaban {$faltantes}).");
+        }
+
+        return redirect()
+            ->route('costos-empaque.comparativo', ['fecha' => $fecha, 'sucursal' => $sucursal])
+            ->with('success', "Simulacion: faltan {$faltantes} filas de planificacion para {$fecha}. No se escribio nada en el ERP.");
+    }
+
+    /**
      * Sincroniza UN registro: manda al ERP los puros y horas del sistema
      * (y el precio). Si la fila no existe en el ERP, la registra.
      */

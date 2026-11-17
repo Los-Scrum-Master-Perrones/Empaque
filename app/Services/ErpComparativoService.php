@@ -228,6 +228,51 @@ class ErpComparativoService
     }
 
     /**
+     * Pide a facturacion que agregue al ERP las filas de planificacion del dia
+     * que faltan (solo INSERTA; nunca actualiza ni borra).
+     *
+     * @return array{success:bool,message?:string,faltantes?:int,insertadas?:int,filas?:array}
+     */
+    public function sincronizarPlanificacion(string $fecha, int $sucursal = 2, bool $dryRun = true): array
+    {
+        $url = $this->baseUrl.'/empaque-erp/planificacion/sincronizar';
+
+        try {
+            $respuesta = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+                'Accept' => 'application/json',
+            ])->timeout(120)->post($url, [
+                'fecha' => $fecha,
+                'sucursal' => $sucursal,
+                'dry_run' => $dryRun,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Comparativo ERP sincronizar planificacion: '.$e->getMessage());
+
+            return ['success' => false, 'message' => 'No se pudo conectar con facturacion: '.$e->getMessage()];
+        }
+
+        $data = $respuesta->json();
+
+        if ($respuesta->failed() || ! is_array($data) || ! ($data['success'] ?? false)) {
+            $mensaje = is_array($data)
+                ? ($data['message'] ?? 'respuesta no valida')
+                : 'respuesta no valida (HTTP '.$respuesta->status().')';
+
+            if ($respuesta->status() === 404) {
+                $mensaje = 'Facturacion no tiene la ruta /api/empaque-erp/planificacion/sincronizar (HTTP 404). '
+                    .'Falta subir EmpaqueErpApiController.php + routes/api.php y correr php artisan route:clear.';
+            } elseif ($respuesta->status() === 401) {
+                $mensaje = 'Facturacion rechazo la clave (HTTP 401). Revisa ERP_API_KEY en el .env de Empaque.';
+            }
+
+            return ['success' => false, 'message' => $mensaje];
+        }
+
+        return $data;
+    }
+
+    /**
      * Ya se intento descargar esta fecha/sucursal y salio bien?
      * (incluso si el ERP no tiene documentos ese dia).
      */

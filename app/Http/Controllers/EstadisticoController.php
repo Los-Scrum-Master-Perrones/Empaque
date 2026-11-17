@@ -159,10 +159,18 @@ class EstadisticoController extends Controller
                 'tipo_empaque' => $first->tipo_empaque ?: 'N/A',
                 // Una sola linea por actividad: si la misma actividad viene en varias
                 // filas (p. ej. distinta marca/nombre en algun registro) se suman.
-                'actividades' => $items->groupBy('actividad_nombre')->map(fn ($filas) => (object) [
-                    'actividad_nombre' => $filas->first()->actividad_nombre,
-                    'cantidad' => (int) $filas->sum('cantidad_procesada'),
-                ])->values(),
+                // Orden: 1) Limpieza, 2) Rezagado, 3) Anillado, 4) Llenado, 5) el resto (Sellado, etc.).
+                'actividades' => $items->groupBy('actividad_nombre')
+                    ->map(fn ($filas) => (object) [
+                        'actividad_nombre' => $filas->first()->actividad_nombre,
+                        'cantidad' => (int) $filas->sum('cantidad_procesada'),
+                    ])
+                    ->sortBy(fn ($actividad) => sprintf(
+                        '%d|%s',
+                        $this->prioridadActividad($actividad->actividad_nombre),
+                        mb_strtolower($actividad->actividad_nombre)
+                    ))
+                    ->values(),
                 'subtotal' => $subtotal,
             ];
         })->values();
@@ -364,5 +372,32 @@ class EstadisticoController extends Controller
         ];
 
         return view('estadistico.partials.modal-detalle', $viewData)->render();
+    }
+
+    /**
+     * Orden de las actividades dentro de cada tarjeta:
+     * 0 = Limpieza, 1 = Rezagado, 2 = Anillado, 3 = Llenado, 4 = el resto (Sellado, Petaca, etc.).
+     */
+    private function prioridadActividad(?string $nombre): int
+    {
+        $texto = strtolower(trim((string) $nombre));
+
+        if (str_starts_with($texto, 'limpieza')) {
+            return 0;
+        }
+
+        if (str_starts_with($texto, 'rezag')) {
+            return 1;
+        }
+
+        if (str_contains($texto, 'anill')) {
+            return 2;
+        }
+
+        if (str_starts_with($texto, 'llenado')) {
+            return 3;
+        }
+
+        return 4;
     }
 }

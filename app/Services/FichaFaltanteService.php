@@ -130,6 +130,7 @@ class FichaFaltanteService
                 'producto' => trim((string) ($item['producto'] ?? '')),
                 'producto_nombre' => trim((string) ($item['producto_nombre'] ?? '')),
                 'sku' => trim((string) ($item['sku'] ?? '')),
+                'capa' => trim((string) ($item['capa'] ?? '')),
                 'actividad' => (int) ($item['actividad'] ?? 0),
                 'actividad_nombre' => trim((string) ($item['actividad_nombre'] ?? '')),
                 'tipo_empaque' => (int) ($item['tipo_empaque'] ?? 0),
