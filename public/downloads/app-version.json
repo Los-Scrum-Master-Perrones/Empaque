@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.23",
-    "version_code": 2077,
-    "release_notes": "Jornada laboral hasta 12 h (antes 9 h 30): acepta hasta 720 minutos y los mensajes muestran el tope real. Se corrigieron los acentos y la enie que salian mal en varias pantallas (vineta, version, etc.). El aviso de productos sin ficha de empaque ahora muestra la capa del producto (Corojo, Connecticut...). IMPORTANTE: esta version cambia la firma de la app, por lo que hay que DESINSTALAR la version anterior antes de instalar esta (Android no permite actualizar entre firmas distintas). Se conserva todo lo de 2.1.21: campanita con codigo, descripcion, SKU y NO EXISTE FICHA, boton Actividades para ignorar actividades, y paso a AL DIA (por hora).",
-    "apk_filename": "app-empaque-2.1.23-2077.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.23-2077.apk",
-    "apk_filename_universal": "app-empaque-2.1.23-2077.apk",
+    "version_name": "2.1.24",
+    "version_code": 2078,
+    "release_notes": "Jornada maxima de 9 h 30 (570 minutos): se volvio al tope de antes (estaba en 12 h). Aplica a horas ordinarias, minutos por tarea, jornada del dia y avisos de la app, con los mensajes mostrando el tope real.",
+    "apk_filename": "app-empaque-2.1.24-2078.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.24-2078.apk",
+    "apk_filename_universal": "app-empaque-2.1.24-2078.apk",
     "force_update": false,
-    "published_at": "2026-11-17 14:47:00"
+    "published_at": "2026-11-18 22:10:00"
 }

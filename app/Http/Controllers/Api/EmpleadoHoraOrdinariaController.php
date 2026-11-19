@@ -21,7 +21,7 @@ class EmpleadoHoraOrdinariaController extends Controller
 
     public function __construct()
     {
-        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 720);
+        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 570);
     }
 
     public function resumenEmpleados(Request $request): JsonResponse
