@@ -138,35 +138,24 @@ class RolesPermisosSeeder extends Seeder
             'reportes.exportar',
         ]);
 
-        // Digitalizador: puede editar, eliminar, sincronizar empleados y viñetas
+        // Digitalizador: solo supervisar / lectura (sin crear, editar, eliminar, ni sincronizar)
         $digitalizador->syncPermissions([
             'dashboard.ver',
 
             'catalogos.ver',
             'productos.ver',
-            'productos.sincronizar',
             'marcas.ver',
             'vitolas.ver',
             'capas.ver',
             'actividades.ver',
 
             'cajones.ver',
-            'cajones.registrar',
-            'cajones.editar',
-            'cajones.eliminar',
 
             'anillado.ver',
-            'anillado.registrar',
-            'anillado.editar',
-
             'llenado.ver',
-            'llenado.registrar',
-            'llenado.editar',
 
             'reportes.ver',
             'reportes.exportar',
-
-            'costos-empaque.ver',
         ]);
 
         // Operador: registrar anillado y llenado

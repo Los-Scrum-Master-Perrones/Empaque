@@ -157,7 +157,7 @@
 
                         @if($sinDocumentos ?? false)
                             <div class="theme-card bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-sm">
-                                El ERP se consultó correctamente pero <strong>no tiene documentos para {{ $fecha }}</strong>
+                                El ERP se consult� correctamente pero <strong>no tiene documentos para {{ $fecha }}</strong>
                                 (sucursal {{ $sucursal }}).
                             </div>
                         @endif

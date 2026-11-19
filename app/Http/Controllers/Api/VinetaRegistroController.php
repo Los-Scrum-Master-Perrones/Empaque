@@ -26,7 +26,7 @@ class VinetaRegistroController extends Controller
 {
     private string $timezone = 'America/Tegucigalpa';
 
-    private int $metaDiariaMinutos = 570;
+    private int $metaDiariaMinutos = 750;
 
     public function feed(Request $request): JsonResponse
     {
@@ -1555,7 +1555,7 @@ class VinetaRegistroController extends Controller
             'cantidad_puros' => ['required', 'integer', 'min:1', 'max:1000000'],
             'cantidad_cajones' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'cantidad_actividades' => ['nullable', 'integer', 'min:0', 'max:1000'],
-            'minutos_trabajados' => [$requireMinutosTrabajados ? 'required' : 'nullable', 'integer', 'min:0', 'max:570'],
+            'minutos_trabajados' => [$requireMinutosTrabajados ? 'required' : 'nullable', 'integer', 'min:0', 'max:750'],
             'fecha_registro' => ['nullable', 'date_format:Y-m-d'],
             'hora_registro' => ['nullable', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/'],
             'registrado_en' => ['nullable', 'date'],

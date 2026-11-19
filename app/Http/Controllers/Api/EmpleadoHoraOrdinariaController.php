@@ -17,11 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 class EmpleadoHoraOrdinariaController extends Controller
 {
-    private int $metaDiariaMinutos = 570;
+    private int $metaDiariaMinutos = 750;
 
     public function __construct()
     {
-        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 570);
+        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 750);
     }
 
     public function resumenEmpleados(Request $request): JsonResponse

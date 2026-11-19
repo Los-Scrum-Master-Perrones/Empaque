@@ -84,9 +84,6 @@
                             + (it.sku
                                 ? '<p style="font-size:10.5px;color:#475569;margin:1px 0 0">SKU ' + it.sku + '</p>'
                                 : '')
-                            + (it.capa
-                                ? '<p style="font-size:10.5px;color:#475569;margin:1px 0 0">Capa ' + it.capa + '</p>'
-                                : '')
                             + '<p style="font-size:11px;color:#475569;margin:2px 0 0">' + (it.actividad || '') + '</p>'
                             + '<p style="font-size:11px;color:#475569;margin:0">Empaque ' + (it.empaque || '') + '</p>'
                             + '<p style="font-size:11px;color:#b91c1c;margin:3px 0 0;font-weight:800">'

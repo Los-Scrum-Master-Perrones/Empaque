@@ -19,11 +19,11 @@ use ZipArchive;
 
 class VinetaRegistroController extends Controller
 {
-    private int $metaDiariaMinutos = 570;
+    private int $metaDiariaMinutos = 750;
 
     public function __construct()
     {
-        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 720);
+        $this->metaDiariaMinutos = (int) config('empaque.jornada_max_minutos', 750);
     }
 
     public function index(Request $request)

@@ -548,12 +548,12 @@
                                    type="number"
                                    name="minutos_trabajados"
                                    min="1"
-                                   max="{{ (int) config('empaque.jornada_max_minutos', 720) }}"
+                                   max="{{ (int) config('empaque.jornada_max_minutos', 570) }}"
                                    required
                                    class="w-full rounded-2xl border theme-border bg-white px-4 py-3 text-sm theme-title outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20">
 
                             <p class="theme-text mt-1 text-[11px] font-semibold">
-                                Meta diaria: {{ (int) config('empaque.jornada_max_minutos', 720) }} min ({{ \App\Models\VinetaRegistro::minutosATiempoTexto((int) config('empaque.jornada_max_minutos', 720)) }}).
+                                Meta diaria: {{ (int) config('empaque.jornada_max_minutos', 570) }} min ({{ \App\Models\VinetaRegistro::minutosATiempoTexto((int) config('empaque.jornada_max_minutos', 570)) }}).
                             </p>
                         </div>
                     @endif
@@ -697,7 +697,7 @@
                 </div>
 
                 <p class="theme-text mt-3 text-[11px] font-semibold">
-                    Tiempo máximo por registro: {{ (int) config('empaque.jornada_max_minutos', 720) }} min ({{ \App\Models\VinetaRegistro::minutosATiempoTexto((int) config('empaque.jornada_max_minutos', 720)) }}).
+                    Tiempo máximo por registro: {{ (int) config('empaque.jornada_max_minutos', 570) }} min ({{ \App\Models\VinetaRegistro::minutosATiempoTexto((int) config('empaque.jornada_max_minutos', 570)) }}).
                 </p>
 
                 <div class="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">

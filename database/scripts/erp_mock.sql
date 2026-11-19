@@ -84,7 +84,7 @@ CREATE TABLE Produccion_EmpaquesDiariaG_Detalles (
   CantidadTrabajadas     DECIMAL(18,4) NOT NULL DEFAULT 0,
   CantidadDefectuosa     DECIMAL(18,4) NOT NULL DEFAULT 0,
   CantidadPagadas        DECIMAL(18,4) NOT NULL DEFAULT 0,
-  Precio_Unitario        DECIMAL(18,4) NOT NULL DEFAULT 0,
+  Precio_Unitario        DECIMAL(18,7) NOT NULL DEFAULT 0,
   CantidadControlCalidad DECIMAL(18,4) NOT NULL DEFAULT 0,
   isComplemento          TINYINT       NOT NULL DEFAULT 0,
   HorasTrabajadas        DECIMAL(18,4) NOT NULL DEFAULT 0,
@@ -167,8 +167,10 @@ VALUES
   (171, 'Rolado Empaque',         0,1,0,0,'PUROS');
 
 -- ordenes de ejemplo
+-- NumDocProviene = documento de factura donde vive la linea de la orden
+-- (es contra lo que se cruza Facturas_Detalles en numeroDetalle()).
 INSERT INTO Produccion_OrdenTrabajo
-  (CodigoSucursal, Numero_de_Documento, Fecha, Codigo_Cliente, Nombre_del_Cliente, Estado, Cerrada, Anulado)
+  (CodigoSucursal, Numero_de_Documento, Fecha, Codigo_Cliente, Nombre_del_Cliente, Estado, Cerrada, Anulado, NumDocProviene)
 VALUES
   (2, '0000003593', '2026-10-10', 'C-001', 'CLIENTE DEMO UNO', 1, 0, 0, '115398'),
   (2, '0000003597', '2026-10-10', 'C-002', 'CLIENTE DEMO DOS', 1, 0, 0, '115399'),
@@ -263,7 +265,79 @@ INSERT INTO Facturas_Detalles (CodigoSucursal, Numero_de_Documento, Numero, Codi
  (1,'111395',4,'NSR-PM-1000','P-0004','111395');
 
 INSERT INTO Inventario_SKU (CodigoSKU, CodigoTipoEmpaque) VALUES
- ('47604630',4),('47801428',4),('NSR-PM-1004',4),('NSR-PM-1000',4),('TE-CC-2001',4);
+ ('47604630',4),('47801428',4),('NSR-PM-1004',4),('NSR-PM-1000',4),('TE-CC-2001',4),
+ ('99887766',31);
+
+-- =====================================================================
+-- Catalogos que usa el aviso de ficha de empaque (campanita)
+-- =====================================================================
+
+DROP TABLE IF EXISTS Produccion_FichaEmpaqueAct;
+DROP TABLE IF EXISTS cProduccion_TiposEmpaques;
+DROP TABLE IF EXISTS cProduccion_Actividades;
+
+CREATE TABLE cProduccion_TiposEmpaques (
+  CodigoTipoEmpaque INT NOT NULL,
+  NombreTipoEmpaque VARCHAR(100) NULL,
+  PRIMARY KEY (CodigoTipoEmpaque)
+) ENGINE=InnoDB;
+
+CREATE TABLE cProduccion_Actividades (
+  CodigoSucursal  INT NOT NULL,
+  CodigoActividad INT NOT NULL,
+  NombreActividad VARCHAR(120) NULL,
+  PRIMARY KEY (CodigoSucursal, CodigoActividad)
+) ENGINE=InnoDB;
+
+CREATE TABLE Produccion_FichaEmpaqueAct (
+  CodigoSucursal      INT         NOT NULL,
+  Codigo_Producto     VARCHAR(50) NOT NULL,
+  CodigoActividad     INT         NOT NULL,
+  CodigoTipoEmpaque   INT         NOT NULL,
+  Codigo_ProductoEmp  VARCHAR(50) NOT NULL,
+  Cantidad            DECIMAL(18,4) NULL DEFAULT 0,
+  Lote                VARCHAR(50) NULL,
+  isUnidadxEmpaque    TINYINT NULL DEFAULT 0,
+  PRIMARY KEY (CodigoSucursal, Codigo_Producto, CodigoActividad, CodigoTipoEmpaque, Codigo_ProductoEmp)
+) ENGINE=InnoDB;
+
+INSERT INTO cProduccion_TiposEmpaques (CodigoTipoEmpaque, NombreTipoEmpaque) VALUES
+ (3, 'MAZOS 1/5'), (4, 'CAJAS 1/20'), (5, 'MAZOS 1/20'), (31, 'CAJAS 1/10'), (47, 'TINS 1/5');
+
+INSERT INTO cProduccion_Actividades (CodigoSucursal, CodigoActividad, NombreActividad) VALUES
+ (2, 2,   'Rezagado'),
+ (2, 103, 'Limpieza de Puros'),
+ (2, 133, 'Anillado de Puros'),
+ (2, 135, 'Rezagado Empaque'),
+ (2, 141, 'Prensado'),
+ (2, 157, 'Llenado de Cajas 1/20'),
+ (2, 171, 'Rolado Empaque');
+
+-- Fichas que SI existen (las demas combinaciones salen como faltantes)
+INSERT INTO Produccion_FichaEmpaqueAct
+  (CodigoSucursal, Codigo_Producto, CodigoActividad, CodigoTipoEmpaque, Codigo_ProductoEmp, Cantidad, Lote, isUnidadxEmpaque)
+VALUES
+ (2, 'P-0001', 133, 4, 'ME-TEST', 10, 'MATERIAL_EMPAQUE', 1),
+ (2, 'P-0001', 141, 4, 'ME-TEST', 10, 'MATERIAL_EMPAQUE', 1),
+ (2, 'P-0002', 141, 4, 'ME-TEST', 10, 'MATERIAL_EMPAQUE', 1);
+
+-- =====================================================================
+-- Documento del caso real: 0000011337 del 17/11 (Rolado Empaque = 171)
+-- =====================================================================
+INSERT INTO Produccion_OrdenTrabajo
+  (CodigoSucursal, Numero_de_Documento, Fecha, Codigo_Cliente, Nombre_del_Cliente, Estado, Cerrada, Anulado, NumDocProviene)
+VALUES
+  (2, '0000011340', '2026-11-17', 'C-010', 'CLIENTE ROLADO', 1, 0, 0, '111340');
+
+INSERT INTO Produccion_EmpaquesDiariaG
+  (CodigoSucursal, Numero_de_Documento, Fecha, CodigoArea, NombreArea, Aplicada, Observaciones, Anulado)
+VALUES
+  (2, '0000011337', '2026-11-17 00:00:00', 4, 'Empaque(Permamente)', 0,
+   'REGISTRO DE ROLADO DE PUROS EN EL DEPTO. DE EMPAQUE A TAREA (ROLERA)', 0);
+
+INSERT INTO Facturas_Detalles (CodigoSucursal, Numero_de_Documento, Numero, CodigoSKU, Codigo_Producto, NumeroOrden) VALUES
+ (2, '111340', 1, '99887766', 'P-02000', '111340');
+
 
 
 

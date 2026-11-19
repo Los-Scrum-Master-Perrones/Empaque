@@ -1,10 +1,10 @@
 {
-    "version_name": "2.1.24",
-    "version_code": 2078,
-    "release_notes": "Jornada maxima de 9 h 30 (570 minutos): se volvio al tope de antes (estaba en 12 h). Aplica a horas ordinarias, minutos por tarea, jornada del dia y avisos de la app, con los mensajes mostrando el tope real.",
-    "apk_filename": "app-empaque-2.1.24-2078.apk",
-    "apk_filename_armeabi_v7a": "app-empaque-2.1.24-2078.apk",
-    "apk_filename_universal": "app-empaque-2.1.24-2078.apk",
+    "version_name": "2.1.25",
+    "version_code": 2079,
+    "release_notes": "Jornada maxima de 12 h 30 (750 minutos), como se pidio. Se corrigieron las tildes y la enie que salian mal (vi\u00f1etas, c\u00f3digo, d\u00eda, botones y mensajes). Se mantiene la campanita de fichas con descripcion, SKU, fecha y NO EXISTE FICHA.",
+    "apk_filename": "app-empaque-2.1.25-2079.apk",
+    "apk_filename_armeabi_v7a": "app-empaque-2.1.25-2079.apk",
+    "apk_filename_universal": "app-empaque-2.1.25-2079.apk",
     "force_update": false,
-    "published_at": "2026-11-18 22:10:00"
+    "published_at": "2026-11-18 23:30:00"
 }
